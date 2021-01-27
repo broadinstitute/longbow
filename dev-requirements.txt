@@ -11,3 +11,7 @@ sphinx
 sphinx-rtd-theme
 mypy==0.770
 click
+pomegranate
+pandas
+numpy
+matplotlib
