@@ -86,6 +86,7 @@ the following commands:
 
     python3 -mvenv venv
     . venv/bin/activate
+    pip install --upgrade pip
     pip install -r dev-requirements.txt
     pip install -e .
 
