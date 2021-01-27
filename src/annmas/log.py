@@ -4,11 +4,11 @@ from pathlib import Path
 
 
 def configure_logging(verbosity):
-    """Set up logging for the PROJECT_NAME module"""
+    """Set up logging for the annmas module"""
 
-    import PROJECT_NAME  # pylint: disable=C0415
+    import annmas  # pylint: disable=C0415
 
-    format_string = get_logging_format_string(PROJECT_NAME)
+    format_string = get_logging_format_string(annmas)
 
     # Set logging level:
     log_level = logging.INFO

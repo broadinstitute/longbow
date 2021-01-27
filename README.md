@@ -67,8 +67,8 @@ Below this line begins the project-specific portion of the README that should be
 
 ---
 
-# PROJECT\_NAME 
-\_SHORT\_PROJECT\_DESCRIPTION\_
+# annmas 
+Annotation and segmentation of MAS-seq data
 
 Current version: 0.0.1
 

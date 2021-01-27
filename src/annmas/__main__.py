@@ -16,7 +16,7 @@ __version__ = "0.0.1"
 LOGGER = logging.getLogger(__name__)
 
 
-@click.group(name="PROJECT_NAME")
+@click.group(name="annmas")
 @click.option(
     "-q",
     "--quiet",
@@ -50,8 +50,8 @@ def main_entry(verbosity):
 
 @main_entry.command()
 def version():
-    """Print the version of PROJECT_NAME"""
-    LOGGER.info("PROJECT_NAME: %s", __version__)
+    """Print the version of annmas"""
+    LOGGER.info("annmas: %s", __version__)
 
 
 # Update with new sub-commands:
