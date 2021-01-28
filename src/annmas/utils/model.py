@@ -201,12 +201,19 @@ def annotate(full_model, seq):
     return logp, ppath
 
 
-def reverse_complement(seq):
-    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
+# IUPAC RC's from: http://arep.med.harvard.edu/labgc/adnan/projects/Utilities/revcomp.html
+# and https://www.dnabaser.com/articles/IUPAC%20ambiguity%20codes.html
+RC_BASE_MAP = {"N": "N", "A": "T", "T": "A", "G": "C", "C": "G", "Y": "R", "R": "Y", "S": "S", "W": "W", "K": "M",
+               "M": "K", "B": "V", "V": "B", "D": "H", "H": "D", "n": "n", "a": "t", "t": "a", "g": "c", "c": "g",
+               "y": "r", "r": "y", "s": "s", "w": "w", "k": "m", "m": "k", "b": "v", "v": "b", "d": "h", "h": "d"}
 
-    bases = list(seq)
-    bases = reversed([complement.get(base, base) for base in bases])
-    bases = ''.join(bases)
 
-    return bases
+def reverse_complement(base_string):
+    """
+    Reverse complements the given base_string.
+    :param base_string: String of bases to be reverse-complemented.
+    :return: The reverse complement of the given base string.
+    """
+
+    return ''.join(map(lambda b: RC_BASE_MAP[b], base_string[::-1]))
 
