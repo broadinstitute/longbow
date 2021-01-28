@@ -12,6 +12,51 @@ import re
 import math
 
 
+adapters = {
+    "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
+    "5p_TSO": "TTTCTTATATGGG",
+    "Poly_A": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
+    "A": "AGCTTACTTGTGAAGA",
+    "B": "ACTTGTAAGCTGTCTA",
+    "C": "ACTCTGTCAGGTCCGA",
+    "D": "ACCTCCTCCTCCAGAA",
+    "E": "AACCGGACACACTTAG",
+    "F": "AGAGTCCAATTCGCAG",
+    "G": "AATCAAGGCTTAACGG",
+    "H": "ATGTTGAATCCTAGCG",
+    "I": "AGTGCGTTGCGAATTG",
+    "J": "AATTGCGTAGTTGGCC",
+    "K": "ACACTTGGTCGCAATC",
+    "L": "AGTAAGCCTTCGTGTC",
+    "M": "ACCTAGATCAGAGCCT",
+    "N": "AGGTATGCCGGTTAAG",
+    "O": "AAGTCACCGGCACCTT",
+    "P": "ATGAAGTGGCTCGAGA"
+}
+
+direct_connections = {
+    "Poly_A": ["3p_Adapter"],
+    "3p_Adapter": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"],
+    "A": ["10x_Adapter"],
+    "B": ["10x_Adapter"],
+    "C": ["10x_Adapter"],
+    "D": ["10x_Adapter"],
+    "E": ["10x_Adapter"],
+    "F": ["10x_Adapter"],
+    "G": ["10x_Adapter"],
+    "H": ["10x_Adapter"],
+    "I": ["10x_Adapter"],
+    "J": ["10x_Adapter"],
+    "K": ["10x_Adapter"],
+    "L": ["10x_Adapter"],
+    "M": ["10x_Adapter"],
+    "N": ["10x_Adapter"],
+    "O": ["10x_Adapter"],
+    "P": ["10x_Adapter"]
+}
+
+
 def make_global_alignment_model(target, name=None):
     model = HiddenMarkovModel(name=name)
     s = {}
@@ -104,50 +149,6 @@ def make_random_repeat_model(name='random'):
 
 
 def build_default_model():
-    adapters = {
-        "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
-        "5p_TSO": "TTTCTTATATGGG",
-        "Poly_A": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
-        "A": "AGCTTACTTGTGAAGA",
-        "B": "ACTTGTAAGCTGTCTA",
-        "C": "ACTCTGTCAGGTCCGA",
-        "D": "ACCTCCTCCTCCAGAA",
-        "E": "AACCGGACACACTTAG",
-        "F": "AGAGTCCAATTCGCAG",
-        "G": "AATCAAGGCTTAACGG",
-        "H": "ATGTTGAATCCTAGCG",
-        "I": "AGTGCGTTGCGAATTG",
-        "J": "AATTGCGTAGTTGGCC",
-        "K": "ACACTTGGTCGCAATC",
-        "L": "AGTAAGCCTTCGTGTC",
-        "M": "ACCTAGATCAGAGCCT",
-        "N": "AGGTATGCCGGTTAAG",
-        "O": "AAGTCACCGGCACCTT",
-        "P": "ATGAAGTGGCTCGAGA"
-    }
-
-    direct_connections = {
-        "Poly_A": ["3p_Adapter"],
-        "3p_Adapter": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"],
-        "A": ["10x_Adapter"],
-        "B": ["10x_Adapter"],
-        "C": ["10x_Adapter"],
-        "D": ["10x_Adapter"],
-        "E": ["10x_Adapter"],
-        "F": ["10x_Adapter"],
-        "G": ["10x_Adapter"],
-        "H": ["10x_Adapter"],
-        "I": ["10x_Adapter"],
-        "J": ["10x_Adapter"],
-        "K": ["10x_Adapter"],
-        "L": ["10x_Adapter"],
-        "M": ["10x_Adapter"],
-        "N": ["10x_Adapter"],
-        "O": ["10x_Adapter"],
-        "P": ["10x_Adapter"]
-    }
-
     full_model = make_random_repeat_model()
     for k in adapters:
         full_model.add_model(make_global_alignment_model(adapters[k], k))
@@ -190,13 +191,56 @@ def build_default_model():
     return full_model
 
 
-def annotate(full_model, seq):
+def smooth(path, radius=5):
+    p = 0
+
+    while p < len(path):
+        # Are we in an adapter (as opposed to just the random model)?
+        if path[p] in adapters:
+            # We are!  How far does it extend?
+            p_adapter_left = p - 1
+            while p_adapter_left >= 0 and path[p_adapter_left] == path[p]:
+                p_adapter_left = p_adapter_left - 1
+
+            p_adapter_right = p + 1
+            while p_adapter_right < len(path) and path[p_adapter_right] == path[p]:
+                p_adapter_right = p_adapter_right + 1
+
+            # Now check if this is an adapter island (the surrounding states are just the random model)
+            prev_label = None
+            if p_adapter_left - radius >= 0:
+                prev_labels = set(path[(p_adapter_left - 1 - radius):(p_adapter_left - 1)])
+                if len(prev_labels) == 1:
+                    prev_label = next(iter(prev_labels))
+
+            next_label = None
+            if p_adapter_right + radius < len(path):
+                next_labels = set(path[(p_adapter_right + 1):(p_adapter_right + 1 + radius)])
+                if len(next_labels) == 1:
+                    next_label = next(iter(next_labels))
+
+            # Are we an island?
+            if prev_label == next_label and prev_label == 'random':
+                for q in range(p_adapter_left, p_adapter_right):
+                    path[q] = 'random'
+
+            p = p_adapter_right
+
+        p += 1
+
+    return path
+
+
+def annotate(full_model, seq, smooth_islands=True):
     logp, path = full_model.viterbi(seq)
 
     ppath = []
     for p, (idx, state) in enumerate(path[1:-1]):
         if "start" not in state.name and ":RD" not in state.name and ":D" not in state.name:
             ppath.append(f'{re.split(":", state.name)[0]}')
+
+    if smooth_islands:
+        ppath = smooth(ppath)
 
     return logp, ppath
 
