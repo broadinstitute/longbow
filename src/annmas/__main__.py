@@ -1,63 +1,37 @@
 import logging
-from sys import argv
-
 import click
+import click_log
 
 # porcelain
-from .sub_command_1 import command as sub_command_1
-from .sub_command_2 import command as sub_command_2
-from .sub_command_3 import command as sub_command_3
+from .segment import command as segment
+from .train import command as train
+from .inspect import command as inspect
 
 # Version number is automatically set via bumpversion.
 # DO NOT MODIFY:
 __version__ = "0.0.1"
 
-# Create a logger for this module:
-LOGGER = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+click_log.basic_config(logger)
+logger.handlers[0].formatter = logging.Formatter("[%(levelname)s %(asctime)s] %(message)s", "%Y-%m-%d %H:%M:%S")
 
 
 @click.group(name="annmas")
-@click.option(
-    "-q",
-    "--quiet",
-    "verbosity",
-    flag_value=logging.CRITICAL + 10,
-    help="Suppress all logging",
-)
-@click.option(
-    "-v",
-    "--verbose",
-    "verbosity",
-    flag_value=logging.DEBUG,
-    help="More verbose logging",
-)
-@click.option(
-    "--trace",
-    "verbosity",
-    flag_value=logging.NOTSET,
-    help="Highest level logging for debugging",
-)
-def main_entry(verbosity):
-    # Set up our log verbosity
-    from . import log  # pylint: disable=C0415
-
-    log.configure_logging(verbosity)
-
-    # Log our command-line and log level so we can have it in the log file:
-    LOGGER.info("Invoked by: %s", " ".join(argv))
-    LOGGER.info("Log level set to: %s", logging.getLevelName(logging.getLogger().level))
+def main_entry():
+    pass
 
 
 @main_entry.command()
+@click_log.simple_verbosity_option(logger)
 def version():
     """Print the version of annmas"""
-    LOGGER.info("annmas: %s", __version__)
+    logger.info(f"annmas: {__version__}")
 
 
 # Update with new sub-commands:
-main_entry.add_command(sub_command_1.main)
-main_entry.add_command(sub_command_2.main)
-main_entry.add_command(sub_command_3.main)
+main_entry.add_command(segment.main)
+main_entry.add_command(train.main)
+main_entry.add_command(inspect.main)
 
 
 if __name__ == "__main__":

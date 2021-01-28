@@ -11,8 +11,10 @@ sphinx
 sphinx-rtd-theme
 mypy==0.770
 click
+click-log
 pomegranate
 pandas
 numpy
 matplotlib
 pysam
+progress
