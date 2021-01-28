@@ -1,12 +1,9 @@
 import logging
 import click
 import click_log
-import sys
 import tqdm
 
 import multiprocessing as mp
-from multiprocessing import Process, Manager
-
 import concurrent.futures
 
 from collections import namedtuple
