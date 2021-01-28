@@ -1,6 +1,7 @@
 import logging
 import click
 import click_log
+import sys
 
 import multiprocessing as mp
 from multiprocessing import Process, Manager
@@ -10,6 +11,7 @@ import concurrent.futures
 from collections import namedtuple
 
 from ..utils.model import *
+
 
 # Named tuple to store alignment information:
 class SegmentInfo(namedtuple(
@@ -54,7 +56,17 @@ def main(model, threads, output_bam, input_bam):
         with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
             future_to_segmented_read = {executor.submit(segment_read, r, m): r for r in bam_file}
 
-            out_bam_header_dict = {'HD': {'VN': '1.0', 'SO': "unknown", 'pb': '>=3.01'}}
+            # Get our header from the input bam file:
+            out_bam_header_dict = bam_file.header.to_dict()
+
+            # Add our program group to it:
+            pg_dict = {'ID': 'annmas-segment-0.0.1', 'PN': 'annmas', 'VN': '0.0.1',
+                       'DS': 'Apply annotation and segmentation model to BAM file.', 'CL': " ".join(sys.argv)}
+            if "PG" in out_bam_header_dict:
+                out_bam_header_dict["PG"].append(pg_dict)
+            else:
+                out_bam_header_dict["PG"] = [pg_dict]
+
             with pysam.AlignmentFile(output_bam, 'wb', header=out_bam_header_dict) as out_bam_file:
 
                 for future in concurrent.futures.as_completed(future_to_segmented_read):
