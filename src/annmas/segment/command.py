@@ -2,6 +2,7 @@ import logging
 import click
 import click_log
 import sys
+import tqdm
 
 import multiprocessing as mp
 from multiprocessing import Process, Manager
@@ -53,7 +54,10 @@ def main(model, threads, output_bam, input_bam):
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor,\
+                tqdm.tqdm(desc="Progress", unit=" read", colour="green", file=sys.stdout) as pbar:
+
             future_to_segmented_read = {executor.submit(segment_read, r, m): r for r in bam_file}
 
             # Get our header from the input bam file:
@@ -89,6 +93,8 @@ def main(model, threads, output_bam, input_bam):
                         # Increment our counters:
                         num_reads_annotated += 1
                         num_sections += len(segments)
+
+                        pbar.update(1)
 
     logger.info("annmas: segment finished")
     logger.info(f"annmas: segmented {num_reads_annotated} reads into {num_sections} sections")
