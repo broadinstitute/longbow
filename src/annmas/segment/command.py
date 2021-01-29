@@ -33,7 +33,9 @@ click_log.basic_config(logger)
               help="number of threads to use (0 for all)")
 @click.option("-o", "--output-bam", required=True, type=click.Path(exists=False), help="segment-annotated bam output")
 @click.option("-p", "--split-bam", required=False, type=click.Path(exists=False), help="segmented bam output")
-@click.option("-s", "--do-simple-splitting", required=False, is_flag=True, default=False)
+@click.option("-s", "--do-simple-splitting", required=False, is_flag=True, default=False,
+              help="Do splitting of reads based on splitter delimiters, rather than whole array structure.  "
+                   "This splitting will cause delimiter sequences to be repeated in each read they bound.")
 @click.argument('input-bam', type=click.Path(exists=True))
 def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
     """Apply annotation and segmentation model to BAM file"""
