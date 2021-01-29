@@ -17,7 +17,7 @@ click_log.basic_config(logger)
 
 @click.command(name="inspect")
 @click_log.simple_verbosity_option(logger)
-@click.option("-r", "--read-names", type=str, multiple=True, help="names of reads to inspect")
+@click.option("-r", "--read-names", type=str, multiple=True, help="read names (or file(s) of read names) to inspect")
 @click.option("-m", "--model", required=False, type=click.Path(exists=True), help="pre-trained model to apply")
 @click.option("-p", "--pbi", required=False, type=click.Path(exists=True), help="BAM .pbi index file")
 @click.option("-o", "--outdir", default=".", required=False, type=click.Path(exists=False), help="Output directory")
@@ -40,7 +40,7 @@ def main(read_names, model, pbi, outdir, input_bam):
     else:
         logger.info(f"Using default annotation model")
 
-    file_offsets = load_read_offsets(pbi, read_names)
+    file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
     pysam.set_verbosity(0)
     bf = pysam.Samfile(input_bam, 'rb', check_sq=False, require_index=False)
@@ -58,6 +58,18 @@ def main(read_names, model, pbi, outdir, input_bam):
     bf.close()
 
     logger.info("annmas: inspect finished")
+
+
+def load_read_names(read_names):
+    rn = []
+
+    for r in read_names:
+        if os.path.exists(r):
+            [rn.append(line.rstrip('\n')) for line in open(r)]
+        else:
+            rn.append(r)
+
+    return rn
 
 
 def load_read_offsets(pbi_file, read_names):
@@ -236,3 +248,6 @@ def draw_state_sequence(seq, path, read_name, out, **kwargs):
                 text.get_transform(), x=0, y=-30 * row, units='dots')
 
     plt.savefig(out, bbox_inches='tight')
+
+    plt.close()
+
