@@ -11,6 +11,23 @@ import numpy as np
 import re
 import math
 
+array_element_structure = (
+    ("A", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("B", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("C", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("D", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("E", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("F", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("G", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("H", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("I", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("J", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("K", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("L", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("M", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("N", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
+    ("O", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter", "P"),
+)
 
 adapters = {
     "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
