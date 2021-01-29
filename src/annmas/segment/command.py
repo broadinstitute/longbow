@@ -51,6 +51,11 @@ def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
     else:
         logger.info(f"Using default annotation model")
 
+    if do_simple_splitting:
+        logger.info(f"Using simple splitting mode.")
+    else:
+        logger.info(f"Using bounded region splitting mode.")
+
     num_reads_annotated = 0
     num_sections = 0
     num_segments = 0
@@ -107,12 +112,6 @@ def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
                                                                       segments,
                                                                       do_simple_splitting,
                                                                       split_bam_out)
-
-                            with open('tmp_segments.txt', 'w') as of:
-                                for s in segments:
-                                    of.write(f"{str(s)}\n")
-                            sys.exit(0)
-
                             # Increment our counters:
                             num_reads_annotated += 1
                             num_sections += len(segments)
@@ -221,7 +220,86 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
 
         return len(seg_delimiters)
     else:
-        raise NotImplemented("OOPS - bounded region splitting is not yet implemented!")
+        # Here we're doing bounded region splitting.
+        # This requires each read to conform to the expected read structure as defined in the model.
+        # The process is similar to what is done above for simple splitting.
+
+        # Create our delimiter list.
+        delimiters = array_element_structure
+
+        # We need to go through our segments and split them up.
+        # Note: we assume each full array element can occur only once and they do not overlap.
+        delimiter_match_matrix = [0 for _ in delimiters]
+        delimiter_segments = [list() for _ in delimiters]
+        delimiter_found = [False for _ in delimiters]
+        delimiter_score = [0 for _ in delimiters]
+
+        # We define some scoring increments here:
+        match_val = 2
+        indel_val = 1
+
+        # We do it this way so we iterate over the segments once and the delimiters many times
+        # under the assumption the segment list is much longer than the delimiters.
+        for seg in segments:
+            # at each position go through our delimiters and track whether we're a match:
+            for i, dmi in enumerate(delimiter_match_matrix):
+                if not delimiter_found[i]:
+                    try:
+                        if seg.name == delimiters[i][dmi]:
+                            delimiter_match_matrix[i] += 1
+                            delimiter_segments[i].append(seg)
+                            delimiter_score[i] += match_val
+                        else:
+                            found = False
+                            # Only look ahead if we already have a partial match:
+                            if delimiter_match_matrix[i] != 0:
+                                # Here we "peek ahead" so we an look at other delimiters after the current one just in
+                                # case we're missing a delimiter / segment.  This will impact the "score" but allow for
+                                # fuzzy matching.
+                                for l in range(1, len(delimiters[i]) - delimiter_match_matrix[i]):
+                                    if seg.name == delimiters[i][dmi+l]:
+                                        delimiter_match_matrix[i] += (1+l)
+                                        delimiter_segments[i].append(seg)
+                                        delimiter_score[i] += indel_val
+                                        found = True
+                                        break
+
+                            if not found:
+                                # No match at the position we expected!
+                                # We need to reset our count and start segment:
+                                delimiter_match_matrix[i] = 0
+                                delimiter_segments[i] = list()
+                                delimiter_score[i] = 0
+
+                        # Make sure we mark ourselves as done if we're out of info:
+                        if delimiter_match_matrix[i] == len(delimiters[i]):
+                            delimiter_found[i] = True
+
+                    except IndexError:
+                        # We're out of range of the delimiter.
+                        # This means we've hit the end and actually have a match.
+                        delimiter_found[i] = True
+
+        # Now we have our segments as described by our model.
+        # We assume they don't overlap and we write them out:
+        for i, seg_list in enumerate(delimiter_segments):
+            if delimiter_found[i]:
+
+                start_seg = seg_list[0]
+                end_seg = seg_list[-1]
+
+                start_coord = start_seg.start
+                end_coord = end_seg.end
+                start_delim_name = seg_list[0].name
+                end_delim_name = seg_list[-1].name
+
+                # Write our segment here:
+                _write_split_array_element(bam_out, start_coord, end_coord, read, seg_list,
+                                           end_delim_name, start_delim_name)
+
+        # Return the number of array elements.
+        # NOTE: this works because booleans are a subset of integers in python.
+        return sum(delimiter_found)
 
 
 def _write_split_array_element(bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name):
