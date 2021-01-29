@@ -28,7 +28,7 @@ def main(read_names, model, pbi, outdir, input_bam):
 
     pbi = f'{input_bam}.pbi' if pbi is None else pbi
     if not os.path.exists(pbi):
-        raise FileNotFoundError()
+        raise FileNotFoundError(f"Missing .pbi file for {input_bam}")
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -81,7 +81,7 @@ def load_read_offsets(pbi_file, read_names):
 
         # Basic information section (columnar format)
         "rgId" / Padding(this.n_reads * 4),
-        "qStart" / Padding(this.n_reads * 4),
+        "qStart" / Array(this.n_reads, Int32sl),
         "qEnd" / Padding(this.n_reads * 4),
         "holeNumber" / Array(this.n_reads, Int32sl),
         "readQual" / Padding(this.n_reads * 4),
@@ -93,16 +93,22 @@ def load_read_offsets(pbi_file, read_names):
     file_offsets_hash = OrderedDict()
     for read_name in read_names:
         movie_name, zmw, r = re.split("/", read_name)
+        if r == 'ccs':
+            r = 0
+        else:
+            r = re.split("_", r)[0]
 
-        file_offsets_hash[int(zmw)] = {'read_name': read_name, 'offset': None}
+        file_offsets_hash[f'{zmw}_{r}'] = {'read_name': read_name, 'offset': None}
 
     with gzip.open(pbi_file, "rb") as f:
         idx_contents = fmt.parse_stream(f)
 
         for j in range(0, idx_contents.n_reads):
+            key = f'{idx_contents.holeNumber[j]}_{idx_contents.qStart[j]}'
+
             # Save virtual file offsets for the selected reads only
-            if idx_contents.holeNumber[j] in file_offsets_hash:
-                file_offsets_hash[idx_contents.holeNumber[j]]['offset'] = idx_contents.fileOffset[j]
+            if key in file_offsets_hash:
+                file_offsets_hash[key]['offset'] = idx_contents.fileOffset[j]
 
     return file_offsets_hash
 
