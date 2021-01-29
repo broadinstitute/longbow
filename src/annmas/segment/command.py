@@ -1,20 +1,25 @@
 import logging
+import sys
+import math
+
+from collections import namedtuple
+
 import click
 import click_log
 import tqdm
 
+import pysam
 import multiprocessing as mp
 import concurrent.futures
 
-from collections import namedtuple
-
-from ..utils.model import *
+from ..utils.model import build_default_model
+from ..utils.model import array_element_structure
+from ..utils.model import reverse_complement
+from ..utils.model import annotate
 
 
 # Named tuple to store alignment information:
-class SegmentInfo(namedtuple(
-    "SegmentInfo", ["name", "start", "end"]
-)):
+class SegmentInfo(namedtuple("SegmentInfo", ["name", "start", "end"])):
     def __str__(self):
         return f"SegmentInfo({self.to_tag()})"
 
@@ -28,18 +33,48 @@ click_log.basic_config(logger)
 
 @click.command(name="segment")
 @click_log.simple_verbosity_option(logger)
-@click.option("-m", "--model", required=False, type=click.Path(exists=True), help="pre-trained model to apply")
-@click.option("-t", "--threads", type=int, default=mp.cpu_count()-1, show_default=True,
-              help="number of threads to use (0 for all)")
-@click.option("-o", "--output-bam", required=True, type=click.Path(exists=False), help="segment-annotated bam output")
-@click.option("-p", "--split-bam", required=False, type=click.Path(exists=False), help="segmented bam output")
-@click.option("-s", "--do-simple-splitting", required=False, is_flag=True, default=False,
-              help="Do splitting of reads based on splitter delimiters, rather than whole array structure.  "
-                   "This splitting will cause delimiter sequences to be repeated in each read they bound.")
-@click.argument('input-bam', type=click.Path(exists=True))
+@click.option(
+    "-m",
+    "--model",
+    required=False,
+    type=click.Path(exists=True),
+    help="pre-trained model to apply",
+)
+@click.option(
+    "-t",
+    "--threads",
+    type=int,
+    default=mp.cpu_count() - 1,
+    show_default=True,
+    help="number of threads to use (0 for all)",
+)
+@click.option(
+    "-o",
+    "--output-bam",
+    required=True,
+    type=click.Path(exists=False),
+    help="segment-annotated bam output",
+)
+@click.option(
+    "-p",
+    "--split-bam",
+    required=False,
+    type=click.Path(exists=False),
+    help="segmented bam output",
+)
+@click.option(
+    "-s",
+    "--do-simple-splitting",
+    required=False,
+    is_flag=True,
+    default=False,
+    help="Do splitting of reads based on splitter delimiters, rather than whole array structure."
+    "This splitting will cause delimiter sequences to be repeated in each read they bound.",
+)
+@click.argument("input-bam", type=click.Path(exists=True))
 def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
     """Apply annotation and segmentation model to BAM file"""
-    logger.info(f"annmas: segment started")
+    logger.info("annmas: segment started")
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} thread(s)")
@@ -49,12 +84,12 @@ def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
         m.from_yaml(model)
         logger.info(f"Using pretrained annotation model {model}")
     else:
-        logger.info(f"Using default annotation model")
+        logger.info("Using default annotation model")
 
     if do_simple_splitting:
-        logger.info(f"Using simple splitting mode.")
+        logger.info("Using simple splitting mode.")
     else:
-        logger.info(f"Using bounded region splitting mode.")
+        logger.info("Using bounded region splitting mode.")
 
     num_reads_annotated = 0
     num_sections = 0
@@ -66,41 +101,64 @@ def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
 
     try:
         pysam.set_verbosity(0)  # silence message about the .bai file not being found
-        with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
+        with pysam.AlignmentFile(
+            input_bam, "rb", check_sq=False, require_index=False
+        ) as bam_file:
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor,\
-                    tqdm.tqdm(desc="Progress", unit=" read", colour="green", file=sys.stdout) as pbar:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=threads
+            ) as executor, tqdm.tqdm(
+                desc="Progress", unit=" read", colour="green", file=sys.stdout
+            ) as pbar:
 
-                future_to_segmented_read = {executor.submit(_segment_read, r, m): r for r in bam_file}
+                future_to_segmented_read = {
+                    executor.submit(_segment_read, r, m): r for r in bam_file
+                }
 
                 # Get our header from the input bam file:
                 out_bam_header_dict = bam_file.header.to_dict()
 
                 # Add our program group to it:
-                pg_dict = {'ID': 'annmas-segment-0.0.1', 'PN': 'annmas', 'VN': '0.0.1',
-                           'DS': 'Apply annotation and segmentation model to BAM file.', 'CL': " ".join(sys.argv)}
+                pg_dict = {
+                    "ID": "annmas-segment-0.0.1",
+                    "PN": "annmas",
+                    "VN": "0.0.1",
+                    "DS": "Apply annotation and segmentation model to BAM file.",
+                    "CL": " ".join(sys.argv),
+                }
                 if "PG" in out_bam_header_dict:
                     out_bam_header_dict["PG"].append(pg_dict)
                 else:
                     out_bam_header_dict["PG"] = [pg_dict]
 
                 if split_bam:
-                    split_bam_out = pysam.AlignmentFile(split_bam, 'wb', header=out_bam_header_dict)
+                    split_bam_out = pysam.AlignmentFile(
+                        split_bam, "wb", header=out_bam_header_dict
+                    )
 
-                with pysam.AlignmentFile(output_bam, 'wb', header=out_bam_header_dict) as out_bam_file:
+                with pysam.AlignmentFile(
+                    output_bam, "wb", header=out_bam_header_dict
+                ) as out_bam_file:
 
-                    for future in concurrent.futures.as_completed(future_to_segmented_read):
+                    for future in concurrent.futures.as_completed(
+                        future_to_segmented_read
+                    ):
                         read = future_to_segmented_read[future]
                         try:
                             path, logp = future.result()
                         except Exception as ex:
-                            logger.error('%r generated an exception: %s', read, ex)
+                            logger.error("%r generated an exception: %s", read, ex)
                         else:
                             # Condense the output annotations so we can write them out with indices:
                             segments = _collapse_annotations(path)
 
                             # Obligatory log message:
-                            logger.debug("Path for read %s (%2.2f): %s", read.query_name, logp, segments)
+                            logger.debug(
+                                "Path for read %s (%2.2f): %s",
+                                read.query_name,
+                                logp,
+                                segments,
+                            )
 
                             # Set our tag and write out the read to the annotated file:
                             read.set_tag("SG", "|".join([s.to_tag() for s in segments]))
@@ -108,10 +166,9 @@ def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
 
                             # Write out our segmented reads if we want them:
                             if split_bam_out:
-                                num_segments += _write_segmented_read(read,
-                                                                      segments,
-                                                                      do_simple_splitting,
-                                                                      split_bam_out)
+                                num_segments += _write_segmented_read(
+                                    read, segments, do_simple_splitting, split_bam_out
+                                )
                             # Increment our counters:
                             num_reads_annotated += 1
                             num_sections += len(segments)
@@ -119,7 +176,9 @@ def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
                             pbar.update(1)
 
         logger.info("annmas: segment finished.")
-        logger.info(f"annmas: segmented {num_reads_annotated} reads into {num_sections} sections.")
+        logger.info(
+            f"annmas: segmented {num_reads_annotated} reads into {num_sections} sections."
+        )
 
     finally:
         if split_bam_out:
@@ -175,7 +234,10 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
                         if delimiter_match_matrix[i] == len(delimiters[i]):
                             # We've got a full and complete match!
                             # We store the end segment we found.
-                            delimiter_end_segment_tuples[i] = (delimiter_start_segments[i], seg)
+                            delimiter_end_segment_tuples[i] = (
+                                delimiter_start_segments[i],
+                                seg,
+                            )
                     else:
                         # No match at the position we expected!
                         # We need to reset our count and start segment:
@@ -191,9 +253,13 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
         # We do so by looking at which end delimiters are filled in, and grabbing their complementary start delimiter:
 
         # Sort and filter our delimiters:
-        seg_delimiters = [(delim_index, start, end_tuple) for delim_index, (start, end_tuple) in
-                          enumerate(zip(delimiter_start_segments, delimiter_end_segment_tuples))
-                          if end_tuple is not None]
+        seg_delimiters = [
+            (delim_index, start, end_tuple)
+            for delim_index, (start, end_tuple) in enumerate(
+                zip(delimiter_start_segments, delimiter_end_segment_tuples)
+            )
+            if end_tuple is not None
+        ]
         seg_delimiters.sort(key=lambda dtuple: dtuple[1].start)
 
         cur_read_base_index = 0
@@ -206,7 +272,15 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
             delim_name = "/".join(delimiters[di])
 
             # Write our segment here:
-            _write_split_array_element(bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name)
+            _write_split_array_element(
+                bam_out,
+                start_coord,
+                end_coord,
+                read,
+                segments,
+                delim_name,
+                prev_delim_name,
+            )
 
             cur_read_base_index = end_seg_tuple[0].start
             prev_delim_name = delim_name
@@ -216,7 +290,9 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
         end_coord = len(read.query_sequence)
         delim_name = "END"
 
-        _write_split_array_element(bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name)
+        _write_split_array_element(
+            bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name
+        )
 
         return len(seg_delimiters)
     else:
@@ -256,9 +332,11 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
                                 # Here we "peek ahead" so we an look at other delimiters after the current one just in
                                 # case we're missing a delimiter / segment.  This will impact the "score" but allow for
                                 # fuzzy matching.
-                                for l in range(1, len(delimiters[i]) - delimiter_match_matrix[i]):
-                                    if seg.name == delimiters[i][dmi+l]:
-                                        delimiter_match_matrix[i] += (1+l)
+                                for peek_ahead in range(
+                                    1, len(delimiters[i]) - delimiter_match_matrix[i]
+                                ):
+                                    if seg.name == delimiters[i][dmi + peek_ahead]:
+                                        delimiter_match_matrix[i] += 1 + peek_ahead
                                         delimiter_segments[i].append(seg)
                                         delimiter_score[i] += indel_val
                                         found = True
@@ -294,18 +372,29 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
                 end_delim_name = seg_list[-1].name
 
                 # Write our segment here:
-                _write_split_array_element(bam_out, start_coord, end_coord, read, seg_list,
-                                           end_delim_name, start_delim_name)
+                _write_split_array_element(
+                    bam_out,
+                    start_coord,
+                    end_coord,
+                    read,
+                    seg_list,
+                    end_delim_name,
+                    start_delim_name,
+                )
 
         # Return the number of array elements.
         # NOTE: this works because booleans are a subset of integers in python.
         return sum(delimiter_found)
 
 
-def _write_split_array_element(bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name):
+def _write_split_array_element(
+    bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name
+):
     """Write out an individual array element that has been split out according to the given coordinates."""
     a = pysam.AlignedSegment()
-    a.query_name = f"{read.query_name}_{start_coord}-{end_coord}_{prev_delim_name}-{delim_name}"
+    a.query_name = (
+        f"{read.query_name}_{start_coord}-{end_coord}_{prev_delim_name}-{delim_name}"
+    )
     a.query_sequence = f"{read.query_sequence[start_coord:end_coord]}"
     a.query_qualities = read.query_alignment_qualities[start_coord:end_coord]
     a.tags = read.get_tags()
@@ -313,7 +402,10 @@ def _write_split_array_element(bam_out, start_coord, end_coord, read, segments, 
     a.mapping_quality = 255
 
     # Set our segments tag to only include the segments in this read:
-    a.set_tag("SG", ",".join([s.to_tag() for s in segments if start_coord <= s.start <= end_coord]))
+    a.set_tag(
+        "SG",
+        ",".join([s.to_tag() for s in segments if start_coord <= s.start <= end_coord]),
+    )
 
     bam_out.write(a)
 
