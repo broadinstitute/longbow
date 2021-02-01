@@ -1,8 +1,5 @@
 import logging
 import sys
-import math
-
-from collections import namedtuple
 
 import click
 import click_log
@@ -12,19 +9,12 @@ import pysam
 import multiprocessing as mp
 import concurrent.futures
 
-from ..utils.model import build_default_model
 from ..utils.model import array_element_structure
-from ..utils.model import reverse_complement
-from ..utils.model import annotate
 
+from ..annotate.command import SegmentInfo
+from ..annotate.command import SEGMENTS_TAG
 
-# Named tuple to store alignment information:
-class SegmentInfo(namedtuple("SegmentInfo", ["name", "start", "end"])):
-    def __str__(self):
-        return f"SegmentInfo({self.to_tag()})"
-
-    def to_tag(self):
-        return f"{self.name}:{self.start}-{self.end}"
+from ..meta import VERSION
 
 
 logger = logging.getLogger(__name__)
@@ -33,13 +23,6 @@ click_log.basic_config(logger)
 
 @click.command(name="segment")
 @click_log.simple_verbosity_option(logger)
-@click.option(
-    "-m",
-    "--model",
-    required=False,
-    type=click.Path(exists=True),
-    help="pre-trained model to apply",
-)
 @click.option(
     "-t",
     "--threads",
@@ -56,13 +39,6 @@ click_log.basic_config(logger)
     help="segment-annotated bam output",
 )
 @click.option(
-    "-p",
-    "--split-bam",
-    required=False,
-    type=click.Path(exists=False),
-    help="segmented bam output",
-)
-@click.option(
     "-s",
     "--do-simple-splitting",
     required=False,
@@ -72,118 +48,89 @@ click_log.basic_config(logger)
     "This splitting will cause delimiter sequences to be repeated in each read they bound.",
 )
 @click.argument("input-bam", type=click.Path(exists=True))
-def main(model, threads, output_bam, split_bam, do_simple_splitting, input_bam):
-    """Apply annotation and segmentation model to BAM file"""
+def main(threads, output_bam, do_simple_splitting, input_bam):
+    """Segment pre-annotated reads from an input BAM file."""
     logger.info("annmas: segment started")
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} thread(s)")
-
-    m = build_default_model()
-    if model is not None:
-        m.from_yaml(model)
-        logger.info(f"Using pretrained annotation model {model}")
-    else:
-        logger.info("Using default annotation model")
 
     if do_simple_splitting:
         logger.info("Using simple splitting mode.")
     else:
         logger.info("Using bounded region splitting mode.")
 
-    num_reads_annotated = 0
-    num_sections = 0
+    num_reads = 0
     num_segments = 0
 
     # Placeholder for split out file:
     # NOTE: There's probably a more pythonic way to do this...
     split_bam_out = None
 
-    try:
-        pysam.set_verbosity(0)  # silence message about the .bai file not being found
-        with pysam.AlignmentFile(
-            input_bam, "rb", check_sq=False, require_index=False
-        ) as bam_file:
+    pysam.set_verbosity(0)  # silence message about the .bai file not being found
+    with pysam.AlignmentFile(
+        input_bam, "rb", check_sq=False, require_index=False
+    ) as bam_file:
 
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=threads
-            ) as executor, tqdm.tqdm(
-                desc="Progress", unit=" read", colour="green", file=sys.stdout
-            ) as pbar:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=threads
+        ) as executor, tqdm.tqdm(
+            desc="Progress", unit=" read", colour="green", file=sys.stdout
+        ) as pbar:
 
-                future_to_segmented_read = {
-                    executor.submit(_segment_read, r, m): r for r in bam_file
-                }
+            future_to_segmented_read = {
+                executor.submit(_get_segments, r): r for r in bam_file
+            }
 
-                # Get our header from the input bam file:
-                out_bam_header_dict = bam_file.header.to_dict()
+            # Get our header from the input bam file:
+            out_bam_header_dict = bam_file.header.to_dict()
 
-                # Add our program group to it:
-                pg_dict = {
-                    "ID": "annmas-segment-0.0.1",
-                    "PN": "annmas",
-                    "VN": "0.0.1",
-                    "DS": "Apply annotation and segmentation model to BAM file.",
-                    "CL": " ".join(sys.argv),
-                }
-                if "PG" in out_bam_header_dict:
-                    out_bam_header_dict["PG"].append(pg_dict)
-                else:
-                    out_bam_header_dict["PG"] = [pg_dict]
+            # Add our program group to it:
+            pg_dict = {
+                "ID": f"annmas-segment-{VERSION}",
+                "PN": "annmas",
+                "VN": f"{VERSION}",
+                "DS": "Segment pre-annotated reads from an input BAM file.",
+                "CL": " ".join(sys.argv),
+            }
+            if "PG" in out_bam_header_dict:
+                out_bam_header_dict["PG"].append(pg_dict)
+            else:
+                out_bam_header_dict["PG"] = [pg_dict]
 
-                if split_bam:
-                    split_bam_out = pysam.AlignmentFile(
-                        split_bam, "wb", header=out_bam_header_dict
-                    )
+            with pysam.AlignmentFile(
+                output_bam, "wb", header=out_bam_header_dict
+            ) as out_bam_file:
 
-                with pysam.AlignmentFile(
-                    output_bam, "wb", header=out_bam_header_dict
-                ) as out_bam_file:
+                for future in concurrent.futures.as_completed(
+                    future_to_segmented_read
+                ):
+                    read = future_to_segmented_read[future]
+                    try:
+                        segments = future.result()
+                    except Exception as ex:
+                        logger.error("%r generated an exception: %s", read, ex)
+                    else:
+                        # Obligatory log message:
+                        logger.debug(
+                            "Segments for read %s: %s",
+                            read.query_name,
+                            segments,
+                        )
 
-                    for future in concurrent.futures.as_completed(
-                        future_to_segmented_read
-                    ):
-                        read = future_to_segmented_read[future]
-                        try:
-                            path, logp = future.result()
-                        except Exception as ex:
-                            logger.error("%r generated an exception: %s", read, ex)
-                        else:
-                            # Condense the output annotations so we can write them out with indices:
-                            segments = _collapse_annotations(path)
+                        # Write out our segmented reads if we want them:
+                        num_segments += _write_segmented_read(
+                            read, segments, do_simple_splitting, out_bam_file
+                        )
 
-                            # Obligatory log message:
-                            logger.debug(
-                                "Path for read %s (%2.2f): %s",
-                                read.query_name,
-                                logp,
-                                segments,
-                            )
+                        # Increment our counters:
+                        num_reads += 1
 
-                            # Set our tag and write out the read to the annotated file:
-                            read.set_tag("SG", "|".join([s.to_tag() for s in segments]))
-                            out_bam_file.write(read)
-
-                            # Write out our segmented reads if we want them:
-                            if split_bam_out:
-                                num_segments += _write_segmented_read(
-                                    read, segments, do_simple_splitting, split_bam_out
-                                )
-                            # Increment our counters:
-                            num_reads_annotated += 1
-                            num_sections += len(segments)
-
-                            pbar.update(1)
+                        pbar.update(1)
 
         logger.info("annmas: segment finished.")
-        logger.info(
-            f"annmas: segmented {num_reads_annotated} reads into {num_sections} sections."
-        )
-
-    finally:
-        if split_bam_out:
-            split_bam_out.close()
-            logger.info(f"annmas: wrote {num_segments} segments.")
+        logger.info(f"annmas: ingested {num_reads} reads.")
+        logger.info(f"annmas: wrote {num_segments} segments.")
 
 
 def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
@@ -403,37 +350,13 @@ def _write_split_array_element(
 
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
-        "SG",
+        SEGMENTS_TAG,
         ",".join([s.to_tag() for s in segments if start_coord <= s.start <= end_coord]),
     )
 
     bam_out.write(a)
 
 
-def _collapse_annotations(path):
-    """Collapses given path into a list of SegmentInfo objects."""
-    last = ""
-    start = 0
-    segments = []
-    for i, seg in enumerate(path):
-        if seg != last:
-            if i != 0:
-                segments.append(SegmentInfo(last, start, i - 1))
-            last = seg
-            start = i
-    # Don't forget the last one:
-    segments.append(SegmentInfo(last, start, i - 1))
-    return segments
-
-
-def _segment_read(read, um):
-    flogp = -math.inf
-    fppath = []
-    for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
-        logp, ppath = annotate(um, seq)
-
-        if logp > flogp:
-            flogp = logp
-            fppath = ppath
-
-    return fppath, flogp
+def _get_segments(read):
+    """Get the segments corresponding to a particular read by reading the segments tag information."""
+    return [SegmentInfo.from_tag(s) for s in read.get_tag(SEGMENTS_TAG).split("|")]

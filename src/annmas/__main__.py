@@ -6,11 +6,11 @@ import click_log
 from .inspect import command as inspect
 # porcelain
 from .segment import command as segment
+from .annotate import command as annotate
 from .train import command as train
 
-# Version number is automatically set via bumpversion.
-# DO NOT MODIFY:
-__version__ = "0.0.1"
+from .meta import VERSION
+
 
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
@@ -28,10 +28,11 @@ def main_entry():
 @click_log.simple_verbosity_option(logger)
 def version():
     """Print the version of annmas"""
-    logger.info(f"annmas: {__version__}")
+    logger.info(f"annmas: {VERSION}")
 
 
 # Update with new sub-commands:
+main_entry.add_command(annotate.main)
 main_entry.add_command(segment.main)
 main_entry.add_command(train.main)
 main_entry.add_command(inspect.main)
