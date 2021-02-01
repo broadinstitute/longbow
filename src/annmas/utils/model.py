@@ -14,7 +14,7 @@ import math
 
 adapters = {
     "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
-    "5p_TSO": "TTTCTTATATGGG",
+    #"5p_TSO": "TTTCTTATATGGG",
     "Poly_A": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
     "A": "AGCTTACTTGTGAAGA",
@@ -167,9 +167,16 @@ def build_default_model():
         elif "random:RDB" in s.name:
             rdb = s
 
+    # link 10x adapter to start
+    for sname in starts:
+        if sname in ["10x_Adapter"]:
+            full_model.add_transition(full_model.start, starts[sname], 1.0)
+
     # link rda to starts
     for sname in starts:
-        full_model.add_transition(rda, starts[sname], 1.0 / len(starts))
+        #if sname in ["Poly_A", "10x_Adapter"]:
+        if sname in ["Poly_A"]:
+            full_model.add_transition(rda, starts[sname], 1.0)
 
     # link up ending states according to our direct connections dictionary
     for s in full_model.states:
@@ -178,11 +185,12 @@ def build_default_model():
             sname = m.group(1)
 
             if sname in direct_connections:
-                p = 1.0 / (10 * len(direct_connections[sname]))
-                full_model.add_transition(s, rdb, p)
+                # p = 1.0 / (10 * len(direct_connections[sname]))
+                # full_model.add_transition(s, rdb, p)
 
                 for dcname in direct_connections[sname]:
-                    full_model.add_transition(s, starts[dcname], (1.0 - p) / len(direct_connections[sname]))
+                    #full_model.add_transition(s, starts[dcname], (1.0 - p) / len(direct_connections[sname]))
+                    full_model.add_transition(s, starts[dcname], 1.0 / len(direct_connections[sname]))
             else:
                 full_model.add_transition(s, rdb, 0.5)
 
@@ -231,7 +239,7 @@ def smooth(path, radius=5):
     return path
 
 
-def annotate(full_model, seq, smooth_islands=True):
+def annotate(full_model, seq, smooth_islands=False):
     logp, path = full_model.viterbi(seq)
 
     ppath = []
