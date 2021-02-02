@@ -26,6 +26,9 @@ class SegmentInfo(namedtuple("SegmentInfo", ["name", "start", "end"])):
 
     _tag_regex = re.compile(r"(.*?):(\d+)-(\d+)")
 
+    def __len__(self):
+        return self.end - self.start
+
     def __str__(self):
         return f"SegmentInfo({self.to_tag()})"
 

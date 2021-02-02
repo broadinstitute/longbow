@@ -48,8 +48,17 @@ click_log.basic_config(logger)
     help="Do splitting of reads based on splitter delimiters, rather than whole array structure."
     "This splitting will cause delimiter sequences to be repeated in each read they bound.",
 )
+@click.option(
+    "-k",
+    "--keep-delimiters",
+    required=False,
+    is_flag=True,
+    default=False,
+    help="If True, will keep the delimiter sequences in the resulting reads.  Otherwise the delimiter sequence "
+         "information will be removed from the resulting reads (the annotations for the delimiters will be preserved).",
+)
 @click.argument("input-bam", type=click.Path(exists=True))
-def main(threads, output_bam, do_simple_splitting, input_bam):
+def main(threads, output_bam, do_simple_splitting, keep_delimiters, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
     logger.info("annmas: segment started")
 
@@ -117,7 +126,7 @@ def main(threads, output_bam, do_simple_splitting, input_bam):
 
                         # Write out our segmented reads if we want them:
                         num_segments += _write_segmented_read(
-                            read, segments, do_simple_splitting, out_bam_file
+                            read, segments, do_simple_splitting, keep_delimiters, out_bam_file
                         )
 
                         # Increment our counters:
@@ -130,13 +139,16 @@ def main(threads, output_bam, do_simple_splitting, input_bam):
         logger.info(f"annmas: wrote {num_segments} segments.")
 
 
-def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
+def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, bam_out):
     """Split and write out the segments of each read to the given bam output file
     :param read: A pysam.AlignedSegment object containing a read that has been segmented.
     :param segments: A list of SegmentInfo objects representing the segments of the given reads.
     :param do_simple_splitting: Flag to control how reads should be split.
                                 If True, will use simple delimiters.
                                 If False, will require reads to appear as expected in model.array_element_structure.
+    :param keep_delimiters: If True, will keep the delimiter sequences in the resulting reads.
+                            Otherwise the delimiter sequence information will be removed from the resulting reads
+                            (the annotations for the delimiters will be preserved).
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
     :return: the number of segments written.
     """
@@ -211,15 +223,20 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
 
         for i, (di, start_seg, end_seg_tuple) in enumerate(seg_delimiters):
 
-            start_coord = cur_read_base_index
-            end_coord = end_seg_tuple[1].end
+            seg_start_coord = cur_read_base_index
+            seg_end_coord = end_seg_tuple[1].end
             delim_name = "/".join(delimiters[di])
+
+            start_coord = seg_start_coord
+            end_coord = seg_end_coord
 
             # Write our segment here:
             _write_split_array_element(
                 bam_out,
                 start_coord,
                 end_coord,
+                seg_start_coord,
+                seg_end_coord,
                 read,
                 segments,
                 delim_name,
@@ -230,12 +247,16 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
             prev_delim_name = delim_name
 
         # Now we have to write out the last segment:
-        start_coord = cur_read_base_index
-        end_coord = len(read.query_sequence)
+        seg_start_coord = cur_read_base_index
+        seg_end_coord = len(read.query_sequence)
+
+        start_coord = seg_start_coord 
+        end_coord = seg_end_coord
+
         delim_name = "END"
 
         _write_split_array_element(
-            bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name
+            bam_out, start_coord, end_coord, seg_start_coord, seg_end_coord, read, segments, delim_name, prev_delim_name
         )
 
         return len(seg_delimiters)
@@ -320,6 +341,8 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
                     bam_out,
                     start_coord,
                     end_coord,
+                    start_coord,
+                    end_coord,
                     read,
                     seg_list,
                     end_delim_name,
@@ -337,7 +360,7 @@ def _transform_to_rc_coords(start, end, read_length):
 
 
 def _write_split_array_element(
-    bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name
+    bam_out, start_coord, end_coord, seg_start_coord, seg_end_coord, read, segments, delim_name, prev_delim_name
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
     a = pysam.AlignedSegment()
@@ -354,7 +377,7 @@ def _write_split_array_element(
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         SEGMENTS_TAG,
-        ",".join([s.to_tag() for s in segments if start_coord <= s.start <= end_coord]),
+        ",".join([s.to_tag() for s in segments if seg_start_coord <= s.start <= seg_end_coord]),
     )
 
     bam_out.write(a)
