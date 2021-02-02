@@ -1,5 +1,6 @@
 import logging
 import sys
+import itertools
 
 import click
 import click_log
@@ -7,13 +8,13 @@ import tqdm
 
 import pysam
 import multiprocessing as mp
-import concurrent.futures
+
+from inspect import getframeinfo, currentframe, getdoc
 
 from ..utils.model import array_element_structure
 
 from ..annotate.command import SegmentInfo
 from ..annotate.command import SEGMENTS_TAG
-from ..annotate.command import SEGMENTS_RC_TAG
 
 from ..meta import VERSION
 
@@ -21,8 +22,10 @@ from ..meta import VERSION
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
 
+mod_name = "segment"
 
-@click.command(name="segment")
+
+@click.command(name=mod_name)
 @click_log.simple_verbosity_option(logger)
 @click.option(
     "-t",
@@ -60,83 +63,143 @@ click_log.basic_config(logger)
 @click.argument("input-bam", type=click.Path(exists=True))
 def main(threads, output_bam, do_simple_splitting, keep_delimiters, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
-    logger.info("annmas: segment started")
+    logger.info(f"annmas: {mod_name} started")
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} thread(s)")
+    logger.info(f"Running with {threads} process(es)")
 
     if do_simple_splitting:
         logger.info("Using simple splitting mode.")
     else:
         logger.info("Using bounded region splitting mode.")
 
-    num_reads = 0
-    num_segments = 0
+    # Configure process manager:
+    # NOTE: We're using processes to overcome the Global Interpreter Lock.
+    manager = mp.Manager()
+    process_input_data_queue = manager.Queue(threads)
+    results = manager.Queue()
+
+    # Start worker sub-processes:
+    worker_process_pool = []
+    for _ in range(threads):
+        p = mp.Process(target=_sub_process_work_fn, args=(process_input_data_queue, results))
+        p.start()
+        worker_process_pool.append(p)
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
-    ) as bam_file:
+    ) as bam_file, tqdm.tqdm(desc="Progress", unit=" read", colour="green", file=sys.stdout) as pbar:
 
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=threads
-        ) as executor, tqdm.tqdm(
-            desc="Progress", unit=" read", colour="green", file=sys.stdout
-        ) as pbar:
+        # Get our header from the input bam file:
+        out_bam_header_dict = bam_file.header.to_dict()
 
-            future_to_read_segments = {
-                executor.submit(_get_segments, r): r for r in bam_file
-            }
+        # Add our program group to it:
+        pg_dict = {
+            "ID": f"annmas-{mod_name}-{VERSION}",
+            "PN": "annmas",
+            "VN": f"{VERSION}",
+            # Use reflection to get the doc string for this main function for our header:
+            "DS": getdoc(globals()[getframeinfo(currentframe()).function]),
+            "CL": " ".join(sys.argv),
+        }
+        if "PG" in out_bam_header_dict:
+            out_bam_header_dict["PG"].append(pg_dict)
+        else:
+            out_bam_header_dict["PG"] = [pg_dict]
+        out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
 
-            # Get our header from the input bam file:
-            out_bam_header_dict = bam_file.header.to_dict()
+        # Start output worker:
+        output_worker = mp.Process(
+            target=_sub_process_write_fn,
+            args=(results, out_header, output_bam, pbar, do_simple_splitting, keep_delimiters)
+        )
+        output_worker.start()
 
-            # Add our program group to it:
-            pg_dict = {
-                "ID": f"annmas-segment-{VERSION}",
-                "PN": "annmas",
-                "VN": f"{VERSION}",
-                "DS": "Segment pre-annotated reads from an input BAM file.",
-                "CL": " ".join(sys.argv),
-            }
-            if "PG" in out_bam_header_dict:
-                out_bam_header_dict["PG"].append(pg_dict)
+        # Add in a `None` sentinel value at the end of the queue - one for each subprocess - so we guarantee
+        # that all subprocesses will exit:
+        iter_data = itertools.chain(bam_file, (None,) * threads)
+        for r in iter_data:
+            if r is not None:
+                process_input_data_queue.put(r.to_string())
             else:
-                out_bam_header_dict["PG"] = [pg_dict]
+                process_input_data_queue.put(r)
 
-            with pysam.AlignmentFile(
-                output_bam, "wb", header=out_bam_header_dict
-            ) as out_bam_file:
+        # Wait for our input jobs to finish:
+        for p in worker_process_pool:
+            p.join()
 
-                for future in concurrent.futures.as_completed(
-                    future_to_read_segments
-                ):
-                    read = future_to_read_segments[future]
-                    try:
-                        segments = future.result()
-                    except Exception as ex:
-                        logger.error("%r generated an exception: %s", read, ex)
-                    else:
-                        # Obligatory log message:
-                        logger.debug(
-                            "Segments for read %s: %s",
-                            read.query_name,
-                            segments,
-                        )
+        # Now that our input processes are done, we can add our exit sentinel onto the output queue and
+        # wait for that process to end:
+        results.put(None)
+        output_worker.join()
 
-                        # Write out our segmented reads if we want them:
-                        num_segments += _write_segmented_read(
-                            read, segments, do_simple_splitting, keep_delimiters, out_bam_file
-                        )
+        logger.info(f"annmas: {mod_name} finished.")
 
-                        # Increment our counters:
-                        num_reads += 1
 
-                        pbar.update(1)
+def _sub_process_work_fn(in_queue, out_queue):
+    """Function to run in each subprocess.
+    Extracts and returns all segments from an input read."""
+    while True:
+        # Wait until we get some data.
+        # Note: Because we have a sentinel value None inserted at the end of the input data for each
+        #       subprocess, we don't have to add a timeout - we're guaranteed each process will always have
+        #       at least one element.
+        raw_data = in_queue.get()
 
-        logger.info("annmas: segment finished.")
-        logger.info(f"annmas: ingested {num_reads} reads.")
-        logger.info(f"annmas: wrote {num_segments} segments.")
+        # Check for exit sentinel:
+        if raw_data is None:
+            return
+
+        # Unpack our data here:
+        read = pysam.AlignedSegment.fromstring(raw_data, pysam.AlignmentHeader.from_dict(dict()))
+
+        # Process and place our data on the output queue:
+        out_queue.put(_get_segments(read))
+
+
+def _sub_process_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar, do_simple_splitting, keep_delimiters):
+    """Thread / process fn to write out all our data."""
+
+    num_reads_segmented = 0
+    num_segments = 0
+
+    with pysam.AlignmentFile(
+            out_bam_file_name, "wb", header=out_bam_header
+    ) as out_bam_file:
+
+        while True:
+            # Wait for some output data:
+            raw_data = out_queue.get()
+
+            # Check for exit sentinel:
+            if raw_data is None:
+                break
+
+            # Unpack data:
+            read, segments = raw_data
+            read = pysam.AlignedSegment.fromstring(read, out_bam_header)
+
+            # Obligatory log message:
+            logger.debug(
+                "Segments for read %s: %s",
+                read.query_name,
+                segments,
+            )
+
+            # Write out our segmented reads:
+            num_segments += _write_segmented_read(
+                read, segments, do_simple_splitting, keep_delimiters, out_bam_file
+            )
+
+            # Increment our counters:
+            num_reads_segmented += 1
+            pbar.update(1)
+
+    logger.info(
+        f"annmas {mod_name}: segmented {num_reads_segmented} reads with {num_segments} total segments."
+    )
+    return
 
 
 def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, bam_out):
@@ -391,4 +454,4 @@ def _write_split_array_element(
 
 def _get_segments(read):
     """Get the segments corresponding to a particular read by reading the segments tag information."""
-    return [SegmentInfo.from_tag(s) for s in read.get_tag(SEGMENTS_TAG).split("|")]
+    return read.to_string(), [SegmentInfo.from_tag(s) for s in read.get_tag(SEGMENTS_TAG).split("|")]

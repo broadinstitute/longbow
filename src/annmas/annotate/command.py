@@ -1,10 +1,10 @@
 import logging
 import sys
 import itertools
-import math
 import re
 
 from collections import namedtuple
+from inspect import getframeinfo, currentframe, getdoc
 
 import click
 import click_log
@@ -12,7 +12,6 @@ import tqdm
 
 import pysam
 import multiprocessing as mp
-import threading
 
 from ..utils.model import build_default_model
 from ..utils.model import reverse_complement
@@ -76,7 +75,7 @@ mod_name = "annotate"
 )
 @click.argument("input-bam", type=click.Path(exists=True))
 def main(model, threads, output_bam, input_bam):
-    """Apply annotation and segmentation model to BAM file"""
+    """Annotate reads in a BAM file with segments from the model."""
     logger.info(f"annmas: {mod_name} started")
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
@@ -90,6 +89,7 @@ def main(model, threads, output_bam, input_bam):
         logger.info("Using default annotation model")
 
     # Configure process manager:
+    # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
     process_input_data_queue = manager.Queue(threads)
     results = manager.Queue()
@@ -104,63 +104,57 @@ def main(model, threads, output_bam, input_bam):
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
-    ) as bam_file:
+    ) as bam_file, tqdm.tqdm(desc="Progress", unit=" read", colour="green", file=sys.stdout) as pbar:
 
-        with tqdm.tqdm(
-            desc="Progress", unit=" read", colour="green", file=sys.stdout
-        ) as pbar:
+        # Get our header from the input bam file:
+        out_bam_header_dict = bam_file.header.to_dict()
 
-            # Get our header from the input bam file:
-            out_bam_header_dict = bam_file.header.to_dict()
+        # Add our program group to it:
+        pg_dict = {
+            "ID": f"annmas-annotate-{VERSION}",
+            "PN": "annmas",
+            "VN": f"{VERSION}",
+            # Use reflection to get the doc string for this main function for our header:
+            "DS": getdoc(globals()[getframeinfo(currentframe()).function]),
+            "CL": " ".join(sys.argv),
+        }
+        if "PG" in out_bam_header_dict:
+            out_bam_header_dict["PG"].append(pg_dict)
+        else:
+            out_bam_header_dict["PG"] = [pg_dict]
+        out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
 
-            # Add our program group to it:
-            pg_dict = {
-                "ID": f"annmas-annotate-{VERSION}",
-                "PN": "annmas",
-                "VN": f"{VERSION}",
-                "DS": "Apply segmentation/annotation model to BAM file.",
-                "CL": " ".join(sys.argv),
-            }
-            if "PG" in out_bam_header_dict:
-                out_bam_header_dict["PG"].append(pg_dict)
+        # Start output worker:
+        output_worker = mp.Process(
+            target=_sub_process_write_fn,
+            args=(results, out_header, output_bam, pbar)
+        )
+        output_worker.start()
+
+        # Add in a `None` sentinel value at the end of the queue - one for each subprocess - so we guarantee
+        # that all subprocesses will exit:
+        iter_data = itertools.chain(bam_file, (None,) * threads)
+        for r in iter_data:
+            if r is not None:
+                process_input_data_queue.put(
+                    (r.to_string(), m)
+                )
             else:
-                out_bam_header_dict["PG"] = [pg_dict]
+                process_input_data_queue.put(r)
 
-            out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
+        # Wait for our input jobs to finish:
+        for p in worker_process_pool:
+            p.join()
 
-            # Start output thread:
-            # NOTE: we use a thread here so we can reuse the read objects without serializing them:
-            # output_worker = threading.Thread(
-            output_worker = mp.Process(
-                target=_sub_thread_write_fn,
-                args=(results, out_header, output_bam, pbar)
-            )
-            output_worker.start()
-
-            # Add in a `None` sentinel value at the end of the queue - one for each subprocess - so we guarantee
-            # that all subprocesses will exit:
-            iter_data = itertools.chain(bam_file, (None,) * threads)
-            for r in iter_data:
-                if r is not None:
-                    process_input_data_queue.put(
-                        (r.to_string(), m)
-                    )
-                else:
-                    process_input_data_queue.put(r)
-
-            # Wait for our input jobs to finish:
-            for p in worker_process_pool:
-                p.join()
-
-            # Now that our input processes are done, we can add our exit sentinel onto the output queue and
-            # wait for that process to end:
-            results.put(None)
-            output_worker.join()
+        # Now that our input processes are done, we can add our exit sentinel onto the output queue and
+        # wait for that process to end:
+        results.put(None)
+        output_worker.join()
 
     logger.info(f"annmas: {mod_name} finished.")
 
 
-def _sub_thread_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
+def _sub_process_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
     """Thread / process fn to write out all our data."""
 
     num_reads_annotated = 0
