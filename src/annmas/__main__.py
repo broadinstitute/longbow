@@ -3,6 +3,8 @@ import logging
 import click
 import click_log
 
+import sys
+
 from .inspect import command as inspect
 # porcelain
 from .segment import command as segment
@@ -21,7 +23,7 @@ logger.handlers[0].formatter = logging.Formatter(
 
 @click.group(name="annmas")
 def main_entry():
-    pass
+    logger.info("annmas invoked via: %s", " ".join(sys.argv))
 
 
 @main_entry.command()

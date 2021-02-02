@@ -66,7 +66,11 @@ def load_read_names(read_names):
 
     for r in read_names:
         if os.path.exists(r):
-            [rn.append(line.rstrip('\n')) for line in open(r)]
+            with open(r, 'r') as f:
+                for line in f:
+                    # Space / Tab / Newline / Line feed are all forbidden in read names by the sam spec, so we can
+                    # trim it all off:
+                    rn.append(line.strip())
         else:
             rn.append(r)
 

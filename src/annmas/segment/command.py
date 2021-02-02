@@ -13,6 +13,7 @@ from ..utils.model import array_element_structure
 
 from ..annotate.command import SegmentInfo
 from ..annotate.command import SEGMENTS_TAG
+from ..annotate.command import SEGMENTS_RC_TAG
 
 from ..meta import VERSION
 
@@ -63,10 +64,6 @@ def main(threads, output_bam, do_simple_splitting, input_bam):
     num_reads = 0
     num_segments = 0
 
-    # Placeholder for split out file:
-    # NOTE: There's probably a more pythonic way to do this...
-    split_bam_out = None
-
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
@@ -78,7 +75,7 @@ def main(threads, output_bam, do_simple_splitting, input_bam):
             desc="Progress", unit=" read", colour="green", file=sys.stdout
         ) as pbar:
 
-            future_to_segmented_read = {
+            future_to_read_segments = {
                 executor.submit(_get_segments, r): r for r in bam_file
             }
 
@@ -103,9 +100,9 @@ def main(threads, output_bam, do_simple_splitting, input_bam):
             ) as out_bam_file:
 
                 for future in concurrent.futures.as_completed(
-                    future_to_segmented_read
+                    future_to_read_segments
                 ):
-                    read = future_to_segmented_read[future]
+                    read = future_to_read_segments[future]
                     try:
                         segments = future.result()
                     except Exception as ex:
@@ -334,6 +331,11 @@ def _write_segmented_read(read, segments, do_simple_splitting, bam_out):
         return sum(delimiter_found)
 
 
+def _transform_to_rc_coords(start, end, read_length):
+    """Transforms the given start and end coordinates into the RC equivalents using the given read_length."""
+    return read_length - end - 1, read_length - start - 1
+
+
 def _write_split_array_element(
     bam_out, start_coord, end_coord, read, segments, delim_name, prev_delim_name
 ):
@@ -342,8 +344,9 @@ def _write_split_array_element(
     a.query_name = (
         f"{read.query_name}_{start_coord}-{end_coord}_{prev_delim_name}-{delim_name}"
     )
-    a.query_sequence = f"{read.query_sequence[start_coord:end_coord]}"
-    a.query_qualities = read.query_alignment_qualities[start_coord:end_coord]
+    # Add one to end_coord because coordinates are inclusive:
+    a.query_sequence = f"{read.query_sequence[start_coord:end_coord+1]}"
+    a.query_qualities = read.query_alignment_qualities[start_coord:end_coord+1]
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255

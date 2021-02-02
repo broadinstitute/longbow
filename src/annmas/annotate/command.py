@@ -39,6 +39,7 @@ class SegmentInfo(namedtuple("SegmentInfo", ["name", "start", "end"])):
 
 
 SEGMENTS_TAG = "SG"
+SEGMENTS_RC_TAG = "RC"
 
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
@@ -76,7 +77,7 @@ def main(model, threads, output_bam, input_bam):
     logger.info(f"annmas: {mod_name} started")
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} thread(s)")
+    logger.info(f"Running with {threads} sub-processor(s)")
 
     m = build_default_model()
     if model is not None:
@@ -183,14 +184,24 @@ def _sub_thread_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
 
             # Obligatory log message:
             logger.debug(
-                "Path for read %s (%2.2f): %s",
+                "Path for read %s (%2.2f)%s: %s",
                 read.query_name,
                 logp,
+                " (RC)" if is_rc else "",
                 segments,
             )
 
             # Set our tag and write out the read to the annotated file:
             read.set_tag(SEGMENTS_TAG, "|".join([s.to_tag() for s in segments]))
+
+            # If we're reverse complemented, we make it easy and just reverse complement the read and add a tag saying
+            # that the read was RC:
+            read.set_tag(SEGMENTS_RC_TAG, is_rc)
+            if is_rc:
+                quals = read.query_qualities[::-1]
+                seq = reverse_complement(read.query_sequence)
+                read.query_sequence = seq
+                read.query_qualities = quals
             out_bam_file.write(read)
 
             # Increment our counters:
@@ -227,6 +238,18 @@ def _sub_process_work_fn(in_queue, out_queue):
         out_queue.put(_segment_read(read, um))
 
 
+def _reverse_segments(segments, read_length):
+    """Reverses the segment order and coordinates to account for segmenting a reverse-complemented read."""
+    rc_segments = []
+    for seg in segments[::-1]:
+        rc_segments.append(
+            # Subtract 2 to account for inclusive coordinates on both ends:
+            SegmentInfo(seg.name, read_length - seg.end - 2, read_length - seg.start - 2)
+        )
+
+    return rc_segments
+
+
 def _collapse_annotations(path):
     """Collapses given path into a list of SegmentInfo objects."""
     last = ""
@@ -243,14 +266,15 @@ def _collapse_annotations(path):
     return segments
 
 
-def _segment_read(read, um):
+def _segment_read(read, model):
     is_rc = False
-    logp, ppath = annotate(um, read.query_sequence)
+    logp, ppath = annotate(model, read.query_sequence)
 
-    rc_logp, rc_ppath = annotate(um, reverse_complement(read.query_sequence))
+    rc_logp, rc_ppath = annotate(model, reverse_complement(read.query_sequence))
     if rc_logp > logp:
         logp = rc_logp
         ppath = rc_ppath
         is_rc = True
+        logger.debug("Sequence scored better in RC: %s", read.query_name)
 
     return read.to_string(), ppath, logp, is_rc
