@@ -228,7 +228,7 @@ def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, 
             delim_name = "/".join(delimiters[di])
 
             start_coord = seg_start_coord
-            end_coord = seg_end_coord
+            end_coord = seg_end_coord if keep_delimiters else start_seg.start - 1
 
             # Write our segment here:
             _write_split_array_element(
@@ -243,14 +243,15 @@ def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, 
                 prev_delim_name,
             )
 
-            cur_read_base_index = end_seg_tuple[0].start
+            cur_read_base_index = end_seg_tuple[0].start if keep_delimiters else end_seg_tuple[1].end + 1
             prev_delim_name = delim_name
 
         # Now we have to write out the last segment:
         seg_start_coord = cur_read_base_index
-        seg_end_coord = len(read.query_sequence)
+        # Subtract 1 for 0-based inclusive coords:
+        seg_end_coord = len(read.query_sequence) - 1
 
-        start_coord = seg_start_coord 
+        start_coord = seg_start_coord
         end_coord = seg_end_coord
 
         delim_name = "END"
@@ -331,8 +332,13 @@ def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, 
                 start_seg = seg_list[0]
                 end_seg = seg_list[-1]
 
-                start_coord = start_seg.start
-                end_coord = end_seg.end
+                # If we don't want to keep delimiters we chop off the start and end segments
+                # under the assumption that those are the delimiters we want to skip:
+                start_coord = start_seg.start if keep_delimiters else seg_list[1].start
+                end_coord = end_seg.end if keep_delimiters else seg_list[-2].end
+                start_seg_coord = start_seg.start
+                end_seg_coord = end_seg.end
+
                 start_delim_name = seg_list[0].name
                 end_delim_name = seg_list[-1].name
 
@@ -341,8 +347,8 @@ def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, 
                     bam_out,
                     start_coord,
                     end_coord,
-                    start_coord,
-                    end_coord,
+                    start_seg_coord,
+                    end_seg_coord,
                     read,
                     seg_list,
                     end_delim_name,

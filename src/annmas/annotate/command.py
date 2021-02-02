@@ -265,7 +265,7 @@ def _collapse_annotations(path):
             last = seg
             start = i
     # Don't forget the last one:
-    segments.append(SegmentInfo(last, start, i - 1))
+    segments.append(SegmentInfo(last, start, i))
     return segments
 
 
