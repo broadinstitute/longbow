@@ -259,6 +259,12 @@ def build_default_model():
             else:
                 full_model.add_transition(s, rdb, 0.5)
 
+    # link up all adapters to model end state
+    for s in full_model.states:
+        m = re.match(r"^(\w+):([MID])(\d+)", s.name)
+        if m is not None and int(m.group(3)) == len(adapters[m.group(1)]):
+            full_model.add_transition(s, full_model.end, 0.01)
+
     full_model.bake()
 
     return full_model
