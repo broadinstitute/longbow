@@ -167,6 +167,9 @@ def _sub_process_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar, do
     # Create our delimiter sequences for simple splitting if we have to:
     delimiters = _create_simple_delimiters() if do_simple_splitting else None
 
+    if do_simple_splitting:
+        logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
+
     with pysam.AlignmentFile(
             out_bam_file_name, "wb", header=out_bam_header
     ) as out_bam_file:
@@ -205,7 +208,7 @@ def _sub_process_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar, do
     return
 
 
-def _create_simple_delimiters(num_seqs_from_each_array_element=2):
+def _create_simple_delimiters(num_seqs_from_each_array_element=1):
     """Create delimiters for simple splitting.
 
     :param num_seqs_from_each_array_element: The number of sequences from each array element to use as delimiters.

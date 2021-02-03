@@ -45,7 +45,9 @@ array_element_structure = (
     ("L", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
     ("M", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
     ("N", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
-    ("O", "10x_Adapter", "random", "Poly_A", "3p_Adapter", "P"),
+    # The last element doesn't actually have the "P" adapter in this version of the library:
+    # ("O", "10x_Adapter", "random", "Poly_A", "3p_Adapter", "P"),
+    ("O", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
 )
 
 adapters = {
