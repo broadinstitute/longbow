@@ -1,4 +1,5 @@
 import logging
+
 import click
 import click_log
 
@@ -53,7 +54,7 @@ def main(read_names, model, pbi, outdir, input_bam):
         seq, path, logp = annotate_read(read, m)
 
         logger.info("Drawing read '%s' to '%s'", read.query_name, out)
-        draw_state_sequence(seq, path, read.query_name, out)
+        draw_state_sequence(seq, path, read, out, size=13, family='monospace')
 
     bf.close()
 
@@ -65,7 +66,11 @@ def load_read_names(read_names):
 
     for r in read_names:
         if os.path.exists(r):
-            [rn.append(line.rstrip('\n')) for line in open(r)]
+            with open(r, 'r') as f:
+                for line in f:
+                    # Space / Tab / Newline / Line feed are all forbidden in read names by the sam spec, so we can
+                    # trim it all off:
+                    rn.append(line.strip())
         else:
             rn.append(r)
 
@@ -141,63 +146,68 @@ def annotate_read(read, m):
 
 def format_state_sequence(seq, path):
     color_hash = {
-        "10x_Adapter": "blue",
-        "5p_TSO": "blue",
-        "Poly_A": "green",
-        "3p_Adapter": "gold",
-        "A": "red",
-        "B": "red",
-        "C": "red",
-        "D": "red",
-        "E": "red",
-        "F": "red",
-        "G": "red",
-        "H": "red",
-        "I": "red",
-        "J": "red",
-        "K": "red",
-        "L": "red",
-        "M": "red",
-        "N": "red",
-        "O": "red",
-        "P": "red",
-        "random": "darkgrey"
+        "10x_Adapter": "#334D5C",
+        "5p_TSO": "#334D5C",
+        "Poly_A": "#45B29D",
+        "3p_Adapter": "#EFC94C",
+        "A": "#DF5A49",
+        "B": "#DF5A49",
+        "C": "#DF5A49",
+        "D": "#DF5A49",
+        "E": "#DF5A49",
+        "F": "#DF5A49",
+        "G": "#DF5A49",
+        "H": "#DF5A49",
+        "I": "#DF5A49",
+        "J": "#DF5A49",
+        "K": "#DF5A49",
+        "L": "#DF5A49",
+        "M": "#DF5A49",
+        "N": "#DF5A49",
+        "O": "#DF5A49",
+        "P": "#DF5A49",
+        "random": "#aaaaaa"
     }
 
     labelled_bases = []
     state_labels = []
     state_colors = []
 
-    bases = []
-    label = path[0]
-    al = 0
-    for i, (a, b) in enumerate(zip(list(seq), path)):
-        if label == b:
-            if al + len(a) < 150:
+    for i in range(0, len(path), 150):
+        bases = []
+        label = path[i]
+
+        for j in range(i, min(i + 150, len(path))):
+            a = seq[j]
+            b = path[j]
+
+            if label == b:
                 bases.append(a)
-                label = b
-                al += len(a)
-            else:
+            elif label != b:
                 labelled_bases.append("".join(bases))
                 state_labels.append(label)
                 state_colors.append(color_hash[label])
 
                 bases = [a]
                 label = b
-                al = 0
-        else:
-            labelled_bases.append("".join(bases))
-            state_labels.append(label)
-            state_colors.append(color_hash[label])
 
-            bases = [a]
-            label = b
+        labelled_bases.append("".join(bases))
+        state_labels.append(label)
+        state_colors.append(color_hash[label])
 
     return labelled_bases, state_colors, state_labels
 
 
-def draw_state_sequence(seq, path, read_name, out, **kwargs):
+def draw_state_sequence(seq, path, read, out, **kwargs):
     strings, colors, labels = format_state_sequence(seq, path)
+
+    # qq = 0
+    # for q, r, s in zip(strings, colors, labels):
+    #     qq += len(q)
+    #     print(f'{len(q)} {qq} {r} {s} {q}')
+    #
+    #     if qq >= 150:
+    #         qq = 0
 
     f = plt.figure(figsize=(24, 24))
 
@@ -205,7 +215,8 @@ def draw_state_sequence(seq, path, read_name, out, **kwargs):
     t = ax.transData
     canvas = ax.figure.canvas
 
-    f.suptitle(read_name, fontsize=16)
+    f.suptitle(f'{read.query_name} ({len(read.query_sequence)} bp)', fontsize=16)
+
     f.patch.set_visible(False)
     ax.axis('off')
 
@@ -218,22 +229,33 @@ def draw_state_sequence(seq, path, read_name, out, **kwargs):
     letters_seen = 0
     row = 0
     column = 0
+    n = 0
+
     for s, c, l in zip(strings, colors, labels):
-        text = ax.text(0.5 + column * 1.2, rows - row, s, color=c, transform=t,
-                       bbox=dict(facecolor='none', edgecolor=c), **kwargs)
+        if column == 0:
+            ytic = ax.text(0, rows - row, f'{n}  ', transform=t, ha='right')
+
+        text = ax.text(0, rows - row, s, color=c, transform=t, bbox=dict(facecolor=f'{c}22', edgecolor=f'{c}22', pad=0),
+                       **kwargs)
 
         # Write classified sequence
         text.draw(canvas.get_renderer())
         ex = text.get_window_extent()
-        t = transforms.offset_copy(
-            text.get_transform(), x=ex.width, units='dots')
+        t = transforms.offset_copy(text.get_transform(), x=ex.width, units='dots')
 
-        # Write class label
-        ax.text(0.5 + column * 1.3 - (len(s) / 2), rows - row - 3, l, transform=t, va='bottom', ha='center', fontsize=8,
-                bbox=dict(facecolor='white', edgecolor='black'))
+        # Write state label
+        if l != "random":
+            ax.text(0 - (len(s) / 2), rows - row - 3.5, l, transform=t, va='bottom', ha='center', fontsize=8,
+                    bbox=dict(facecolor='white', edgecolor='black'))
+
+        if l == "10x_Adapter":
+            for o in range(10, 50, 10):
+                if letters_seen + len(s) + o < 150:
+                    ax.text(0, rows - row + 1.7, f"{' ' * o}'", transform=t, **kwargs)
 
         # Decide whether we need to break into a new row
         letters_seen += len(s)
+        n += len(s)
         column += 1
 
         if letters_seen >= columns:
@@ -244,8 +266,9 @@ def draw_state_sequence(seq, path, read_name, out, **kwargs):
 
             text = ax.text(column, row, "")
             text.draw(canvas.get_renderer())
-            t = transforms.offset_copy(
-                text.get_transform(), x=0, y=-30 * row, units='dots')
+            t = transforms.offset_copy(text.get_transform(), x=0, y=-30 * row, units='dots')
+
+    y2tic = ax.text(0, rows - row, f'  {n}', transform=t, ha='left')
 
     plt.savefig(out, bbox_inches='tight')
 
