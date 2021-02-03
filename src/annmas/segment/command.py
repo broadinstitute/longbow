@@ -164,6 +164,9 @@ def _sub_process_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar, do
     num_reads_segmented = 0
     num_segments = 0
 
+    # Create our delimiter sequences for simple splitting if we have to:
+    delimiters = _create_simple_delimiters() if do_simple_splitting else None
+
     with pysam.AlignmentFile(
             out_bam_file_name, "wb", header=out_bam_header
     ) as out_bam_file:
@@ -189,7 +192,7 @@ def _sub_process_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar, do
 
             # Write out our segmented reads:
             num_segments += _write_segmented_read(
-                read, segments, do_simple_splitting, keep_delimiters, out_bam_file
+                read, segments, do_simple_splitting, keep_delimiters, delimiters, out_bam_file
             )
 
             # Increment our counters:
@@ -202,8 +205,37 @@ def _sub_process_write_fn(out_queue, out_bam_header, out_bam_file_name, pbar, do
     return
 
 
-def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, bam_out):
-    """Split and write out the segments of each read to the given bam output file
+def _create_simple_delimiters(num_seqs_from_each_array_element=2):
+    """Create delimiters for simple splitting.
+
+    :param num_seqs_from_each_array_element: The number of sequences from each array element to use as delimiters.
+    The more sequences used, the more specific the delimiter sequences will be.  A value of 1 will result in delimiter
+    tuples that are each 2 sequences long - the last sequence from the leading array element and the first from the
+    trailing array element.
+
+    :return: A list of delimiter tuples, each tuple contains names of sequences from our model in the order in which
+             they appear in the sequences.
+    """
+
+    # We keep a list of delimiter tuples that will serve as the breakpoints in our sequences:
+    delimiters = list()
+
+    # Collect the delimiters by grabbing the inner bounding regions of each array element in the order
+    # that we expect to see them in the overall library:
+    for i in range(1, len(array_element_structure)):
+        delimiters.append(
+            tuple(array_element_structure[i - 1][-num_seqs_from_each_array_element:]) +
+            tuple(array_element_structure[i][0:num_seqs_from_each_array_element])
+        )
+
+    return delimiters
+
+
+def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, delimiters, bam_out):
+    """Split and write out the segments of each read to the given bam output file.
+
+    NOTE: Assumes that all given data are in the forward direction.
+
     :param read: A pysam.AlignedSegment object containing a read that has been segmented.
     :param segments: A list of SegmentInfo objects representing the segments of the given reads.
     :param do_simple_splitting: Flag to control how reads should be split.
@@ -212,23 +244,12 @@ def _write_segmented_read(read, segments, do_simple_splitting, keep_delimiters, 
     :param keep_delimiters: If True, will keep the delimiter sequences in the resulting reads.
                             Otherwise the delimiter sequence information will be removed from the resulting reads
                             (the annotations for the delimiters will be preserved).
+    :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
     :return: the number of segments written.
     """
 
     if do_simple_splitting:
-        # Create the sections on which we want to split.
-        num_required_delimiters = 2
-
-        delimiters = list()
-        delimiters.append(tuple(array_element_structure[0][-num_required_delimiters:]))
-        for i, structure in enumerate(array_element_structure[1:], start=1):
-            # If it's the second element then we append the delmiters to those from the first.
-            # This is simple splitting, after all.
-            if i == 1:
-                delimiters[0] = delimiters[0] + structure[0:num_required_delimiters]
-            else:
-                delimiters.append(tuple(structure[0:num_required_delimiters]))
 
         # Now we have our delimiter list.
         # We need to go through our segments and split them up.

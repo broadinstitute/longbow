@@ -29,7 +29,9 @@ from pomegranate.callbacks import History, ModelCheckpoint
 # )
 
 array_element_structure = (
-    ("A", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
+    # The first element doesn't actually have the "A" adapter in this version of the library.
+    # ("A", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
+    ("10x_Adapter", "random", "Poly_A", "3p_Adapter"),
     ("B", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
     ("C", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
     ("D", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
