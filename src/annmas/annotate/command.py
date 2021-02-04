@@ -7,6 +7,7 @@ import collections
 import math
 import ctypes
 import pickle
+import numpy as np
 
 import queue
 from inspect import getframeinfo, currentframe, getdoc
@@ -28,10 +29,12 @@ import annmas.fmq as fmq
 from ..meta import VERSION
 
 __SLEEP_LEN_S = 0.000001
+__MP_BUFFER_LEN_BYTES = 5 * 1024 * 1024  # 5 Meg buffer
+__MP_MESSAGE_DELIMITER = 0xDEADBEEF
+__SENTINEL_VALUE = r"THE _MOST_ CROMULENT SENTINEL VALUE."
+
 SEGMENTS_TAG = "SG"
 SEGMENTS_RC_TAG = "RC"
-
-_SENTINEL_VALUE = r"THE _MOST_ CROMULENT SENTINEL VALUE."
 
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
@@ -45,6 +48,7 @@ class Deque(collections.deque):
     _sleep_len = 0.000001
 
     def __init__(self, maxsize=None):
+        super().__init__()
         self.maxsize = maxsize if maxsize else math.inf
 
     def put(self, o):
@@ -58,6 +62,149 @@ class Deque(collections.deque):
             # Sleep for arbitrarily small amount of time to avoid stack trace:
             time.sleep(Deque._sleep_len)
         return self.popleft()
+
+
+class ManyProducerSingleConsumerIpcQueue:
+    """Shared memory backed queue class that can communicate between processes.
+    Designed for many producers to be able to write to this queue, but only one consumer to read from it.
+    Shared memory backing is implemented with multiprocessing.Array.
+    """
+
+    def __init__(self, size_bytes=1024*1024*5, sleep_time_s=0.0000001):
+        self._buffer = mp.Array(size_or_initializer=size_bytes, typecode_or_type=ctypes.c_ubyte, lock=True)
+        self._buffer_size = size_bytes
+
+        # The following 3 counters are always updated together, so we use only 1 lock for them:
+        self._num_messages_in_buffer = mp.Value(ctypes.c_ulong, 0, lock=True)
+        self._cur_bytes_in_buffer = mp.Value(ctypes.c_ulong, 0, lock=False)
+        self._unused_bytes_in_buffer = mp.Value(ctypes.c_ulong, size_bytes, lock=False)
+
+        self._cur_buf_read_position = mp.Value(ctypes.c_ulong, 0, lock=True)
+        self._cur_buf_write_position = mp.Value(ctypes.c_ulong, 0, lock=True)
+
+        # we use a canonical delimiter here:
+        # TODO: Update to use UUID lib for increased safety ala: uuid.uuid4().bytes
+        self._delim = bytearray(b'\xDE\xAD\xBE\xEF')
+        self._sleep_time_s = sleep_time_s
+
+    def __len__(self):
+        return self._num_messages_in_buffer
+
+    def size(self):
+        return self._buffer_size
+
+    def put(self, obj):
+        """Put an object onto this queue.
+        The object must be able to be pickled.
+
+        If the queue doesn't have enough free space to hold the object, blocks until enough space is available.
+        If the queue is too small for the object, an exception is thrown."""
+
+        data = pickle.dumps(obj, fix_imports=False)
+        l_data = len(data) + len(self._delim)
+        if l_data > self._buffer_size:
+            raise BufferError(f"Given data cannot fit in buffer with delimiter: {l_data} > {self._buffer_size}")
+
+        # Lock on the write position:
+        with self._cur_buf_write_position.get_lock():
+            # Here we peek at the bytes remaining in the buffer to wait for it to be small enough.
+            # We can't write to this buffer while we're locked above, so we are guaranteed that the size will not grow.
+            while l_data > self._unused_bytes_in_buffer.value:
+                time.sleep(self._sleep_time_s)
+
+            # Now we can write out our data to the buffer:
+            with self._buffer.get_lock():
+                # Do we have to write in multiple pieces because of the end of the buffer?
+                if l_data > (self._buffer_size - self._cur_buf_write_position.value + 1):
+                    # Write the first part of the data:
+                    l_first_part = self._buffer_size - self._cur_buf_write_position.value + 1
+                    self._buffer[self._cur_buf_write_position.value:
+                                 self._cur_buf_write_position.value+l_first_part] = data[0:l_first_part]
+
+                    # Write the second part:
+                    l_second_part = len(data) - l_first_part
+                    self._buffer[0:l_second_part] = data[l_first_part:]
+
+                    # Write delimiter:
+                    self._buffer[l_second_part:l_second_part+len(self._delim)] = self._delim[:]
+
+                    # Update buffer info:
+                    self._cur_buf_write_position.value = l_second_part + len(self._delim)
+                else:
+                    self._buffer[self._cur_buf_write_position.value:
+                                 self._cur_buf_write_position.value+len(data)] = data[:]
+                    self._cur_buf_write_position.value += len(data)
+                    self._buffer[self._cur_buf_write_position.value:
+                                 self._cur_buf_write_position.value+len(self._delim)] = self._delim[:]
+
+                # Update our counts:
+                with self._num_messages_in_buffer.get_lock():
+                    self._unused_bytes_in_buffer.value -= l_data
+                    self._cur_bytes_in_buffer.value += l_data
+                    self._num_messages_in_buffer.value += 1
+
+    def get(self):
+        """Get an object off of this queue.
+        If there are no objects on this queue, waits until one is available."""
+
+        # Get our read lock:
+        with self._cur_buf_read_position.get_lock():
+
+            # Wait for a message to come in:
+            while self._num_messages_in_buffer.value < 1:
+                time.sleep(self._sleep_time_s)
+
+            # Now that we have a message, we need to scan our buffer for the delimiter and grab the data:
+            delim_start_pos = self._cur_buf_read_position.value
+            delim_found = False
+            while not delim_found:
+                if delim_start_pos + len(self._delim) >= self._buffer_size:
+                    # Delimiter could span the circular boundary.
+                    # Get our data in two pieces then compare:
+                    first_piece = self._buffer[delim_start_pos:]
+                    second_piece = self._buffer[0:len(self._delim) - len(first_piece)]
+                    if first_piece + second_piece == self._delim:
+                        delim_found = True
+                else:
+                    if self._buffer[delim_start_pos:delim_start_pos+len(self._delim)] == self._delim:
+                        # We found our delimiter.
+                        delim_found = True
+                delim_start_pos += len(self._delim)
+
+            # Now delim_start_pos holds the delimiter start position.
+            # It's possible that delim_start_pos is now before our current read position, which would mean we have
+            # to read the data in 2 pieces:
+            if delim_start_pos < self._cur_buf_read_position.value:
+                # Get our data size:
+                l_data = self._buffer_size - self._cur_buf_read_position.value + 1
+                l_data += delim_start_pos
+
+                data = bytearray(l_data)
+
+                # Get the first part of the data:
+                data[:self._buffer_size - self._cur_buf_read_position.value + 1] = \
+                    self._buffer[self._cur_buf_read_position.value:]
+
+                # Get the second part of the data:
+                data[-delim_start_pos:] = self._buffer[:delim_start_pos]
+
+            else:
+                # Get the data up to the start of the delimiter:
+                l_data = delim_start_pos - self._cur_buf_read_position.value
+                data = bytearray(l_data)
+                data[:l_data] = self._buffer[self._cur_buf_read_position.value:delim_start_pos]
+
+            # Create our object:
+            obj = pickle.loads(data, fix_imports=False)
+
+            # Update our counts:
+            self._cur_buf_read_position.value = delim_start_pos
+            with self._num_messages_in_buffer.get_lock():
+                self._unused_bytes_in_buffer.value += l_data
+                self._cur_bytes_in_buffer.value -= l_data
+                self._num_messages_in_buffer.value -= 1
+
+        return obj
 
 
 # Named tuple to store alignment information:
@@ -142,7 +289,7 @@ def main(model, threads, output_bam, input_bam):
     # Start worker sub-processes:
     worker_pool = []
     multi_process_arrays = []
-    mp_array_len = 1024 * 1024
+
     for i in range(threads):
         if use_threads:
             p = threading.Thread(target=_worker_segmentation_fn, args=(input_data_queue, results, i))
@@ -151,10 +298,13 @@ def main(model, threads, output_bam, input_bam):
             if use_shared_memory:
                 # TODO: Update to SharableList
                 multi_process_arrays.append(
-                    mp.Array(size_or_initializer=mp_array_len, typecode_or_type=ctypes.c_ubyte, lock=True)
+                    mp.Array(size_or_initializer=__MP_BUFFER_LEN_BYTES, typecode_or_type=ctypes.c_ubyte, lock=True)
                 )
-                ctypes.memset(multi_process_arrays[-1].get_obj(), 0x0, mp_array_len)
+                ctypes.memset(multi_process_arrays[-1].get_obj(), 0x0, __MP_BUFFER_LEN_BYTES)
                 p = mp.Process(target=_worker_segmentation_fn, args=(multi_process_arrays[i], results, i))
+
+                # multi_process_arrays.append(ManyProducerSingleConsumerIpcQueue())
+                # p = mp.Process(target=_worker_segmentation_fn, args=(multi_process_arrays[i], results, i))
             else:
                 p = mp.Process(target=_worker_segmentation_fn, args=(input_data_queue, results, i))
         p.start()
@@ -197,14 +347,14 @@ def main(model, threads, output_bam, input_bam):
 
         # Add in a `None` sentinel value at the end of the queue - one for each subprocess - so we guarantee
         # that all subprocesses will exit:
-        iter_data = itertools.chain(bam_file, (_SENTINEL_VALUE,) * threads)
+        iter_data = itertools.chain(bam_file, (__SENTINEL_VALUE,) * threads)
         queue_put_time = 0
         cur_worker_thread = 0
         still_running = [True for _ in range(threads)]
         iter_st_time = time.time()
         for r in iter_data:
             # We have to adjust for our sentinel value if we've got to it:
-            if r is not _SENTINEL_VALUE:
+            if r is not __SENTINEL_VALUE:
                 st = time.time()
                 rs = r.to_string()
                 serialize_time_s += time.time() - st
@@ -217,14 +367,13 @@ def main(model, threads, output_bam, input_bam):
                     for i in range(threads):
                         worker_indx = (cur_worker_thread + i) % threads
                         if multi_process_arrays[worker_indx][0] != 0x0 or \
-                                (r is _SENTINEL_VALUE and not still_running[worker_indx]):
+                                (r is __SENTINEL_VALUE and not still_running[worker_indx]):
                             continue
                         else:
                             raw = pickle.dumps(r, fix_imports=False)
 
-                            multi_process_arrays[worker_indx].acquire()
-                            multi_process_arrays[worker_indx][0:len(raw)] = raw[:]
-                            multi_process_arrays[worker_indx].release()
+                            with multi_process_arrays[worker_indx].get_lock():
+                                multi_process_arrays[worker_indx][0:len(raw)] = raw[:]
 
                             cur_worker_thread = (worker_indx + 1) % threads
                             placed = True
@@ -250,7 +399,7 @@ def main(model, threads, output_bam, input_bam):
 
         # Now that our input processes are done, we can add our exit sentinel onto the output queue and
         # wait for that process to end:
-        results.put(_SENTINEL_VALUE)
+        results.put(__SENTINEL_VALUE)
         output_worker.join()
 
     logger.info(f"annmas: {mod_name} finished.")
@@ -342,6 +491,27 @@ def main(model, threads, output_bam, input_bam):
 #     logger.info(f"annmas: elapsed time: %2.5fs.", time.time() - t_start)
 
 
+def __get_next_data_from_mp_circular_buffer(data_buffer,
+                                            current_index,
+                                            scratch_buffer=None,
+                                            data_delim=__MP_MESSAGE_DELIMITER,
+                                            read_chunk_size_bytes=1024):
+    """Gets the next piece of data from the circular buffer."""
+    found = False
+    if not scratch_buffer:
+        scratch_buffer = np.array(len(data_buffer), dtype=np.int8)
+    scratch_indx = 0
+    while not found:
+        next_chunk_size = read_chunk_size_bytes
+        if len(scratch_buffer) - scratch_indx - 1 < read_chunk_size_bytes:
+            next_chunk_size = len(scratch_buffer) - scratch_indx - 1
+        if len(data_buffer) - current_index - 1 < next_chunk_size:
+            next_chunk_size = len(data_buffer) - current_index - 1
+
+        with data_buffer.get_lock():
+            scratch_buffer[scratch_indx:next_chunk_size] = data_buffer[current_index:next_chunk_size]
+
+
 def __get_next_data_from_queue(q):
     try:
         # Multi-processing Array:
@@ -349,10 +519,9 @@ def __get_next_data_from_queue(q):
         while first_byte == 0x0:
             time.sleep(__SLEEP_LEN_S)
             first_byte = q[0]
-        q.acquire()
-        raw_data = pickle.loads(q.get_obj(), fix_imports=False)
-        ctypes.memset(q.get_obj(), 0x0, len(q))
-        q.release()
+        with q.get_lock():
+            raw_data = pickle.loads(q.get_obj(), fix_imports=False)
+            ctypes.memset(q.get_obj(), 0x0, len(q))
     # this happens if you can't subscript the data, which you can't with queues:
     except TypeError:
         raw_data = q.get()
@@ -380,7 +549,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
             wait_time_s += time.time() - st
 
             # Check for exit sentinel:
-            if raw_data == _SENTINEL_VALUE:
+            if raw_data == __SENTINEL_VALUE:
                 break
             # Should really never be None, but just in case:
             elif raw_data is None:
@@ -449,7 +618,7 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num):
         wait_time_s += time.time() - st
 
         # Check for exit sentinel:
-        if raw_data == _SENTINEL_VALUE:
+        if raw_data == __SENTINEL_VALUE:
             break
         # Should really never be None, but just in case:
         elif raw_data is None:
