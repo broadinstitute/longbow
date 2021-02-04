@@ -72,6 +72,7 @@ class ManyProducerSingleConsumerIpcQueue:
 
     def __init__(self, size_bytes=1024*1024*5, sleep_time_s=0.0000001):
         self._buffer = mp.Array(size_or_initializer=size_bytes, typecode_or_type=ctypes.c_ubyte, lock=True)
+        ctypes.memset(self._buffer.get_obj(), 0x0, size_bytes)
         self._buffer_size = size_bytes
 
         # The following 3 counters are always updated together, so we use only 1 lock for them:
@@ -88,7 +89,7 @@ class ManyProducerSingleConsumerIpcQueue:
         self._sleep_time_s = sleep_time_s
 
     def __len__(self):
-        return self._num_messages_in_buffer
+        return self._num_messages_in_buffer.value
 
     def size(self):
         return self._buffer_size
@@ -101,46 +102,47 @@ class ManyProducerSingleConsumerIpcQueue:
         If the queue is too small for the object, an exception is thrown."""
 
         data = pickle.dumps(obj, fix_imports=False)
-        l_data = len(data) + len(self._delim)
-        if l_data > self._buffer_size:
-            raise BufferError(f"Given data cannot fit in buffer with delimiter: {l_data} > {self._buffer_size}")
+        packet = data + self._delim
+        l_packet = len(data) + len(self._delim)
+        if l_packet > self._buffer_size:
+            raise BufferError(f"Given data cannot fit in buffer with delimiter: {l_packet} > {self._buffer_size}")
 
         # Lock on the write position:
         with self._cur_buf_write_position.get_lock():
             # Here we peek at the bytes remaining in the buffer to wait for it to be small enough.
             # We can't write to this buffer while we're locked above, so we are guaranteed that the size will not grow.
-            while l_data > self._unused_bytes_in_buffer.value:
+            have_logged = False
+            while l_packet > self._unused_bytes_in_buffer.value:
+                if not have_logged:
+                    logger.debug("Waiting for space (%d < %d) to place: %s", self._unused_bytes_in_buffer.value, l_packet, obj)
+                    have_logged = True
                 time.sleep(self._sleep_time_s)
 
             # Now we can write out our data to the buffer:
             with self._buffer.get_lock():
                 # Do we have to write in multiple pieces because of the end of the buffer?
-                if l_data > (self._buffer_size - self._cur_buf_write_position.value + 1):
+                if l_packet > (self._buffer_size - self._cur_buf_write_position.value):
                     # Write the first part of the data:
-                    l_first_part = self._buffer_size - self._cur_buf_write_position.value + 1
+                    l_first_part = self._buffer_size - self._cur_buf_write_position.value
+
                     self._buffer[self._cur_buf_write_position.value:
-                                 self._cur_buf_write_position.value+l_first_part] = data[0:l_first_part]
+                                 self._cur_buf_write_position.value+l_first_part] = packet[:l_first_part]
 
                     # Write the second part:
-                    l_second_part = len(data) - l_first_part
-                    self._buffer[0:l_second_part] = data[l_first_part:]
-
-                    # Write delimiter:
-                    self._buffer[l_second_part:l_second_part+len(self._delim)] = self._delim[:]
+                    l_second_part = l_packet - l_first_part
+                    self._buffer[:l_second_part] = packet[l_first_part:]
 
                     # Update buffer info:
-                    self._cur_buf_write_position.value = l_second_part + len(self._delim)
+                    self._cur_buf_write_position.value = l_second_part
                 else:
                     self._buffer[self._cur_buf_write_position.value:
-                                 self._cur_buf_write_position.value+len(data)] = data[:]
-                    self._cur_buf_write_position.value += len(data)
-                    self._buffer[self._cur_buf_write_position.value:
-                                 self._cur_buf_write_position.value+len(self._delim)] = self._delim[:]
+                                 self._cur_buf_write_position.value+l_packet] = packet
+                    self._cur_buf_write_position.value += l_packet
 
                 # Update our counts:
                 with self._num_messages_in_buffer.get_lock():
-                    self._unused_bytes_in_buffer.value -= l_data
-                    self._cur_bytes_in_buffer.value += l_data
+                    self._unused_bytes_in_buffer.value -= l_packet
+                    self._cur_bytes_in_buffer.value += l_packet
                     self._num_messages_in_buffer.value += 1
 
     def get(self):
@@ -158,18 +160,19 @@ class ManyProducerSingleConsumerIpcQueue:
             delim_start_pos = self._cur_buf_read_position.value
             delim_found = False
             while not delim_found:
-                if delim_start_pos + len(self._delim) >= self._buffer_size:
+                if delim_start_pos + len(self._delim) > self._buffer_size:
                     # Delimiter could span the circular boundary.
                     # Get our data in two pieces then compare:
                     first_piece = self._buffer[delim_start_pos:]
                     second_piece = self._buffer[0:len(self._delim) - len(first_piece)]
-                    if first_piece + second_piece == self._delim:
+                    if self._are_arrays_equal(first_piece + second_piece, self._delim):
                         delim_found = True
                 else:
-                    if self._buffer[delim_start_pos:delim_start_pos+len(self._delim)] == self._delim:
+                    if self._are_arrays_equal(self._buffer[delim_start_pos:delim_start_pos + len(self._delim)],
+                                              self._delim):
                         # We found our delimiter.
                         delim_found = True
-                delim_start_pos += len(self._delim)
+                delim_start_pos = delim_start_pos + 1 if delim_start_pos < self._buffer_size else 0
 
             # Now delim_start_pos holds the delimiter start position.
             # It's possible that delim_start_pos is now before our current read position, which would mean we have
@@ -198,13 +201,22 @@ class ManyProducerSingleConsumerIpcQueue:
             obj = pickle.loads(data, fix_imports=False)
 
             # Update our counts:
-            self._cur_buf_read_position.value = delim_start_pos
+            self._cur_buf_read_position.value = delim_start_pos + len(self._delim) - 1
             with self._num_messages_in_buffer.get_lock():
-                self._unused_bytes_in_buffer.value += l_data
-                self._cur_bytes_in_buffer.value -= l_data
+                self._unused_bytes_in_buffer.value += l_data + len(self._delim) - 1
+                self._cur_bytes_in_buffer.value -= l_data + len(self._delim) - 1
                 self._num_messages_in_buffer.value -= 1
 
         return obj
+
+    @staticmethod
+    def _are_arrays_equal(it1, it2):
+        if len(it1) != len(it2):
+            return False
+        for i in range(len(it1)):
+            if it1[i] != it2[i]:
+                return False
+        return True
 
 
 # Named tuple to store alignment information:
@@ -296,15 +308,15 @@ def main(model, threads, output_bam, input_bam):
         else:
             # Create an array to store our cross-process objects:
             if use_shared_memory:
-                # TODO: Update to SharableList
-                multi_process_arrays.append(
-                    mp.Array(size_or_initializer=__MP_BUFFER_LEN_BYTES, typecode_or_type=ctypes.c_ubyte, lock=True)
-                )
-                ctypes.memset(multi_process_arrays[-1].get_obj(), 0x0, __MP_BUFFER_LEN_BYTES)
-                p = mp.Process(target=_worker_segmentation_fn, args=(multi_process_arrays[i], results, i))
-
-                # multi_process_arrays.append(ManyProducerSingleConsumerIpcQueue())
+                # TODO: Update to SharableList?
+                # multi_process_arrays.append(
+                #     mp.Array(size_or_initializer=__MP_BUFFER_LEN_BYTES, typecode_or_type=ctypes.c_ubyte, lock=True)
+                # )
+                # ctypes.memset(multi_process_arrays[-1].get_obj(), 0x0, __MP_BUFFER_LEN_BYTES)
                 # p = mp.Process(target=_worker_segmentation_fn, args=(multi_process_arrays[i], results, i))
+
+                multi_process_arrays.append(ManyProducerSingleConsumerIpcQueue())
+                p = mp.Process(target=_worker_segmentation_fn, args=(multi_process_arrays[i], results, i))
             else:
                 p = mp.Process(target=_worker_segmentation_fn, args=(input_data_queue, results, i))
         p.start()
@@ -361,29 +373,32 @@ def main(model, threads, output_bam, input_bam):
                 r = (rs, m)
 
             st = time.time()
-            if use_shared_memory and not use_threads:
-                placed = False
-                while not placed:
-                    for i in range(threads):
-                        worker_indx = (cur_worker_thread + i) % threads
-                        if multi_process_arrays[worker_indx][0] != 0x0 or \
-                                (r is __SENTINEL_VALUE and not still_running[worker_indx]):
-                            continue
-                        else:
-                            raw = pickle.dumps(r, fix_imports=False)
 
-                            with multi_process_arrays[worker_indx].get_lock():
-                                multi_process_arrays[worker_indx][0:len(raw)] = raw[:]
-
-                            cur_worker_thread = (worker_indx + 1) % threads
-                            placed = True
-                            # if r is _SENTINEL_VALUE:
-                            #     still_running[worker_indx] = False
-                            break
-                    if not placed:
-                        time.sleep(__SLEEP_LEN_S)
-            else:
-                input_data_queue.put((rs, m))
+            multi_process_arrays[cur_worker_thread].put(r)
+            cur_worker_thread = (cur_worker_thread + 1) % threads
+            # if use_shared_memory and not use_threads:
+            #     placed = False
+            #     while not placed:
+            #         for i in range(threads):
+            #             worker_indx = (cur_worker_thread + i) % threads
+            #             if multi_process_arrays[worker_indx][0] != 0x0 or \
+            #                     (r is __SENTINEL_VALUE and not still_running[worker_indx]):
+            #                 continue
+            #             else:
+            #                 raw = pickle.dumps(r, fix_imports=False)
+            #
+            #                 with multi_process_arrays[worker_indx].get_lock():
+            #                     multi_process_arrays[worker_indx][0:len(raw)] = raw[:]
+            #
+            #                 cur_worker_thread = (worker_indx + 1) % threads
+            #                 placed = True
+            #                 # if r is _SENTINEL_VALUE:
+            #                 #     still_running[worker_indx] = False
+            #                 break
+            #         if not placed:
+            #             time.sleep(__SLEEP_LEN_S)
+            # else:
+            #     input_data_queue.put((rs, m))
             queue_put_time += time.time() - st
             # print("Still running: " + str(still_running))
 
