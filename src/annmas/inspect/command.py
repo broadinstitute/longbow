@@ -7,9 +7,6 @@ import gzip
 from collections import OrderedDict
 from construct import *
 
-import matplotlib.pyplot as plt
-from matplotlib import transforms
-
 from ..utils.model import *
 
 logger = logging.getLogger(__name__)
@@ -21,9 +18,10 @@ click_log.basic_config(logger)
 @click.option("-r", "--read-names", type=str, multiple=True, help="read names (or file(s) of read names) to inspect")
 @click.option("-m", "--model", required=False, type=click.Path(exists=True), help="pre-trained model to apply")
 @click.option("-p", "--pbi", required=False, type=click.Path(exists=True), help="BAM .pbi index file")
+@click.option("-f", "--file-format", default="png", type=click.Choice(['png', 'pdf']), help="Image file format")
 @click.option("-o", "--outdir", default=".", required=False, type=click.Path(exists=False), help="Output directory")
 @click.argument('input-bam', type=click.Path(exists=True))
-def main(read_names, model, pbi, outdir, input_bam):
+def main(read_names, model, pbi, file_format, outdir, input_bam):
     """Inspect the classification results on specified reads"""
     logger.info(f"annmas: inspect started")
 
@@ -50,7 +48,7 @@ def main(read_names, model, pbi, outdir, input_bam):
         bf.seek(file_offsets[z]['offset'])
         read = bf.__next__()
 
-        out = f'{outdir}/{re.sub("/", "_", read.query_name)}.png'
+        out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
         seq, path, logp = annotate_read(read, m)
 
         logger.info("Drawing read '%s' to '%s'", read.query_name, out)
@@ -201,14 +199,6 @@ def format_state_sequence(seq, path):
 def draw_state_sequence(seq, path, read, out, **kwargs):
     strings, colors, labels = format_state_sequence(seq, path)
 
-    # qq = 0
-    # for q, r, s in zip(strings, colors, labels):
-    #     qq += len(q)
-    #     print(f'{len(q)} {qq} {r} {s} {q}')
-    #
-    #     if qq >= 150:
-    #         qq = 0
-
     f = plt.figure(figsize=(24, 24))
 
     ax = plt.gca()
@@ -241,7 +231,11 @@ def draw_state_sequence(seq, path, read, out, **kwargs):
         # Write classified sequence
         text.draw(canvas.get_renderer())
         ex = text.get_window_extent()
-        t = transforms.offset_copy(text.get_transform(), x=ex.width, units='dots')
+
+        # I truly have no idea why I need the 0.72 scaling factor, but if I don't have this, PDF images
+        # are super broken.
+        scaling_factor = 1.00 if out.endswith(".png") else 0.72
+        t = transforms.offset_copy(text.get_transform(), x=scaling_factor*ex.width, units='dots')
 
         # Write state label
         if l != "random":
