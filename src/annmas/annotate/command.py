@@ -4,12 +4,7 @@ import itertools
 import re
 import time
 import collections
-import math
-import ctypes
-import pickle
-import numpy as np
 
-import queue
 from inspect import getframeinfo, currentframe, getdoc
 
 import click
@@ -18,13 +13,10 @@ import tqdm
 
 import pysam
 import multiprocessing as mp
-import threading
 
 from ..utils.model import build_default_model
 from ..utils.model import reverse_complement
 from ..utils.model import annotate
-
-import annmas.fmq as fmq
 
 from ..meta import VERSION
 
@@ -40,240 +32,6 @@ logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
 
 mod_name = "annotate"
-
-
-class ManyProducerSingleConsumerIpcQueue:
-    """Shared memory backed queue class that can communicate between processes.
-    Designed for many producers to be able to write to this queue, but only one consumer to read from it.
-    Shared memory backing is implemented with multiprocessing.Array.
-    """
-
-    __instance_counter = 0
-
-    def __init__(self, size_bytes=1024*1024*5, sleep_time_s=0.0000001):
-        self._buffer = mp.Array(size_or_initializer=size_bytes, typecode_or_type=ctypes.c_ubyte, lock=True)
-        ctypes.memset(self._buffer.get_obj(), 0x0, size_bytes)
-        self._buffer_size = size_bytes
-
-        # The following 3 counters are always updated together, so we use only 1 lock for them:
-        self._num_messages_in_buffer = mp.Value(ctypes.c_ulong, 0, lock=True)
-        self._cur_bytes_in_buffer = mp.Value(ctypes.c_ulong, 0, lock=False)
-        self._unused_bytes_in_buffer = mp.Value(ctypes.c_ulong, size_bytes, lock=False)
-
-        self._cur_buf_read_position = mp.Value(ctypes.c_ulong, 0, lock=True)
-        self._cur_buf_write_position = mp.Value(ctypes.c_ulong, 0, lock=True)
-
-        # we use a canonical delimiter here:
-        # TODO: Update to use UUID lib for increased safety ala: uuid.uuid4().bytes
-        self._delim = bytearray(b'\xDE\xAD\xBE\xEF')
-        self._sleep_time_s = sleep_time_s
-
-        self._label = ManyProducerSingleConsumerIpcQueue.__instance_counter
-        ManyProducerSingleConsumerIpcQueue.__instance_counter += 1
-
-        # So we can track how long it takes for us to pickle/unpickle our data:
-        self._total_pickle_time_s = mp.Value(ctypes.c_double, 0, lock=True)
-        self._total_unpickle_time_s = mp.Value(ctypes.c_double, 0, lock=True)
-
-        # To track sleep time:
-        self._total_time_spent_waiting_in_put_s = mp.Value(ctypes.c_double, 0, lock=True)
-        self._total_time_spent_waiting_in_get_s = mp.Value(ctypes.c_double, 0, lock=True)
-
-    def __len__(self):
-        return self._num_messages_in_buffer.value
-
-    def total_pickle_time(self):
-        return self._total_pickle_time_s.value
-
-    def total_unpickle_time(self):
-        return self._total_unpickle_time_s.value
-
-    def total_put_wait_time(self):
-        return self._total_time_spent_waiting_in_put_s.value
-
-    def total_get_wait_time(self):
-        return self._total_time_spent_waiting_in_get_s.value
-
-    def size(self):
-        return self._buffer_size
-
-    def put(self, obj):
-        """Put an object onto this queue.
-        The object must be able to be pickled.
-
-        If the queue doesn't have enough free space to hold the object, blocks until enough space is available.
-        If the queue is too small for the object, an exception is thrown."""
-
-        st = time.time()
-        data = pickle.dumps(obj, fix_imports=False)
-        et = time.time()
-        self._total_pickle_time_s.acquire()
-        self._total_pickle_time_s.value += et - st
-        self._total_pickle_time_s.release()
-
-        packet = data + self._delim
-        l_packet = len(data) + len(self._delim)
-        if l_packet > self._buffer_size:
-            raise BufferError(f"Given data cannot fit in buffer with delimiter: {l_packet} > {self._buffer_size}")
-
-        # Lock on the write position:
-        try:
-            logger.debug(f"IPCQ {self._label} about to acquire write position lock.")
-            self._cur_buf_write_position.acquire()
-            logger.debug(f"IPCQ {self._label} acquired write position lock.")
-
-            # Here we peek at the bytes remaining in the buffer to wait for it to be small enough.
-            # We can't write to this buffer while we're locked above, so we are guaranteed that the size will not grow.
-            have_logged = False
-            st = time.time()
-            while l_packet > self._unused_bytes_in_buffer.value:
-                if not have_logged:
-                    logger.debug("Waiting for space to place object (%d > %d/%d free bytes, items in queue: %d).",
-                                 l_packet, self._unused_bytes_in_buffer.value, self._buffer_size,
-                                 self._num_messages_in_buffer.value)
-                    have_logged = True
-                time.sleep(self._sleep_time_s)
-            et = time.time()
-            self._total_time_spent_waiting_in_put_s.acquire()
-            self._total_time_spent_waiting_in_put_s.value += et - st
-            self._total_time_spent_waiting_in_put_s.release()
-
-            # Now we can write out our data to the buffer:
-            # with self._buffer.get_lock():
-
-            # Do we have to write in multiple pieces because of the end of the buffer?
-            if l_packet > (self._buffer_size - self._cur_buf_write_position.value):
-                # Write the first part of the data:
-                l_first_part = self._buffer_size - self._cur_buf_write_position.value
-
-                self._buffer[self._cur_buf_write_position.value:
-                             self._cur_buf_write_position.value+l_first_part] = packet[:l_first_part]
-
-                # Write the second part:
-                l_second_part = l_packet - l_first_part
-                self._buffer[:l_second_part] = packet[l_first_part:]
-
-                # Update buffer info:
-                self._cur_buf_write_position.value = l_second_part
-            else:
-                self._buffer[self._cur_buf_write_position.value:
-                             self._cur_buf_write_position.value+l_packet] = packet
-                self._cur_buf_write_position.value += l_packet
-
-            # Update our counts:
-            try:
-                logger.debug(f"IPCQ {self._label} about to acquire num message lock (put).")
-                self._num_messages_in_buffer.acquire()
-                logger.debug(f"IPCQ {self._label} acquired num message lock (put).")
-
-                self._unused_bytes_in_buffer.value -= l_packet
-                self._cur_bytes_in_buffer.value += l_packet
-                self._num_messages_in_buffer.value += 1
-            finally:
-                logger.debug(f"IPCQ {self._label} about to release num message lock (put).")
-                self._num_messages_in_buffer.release()
-                logger.debug(f"IPCQ {self._label} released num message lock (put).")
-        finally:
-            self._cur_buf_write_position.release()
-
-    def get(self):
-        """Get an object off of this queue.
-        If there are no objects on this queue, waits until one is available."""
-
-        # Wait for a message to come in:
-        st = time.time()
-        while self._num_messages_in_buffer.value < 1:
-            time.sleep(self._sleep_time_s)
-        et = time.time()
-        self._total_time_spent_waiting_in_get_s.acquire()
-        self._total_time_spent_waiting_in_get_s.value += et - st
-        self._total_time_spent_waiting_in_get_s.release()
-
-        # Get our read lock:
-        try:
-            logger.debug(f"IPCQ {self._label} about to acquire read position lock.")
-            self._cur_buf_read_position.acquire()
-            logger.debug(f"IPCQ {self._label} acquired read position lock.")
-
-            # Now that we have a message, we need to scan our buffer for the delimiter and grab the data:
-            delim_start_pos = self._cur_buf_read_position.value
-            delim_found = False
-            while not delim_found:
-                if delim_start_pos + len(self._delim) > self._buffer_size:
-                    # Delimiter could span the circular boundary.
-                    # Get our data in two pieces then compare:
-                    first_piece = self._buffer[delim_start_pos:]
-                    second_piece = self._buffer[0:len(self._delim) - len(first_piece)]
-                    if self._are_arrays_equal(first_piece + second_piece, self._delim):
-                        delim_found = True
-                else:
-                    if self._are_arrays_equal(self._buffer[delim_start_pos:delim_start_pos + len(self._delim)],
-                                              self._delim):
-                        # We found our delimiter.
-                        delim_found = True
-                delim_start_pos = delim_start_pos + 1 if delim_start_pos < self._buffer_size else 0
-
-            # Now delim_start_pos holds the delimiter start position.
-            # It's possible that delim_start_pos is now before our current read position, which would mean we have
-            # to read the data in 2 pieces:
-            if delim_start_pos < self._cur_buf_read_position.value:
-                # Get our data size:
-                l_data = self._buffer_size - self._cur_buf_read_position.value + 1
-                l_data += delim_start_pos
-
-                data = bytearray(l_data)
-
-                # Get the first part of the data:
-                data[:self._buffer_size - self._cur_buf_read_position.value + 1] = \
-                    self._buffer[self._cur_buf_read_position.value:]
-
-                # Get the second part of the data:
-                data[-delim_start_pos:] = self._buffer[:delim_start_pos]
-
-            else:
-                # Get the data up to the start of the delimiter:
-                l_data = delim_start_pos - self._cur_buf_read_position.value
-                data = bytearray(l_data)
-                data[:l_data] = self._buffer[self._cur_buf_read_position.value:delim_start_pos]
-
-            # Create our object:
-            st = time.time()
-            obj = pickle.loads(data, fix_imports=False)
-            et = time.time()
-            self._total_unpickle_time_s.acquire()
-            self._total_unpickle_time_s.value += et - st
-            self._total_unpickle_time_s.release()
-
-            # Update our counts:
-            self._cur_buf_read_position.value = delim_start_pos + len(self._delim) - 1
-            try:
-                logger.debug(f"IPCQ {self._label} about to acquire num message lock (get).")
-                self._num_messages_in_buffer.acquire()
-                logger.debug(f"IPCQ {self._label} acquired num message lock (get).")
-
-                self._unused_bytes_in_buffer.value += l_data + len(self._delim) - 1
-                self._cur_bytes_in_buffer.value -= l_data + len(self._delim) - 1
-                self._num_messages_in_buffer.value -= 1
-            finally:
-                logger.debug(f"IPCQ {self._label} about to release num message lock (get).")
-                self._num_messages_in_buffer.release()
-                logger.debug(f"IPCQ {self._label} released num message lock (get).")
-
-        finally:
-            logger.debug(f"IPCQ {self._label} about to release read position lock.")
-            self._cur_buf_read_position.release()
-            logger.debug(f"IPCQ {self._label} released read position lock.")
-
-        return obj
-
-    @staticmethod
-    def _are_arrays_equal(it1, it2):
-        if len(it1) != len(it2):
-            return False
-        for i in range(len(it1)):
-            if it1[i] != it2[i]:
-                return False
-        return True
 
 
 # Named tuple to store alignment information:
@@ -521,6 +279,7 @@ def _collapse_annotations(path):
     last = ""
     start = 0
     segments = []
+    i = 0
     for i, seg in enumerate(path):
         if seg != last:
             if i != 0:
