@@ -2,6 +2,8 @@ import logging
 import sys
 import itertools
 
+import time
+
 import click
 import click_log
 import tqdm
@@ -63,6 +65,7 @@ mod_name = "segment"
 @click.argument("input-bam", type=click.Path(exists=True))
 def main(threads, output_bam, do_simple_splitting, keep_delimiters, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
+    t_start = time.time()
     logger.info(f"annmas: {mod_name} started")
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
@@ -135,6 +138,7 @@ def main(threads, output_bam, do_simple_splitting, keep_delimiters, input_bam):
         output_worker.join()
 
         logger.info(f"annmas: {mod_name} finished.")
+        logger.info(f"annmas: elapsed time: %2.5fs.", time.time() - t_start)
 
 
 def _sub_process_work_fn(in_queue, out_queue):
