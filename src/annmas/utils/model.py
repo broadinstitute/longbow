@@ -52,7 +52,7 @@ array_element_structure = (
 
 adapters = {
     "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
-    #"5p_TSO": "TTTCTTATATGGG",
+    # "5p_TSO": "TTTCTTATATGGG",
     "Poly_A": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
     "A": "AGCTTACTTGTGAAGA",
@@ -243,7 +243,6 @@ def build_default_model():
 
     # link rda to starts
     for sname in starts:
-        #if sname in ["Poly_A", "10x_Adapter"]:
         if sname in ["Poly_A"]:
             full_model.add_transition(rda, starts[sname], 1.0)
 
@@ -254,12 +253,10 @@ def build_default_model():
             sname = m.group(1)
 
             if sname in direct_connections:
-                # p = 1.0 / (10 * len(direct_connections[sname]))
-                # full_model.add_transition(s, rdb, p)
-
                 for dcname in direct_connections[sname]:
-                    #full_model.add_transition(s, starts[dcname], (1.0 - p) / len(direct_connections[sname]))
-                    full_model.add_transition(s, starts[dcname], 1.0 / len(direct_connections[sname]))
+                    full_model.add_transition(
+                        s, starts[dcname], 1.0 / len(direct_connections[sname])
+                    )
             else:
                 full_model.add_transition(s, rdb, 0.5)
 
@@ -274,51 +271,7 @@ def build_default_model():
     return full_model
 
 
-def smooth(path, radius=5):
-    p = 0
-
-    while p < len(path):
-        # Are we in an adapter (as opposed to just the random model)?
-        if path[p] in adapters:
-            # We are!  How far does it extend?
-            p_adapter_left = p - 1
-            while p_adapter_left >= 0 and path[p_adapter_left] == path[p]:
-                p_adapter_left = p_adapter_left - 1
-
-            p_adapter_right = p + 1
-            while p_adapter_right < len(path) and path[p_adapter_right] == path[p]:
-                p_adapter_right = p_adapter_right + 1
-
-            # Now check if this is an adapter island (the surrounding states are just the random model)
-            prev_label = None
-            if p_adapter_left - radius >= 0:
-                prev_labels = set(
-                    path[(p_adapter_left - 1 - radius) : (p_adapter_left - 1)]
-                )
-                if len(prev_labels) == 1:
-                    prev_label = next(iter(prev_labels))
-
-            next_label = None
-            if p_adapter_right + radius < len(path):
-                next_labels = set(
-                    path[(p_adapter_right + 1) : (p_adapter_right + 1 + radius)]
-                )
-                if len(next_labels) == 1:
-                    next_label = next(iter(next_labels))
-
-            # Are we an island?
-            if prev_label == next_label and prev_label == "random":
-                for q in range(p_adapter_left, p_adapter_right):
-                    path[q] = "random"
-
-            p = p_adapter_right
-
-        p += 1
-
-    return path
-
-
-def annotate(full_model, seq, smooth_islands=False):
+def annotate(full_model, seq):
     logp, path = full_model.viterbi(seq)
 
     ppath = []
@@ -329,9 +282,6 @@ def annotate(full_model, seq, smooth_islands=False):
             and ":D" not in state.name
         ):
             ppath.append(f'{re.split(":", state.name)[0]}')
-
-    if smooth_islands:
-        ppath = smooth(ppath)
 
     return logp, ppath
 
