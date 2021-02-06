@@ -4,6 +4,7 @@ import itertools
 import re
 import time
 import collections
+import os
 
 from inspect import getframeinfo, currentframe, getdoc
 
@@ -28,10 +29,9 @@ __SENTINEL_VALUE = r"THE _MOST_ CROMULENT SENTINEL VALUE."
 SEGMENTS_TAG = "SG"
 SEGMENTS_RC_TAG = "RC"
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(stream=sys.stderr)
+logger = logging.getLogger("annotate")
 click_log.basic_config(logger)
-
-mod_name = "annotate"
 
 
 # Named tuple to store alignment information:
@@ -54,7 +54,7 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
         return SegmentInfo(match[1], int(match[2]), int(match[3]))
 
 
-@click.command(name=mod_name)
+@click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
 @click.option(
     "-m",
@@ -74,16 +74,17 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
 @click.option(
     "-o",
     "--output-bam",
-    required=True,
+    default="-",
     type=click.Path(exists=False),
-    help="segment-annotated bam output",
+    help="annotated bam output  [default: stdout]",
 )
 @click.argument("input-bam", type=click.Path(exists=True))
 def main(model, threads, output_bam, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
-    logger.info(f"annmas: {mod_name} started")
+
+    logger.info("Invoked via: annmas %s", " ".join(sys.argv[1:]))
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
@@ -96,7 +97,7 @@ def main(model, threads, output_bam, input_bam):
         logger.info("Using default annotation model")
 
     # Create queues for data:
-    queue_size = threads*2 if threads < 10 else 20
+    queue_size = threads * 2 if threads < 10 else 20
     manager = mp.Manager()
     input_data_queue = manager.Queue(maxsize=queue_size)
     results = manager.Queue()
@@ -109,14 +110,23 @@ def main(model, threads, output_bam, input_bam):
     # input_data_queue = ManyProducerSingleConsumerIpcQueue()
 
     for i in range(threads):
-        p = mp.Process(target=_worker_segmentation_fn, args=(input_data_queue, results, i, m))
+        p = mp.Process(
+            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m)
+        )
         p.start()
         worker_pool.append(p)
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
-    ) as bam_file, tqdm.tqdm(desc="Progress", unit=" read", colour="green", file=sys.stdout) as pbar:
+    ) as bam_file, tqdm.tqdm(
+        desc="Progress",
+        unit=" read",
+        colour="green",
+        file=sys.stderr,
+        leave=False,
+        disable=input_bam == "-",
+    ) as pbar:
 
         # Get our header from the input bam file:
         out_bam_header_dict = bam_file.header.to_dict()
@@ -137,7 +147,10 @@ def main(model, threads, output_bam, input_bam):
         out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
 
         # Start output worker:
-        output_worker = mp.Process(target=_write_thread_fn, args=(results, out_header, output_bam, pbar))
+        res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
+        output_worker = mp.Process(
+            target=_write_thread_fn, args=(results, out_header, output_bam, pbar, res)
+        )
         output_worker.start()
 
         # Add in a `None` sentinel value at the end of the queue - one for each subprocess - so we guarantee
@@ -149,8 +162,8 @@ def main(model, threads, output_bam, input_bam):
                 r = r.to_string()
             input_data_queue.put(r)
 
-        logger.info("Finished reading data and sending it to sub-processes.")
-        logger.info("Waiting for sub-processes to finish...")
+        logger.debug("Finished reading data and sending it to sub-processes.")
+        logger.debug("Waiting for sub-processes to finish...")
 
         # Wait for our input jobs to finish:
         for p in worker_pool:
@@ -164,18 +177,17 @@ def main(model, threads, output_bam, input_bam):
         results.put(__SENTINEL_VALUE)
         output_worker.join()
 
-    logger.info(f"annmas: {mod_name} finished.")
-    logger.info(f"annmas: elapsed time: %2.5fs.", time.time() - t_start)
+    logger.info(
+        f"Annotated {res['num_reads_annotated']} reads with {res['num_sections']} total sections."
+    )
+    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res):
     """Thread / process fn to write out all our data."""
 
-    num_reads_annotated = 0
-    num_sections = 0
-
     with pysam.AlignmentFile(
-            out_bam_file_name, "wb", header=out_bam_header
+        out_bam_file_name, "wb", header=out_bam_header
     ) as out_bam_file:
 
         while True:
@@ -219,14 +231,10 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
             out_bam_file.write(read)
 
             # Increment our counters:
-            num_reads_annotated += 1
-            num_sections += len(segments)
+            res["num_reads_annotated"] += 1
+            res["num_sections"] += len(segments)
 
             pbar.update(1)
-
-    logger.info(
-        f"annmas {mod_name}: annotated {num_reads_annotated} reads with {num_sections} total sections."
-    )
 
 
 def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
@@ -251,7 +259,9 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
 
         # Unpack our data here:
         read = raw_data
-        read = pysam.AlignedSegment.fromstring(read, pysam.AlignmentHeader.from_dict(dict()))
+        read = pysam.AlignedSegment.fromstring(
+            read, pysam.AlignmentHeader.from_dict(dict())
+        )
 
         # Process and place our data on the output queue:
         segment_info = _segment_read(read, model)
@@ -259,7 +269,7 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
         out_queue.put(segment_info)
         num_reads_segmented += 1
 
-    logger.info(f"Worker %d: Num reads segmented: %d", worker_num, num_reads_segmented)
+    logger.debug(f"Worker %d: Num reads segmented: %d", worker_num, num_reads_segmented)
 
 
 def _reverse_segments(segments, read_length):
@@ -268,7 +278,9 @@ def _reverse_segments(segments, read_length):
     for seg in segments[::-1]:
         rc_segments.append(
             # Subtract 2 to account for inclusive coordinates on both ends:
-            SegmentInfo(seg.name, read_length - seg.end - 2, read_length - seg.start - 2)
+            SegmentInfo(
+                seg.name, read_length - seg.end - 2, read_length - seg.start - 2
+            )
         )
 
     return rc_segments
