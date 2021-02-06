@@ -67,7 +67,7 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
     "-t",
     "--threads",
     type=int,
-    default=1,
+    default=mp.cpu_count() - 1,
     show_default=True,
     help="number of threads to use (0 for all)",
 )
