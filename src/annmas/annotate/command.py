@@ -4,7 +4,6 @@ import itertools
 import re
 import time
 import collections
-import os
 
 from inspect import getframeinfo, currentframe, getdoc
 
@@ -78,7 +77,7 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
     type=click.Path(exists=False),
     help="annotated bam output  [default: stdout]",
 )
-@click.argument("input-bam", type=click.Path(exists=True))
+@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(model, threads, output_bam, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
@@ -125,7 +124,6 @@ def main(model, threads, output_bam, input_bam):
         colour="green",
         file=sys.stderr,
         leave=False,
-        disable=input_bam == "-",
     ) as pbar:
 
         # Get our header from the input bam file:
