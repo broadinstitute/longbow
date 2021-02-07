@@ -131,8 +131,8 @@ def load_read_offsets(pbi_file, read_names):
         "reserved" / Padding(18),
         # Basic information section (columnar format)
         "rgId" / Padding(this.n_reads * 4),
-        "qStart" / Array(this.n_reads, Int32sl),
-        "qEnd" / Padding(this.n_reads * 4),
+        "qStart" / Padding(this.n_reads * 4),
+        "qEnd" / Array(this.n_reads, Int32sl),
         "holeNumber" / Array(this.n_reads, Int32sl),
         "readQual" / Padding(this.n_reads * 4),
         "ctxtFlag" / Padding(this.n_reads * 1),
@@ -142,19 +142,22 @@ def load_read_offsets(pbi_file, read_names):
     # Make a list of bgzf virtual file offsets for sharding and store ZMW counts.
     file_offsets_hash = OrderedDict()
     for read_name in read_names:
-        movie_name, zmw, r = re.split("/", read_name)
-        if r == "ccs":
-            r = 0
-        else:
-            r = re.split("_", r)[0]
+        name_pieces = re.split("/", read_name)
 
-        file_offsets_hash[f"{zmw}_{r}"] = {"read_name": read_name, "offset": None}
+        hole_number = int(name_pieces[1])
+        if "ccs" and len(name_pieces) > 3:
+            rr = re.split("_", name_pieces[3])
+            range_end = int(rr[1]) - int(rr[0]) + 1
+        else:
+            range_end = re.split("_", name_pieces[2])[1]
+
+        file_offsets_hash[f"{hole_number}_{range_end}"] = {"read_name": read_name, "offset": None}
 
     with gzip.open(pbi_file, "rb") as f:
         idx_contents = fmt.parse_stream(f)
 
         for j in range(0, idx_contents.n_reads):
-            key = f"{idx_contents.holeNumber[j]}_{idx_contents.qStart[j]}"
+            key = f"{idx_contents.holeNumber[j]}_{idx_contents.qEnd[j]}"
 
             # Save virtual file offsets for the selected reads only
             if key in file_offsets_hash:
@@ -165,14 +168,29 @@ def load_read_offsets(pbi_file, read_names):
 
 def annotate_read(read, m):
     flogp = -math.inf
-    fseq = None
-    for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
-        logp, ppath = annotate(m, seq)
+    fseq = read.query_sequence
+    fppath = []
 
-        if logp > flogp:
-            fseq = seq
-            flogp = logp
-            fppath = ppath
+    if read.has_tag("SG"):
+        tag = re.split(",", read.get_tag("SG"))
+
+        # At the moment, we need to slice the tag array because the
+        # first and last elements listed in the state sequence aren't
+        # actually in the segmented reads.
+        for e in tag[1:len(tag)-1]:
+            state, rrange = re.split(":", e)
+            qStart, qEnd = re.split("-", rrange)
+            qLen = int(qEnd) - int(qStart) + 1
+
+            fppath.extend([state] * qLen)
+    else:
+        for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
+            logp, ppath = annotate(m, seq)
+
+            if logp > flogp:
+                fseq = seq
+                flogp = logp
+                fppath = ppath
 
     return fseq, fppath, flogp
 
