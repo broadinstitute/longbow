@@ -145,9 +145,12 @@ def load_read_offsets(pbi_file, read_names):
         name_pieces = re.split("/", read_name)
 
         hole_number = int(name_pieces[1])
-        if "ccs" and len(name_pieces) > 3:
-            rr = re.split("_", name_pieces[3])
-            range_end = int(rr[1]) - int(rr[0]) + 1
+        if "ccs" in name_pieces:
+            if len(name_pieces) > 3:
+                rr = re.split("_", name_pieces[3])
+                range_end = int(rr[1]) - int(rr[0]) + 1
+            else:
+                range_end = -1
         else:
             range_end = re.split("_", name_pieces[2])[1]
 
@@ -157,11 +160,14 @@ def load_read_offsets(pbi_file, read_names):
         idx_contents = fmt.parse_stream(f)
 
         for j in range(0, idx_contents.n_reads):
-            key = f"{idx_contents.holeNumber[j]}_{idx_contents.qEnd[j]}"
+            key1 = f"{idx_contents.holeNumber[j]}_{idx_contents.qEnd[j]}"
+            key2 = f"{idx_contents.holeNumber[j]}_-1"
 
             # Save virtual file offsets for the selected reads only
-            if key in file_offsets_hash:
-                file_offsets_hash[key]["offset"] = idx_contents.fileOffset[j]
+            if key1 in file_offsets_hash:
+                file_offsets_hash[key1]["offset"] = idx_contents.fileOffset[j]
+            elif key2 in file_offsets_hash:
+                file_offsets_hash[key2]["offset"] = idx_contents.fileOffset[j]
 
     return file_offsets_hash
 
