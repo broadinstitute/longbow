@@ -119,14 +119,7 @@ def main(model, threads, output_bam, input_bam):
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
-    ) as bam_file, tqdm.tqdm(
-        desc="Progress",
-        unit=" read",
-        colour="green",
-        file=sys.stderr,
-        leave=False,
-        disable=input_bam == "-",
-    ) as pbar:
+    ) as bam_file:
 
         # Get our header from the input bam file:
         out_bam_header_dict = bam_file.header.to_dict()
@@ -149,7 +142,7 @@ def main(model, threads, output_bam, input_bam):
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
         output_worker = mp.Process(
-            target=_write_thread_fn, args=(results, out_header, output_bam, pbar, res)
+            target=_write_thread_fn, args=(results, out_header, output_bam, input_bam == "-", res)
         )
         output_worker.start()
 
@@ -180,15 +173,23 @@ def main(model, threads, output_bam, input_bam):
     logger.info(
         f"Annotated {res['num_reads_annotated']} reads with {res['num_sections']} total sections."
     )
-    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+    et = time.time()
+    logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s.  "
+                f"Overall processing rate: {res['num_reads_annotated']/(et - t_start):2.2f} reads/s.")
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res):
     """Thread / process fn to write out all our data."""
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
-    ) as out_bam_file:
+    ) as out_bam_file, tqdm.tqdm(
+        desc="Progress",
+        unit=" read",
+        colour="green",
+        file=sys.stderr,
+        disable=disable_pbar,
+    ) as pbar:
 
         while True:
             # Wait for some output data:
