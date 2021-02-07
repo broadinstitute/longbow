@@ -141,7 +141,7 @@ def main(model, threads, output_bam, input_bam):
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
         output_worker = mp.Process(
-            target=_write_thread_fn, args=(results, out_header, output_bam, input_bam == "-", res)
+            target=_write_thread_fn, args=(results, out_header, output_bam, not sys.stdin.isatty(), res)
         )
         output_worker.start()
 
@@ -173,7 +173,7 @@ def main(model, threads, output_bam, input_bam):
         f"Annotated {res['num_reads_annotated']} reads with {res['num_sections']} total sections."
     )
     et = time.time()
-    logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s.  "
+    logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
                 f"Overall processing rate: {res['num_reads_annotated']/(et - t_start):2.2f} reads/s.")
 
 
