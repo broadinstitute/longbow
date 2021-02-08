@@ -19,7 +19,7 @@ from .meta import VERSION
 logger = logging.getLogger("version")
 click_log.basic_config(logger)
 logger.handlers[0].formatter = logging.Formatter(
-    "[%(levelname)s %(asctime)s %(name)s] %(message)s", "%Y-%m-%d %H:%M:%S"
+    "[%(levelname)s %(asctime)s %(name)8s] %(message)s", "%Y-%m-%d %H:%M:%S"
 )
 
 

@@ -61,7 +61,7 @@ click_log.basic_config(logger)
     help="If True, will keep the delimiter sequences in the resulting reads.  Otherwise the delimiter sequence "
     "information will be removed from the resulting reads (the annotations for the delimiters will be preserved).",
 )
-@click.argument("input-bam", default="-", type=click.Path())
+@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(threads, output_bam, do_simple_splitting, keep_delimiters, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
@@ -101,7 +101,7 @@ def main(threads, output_bam, do_simple_splitting, keep_delimiters, input_bam):
         colour="green",
         file=sys.stderr,
         leave=False,
-        disable=input_bam == "-",
+        disable=not sys.stdin.isatty(),
     ) as pbar:
 
         # Get our header from the input bam file:
@@ -510,7 +510,7 @@ def _write_split_array_element(
     """Write out an individual array element that has been split out according to the given coordinates."""
     a = pysam.AlignedSegment()
     a.query_name = (
-        f"{read.query_name}_{start_coord}-{end_coord}_{prev_delim_name}-{delim_name}"
+        f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}"
     )
     # Add one to end_coord because coordinates are inclusive:
     a.query_sequence = f"{read.query_sequence[start_coord:end_coord+1]}"
