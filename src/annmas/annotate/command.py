@@ -4,6 +4,7 @@ import itertools
 import re
 import time
 import collections
+import os
 
 from inspect import getframeinfo, currentframe, getdoc
 
@@ -13,6 +14,9 @@ import tqdm
 
 import pysam
 import multiprocessing as mp
+
+import gzip
+from construct import *
 
 from ..utils.model import build_default_model
 from ..utils.model import reverse_complement
@@ -63,6 +67,13 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
     help="pre-trained model to apply",
 )
 @click.option(
+    "-p",
+    "--pbi",
+    required=False,
+    type=click.Path(),
+    help="BAM .pbi index file",
+)
+@click.option(
     "-t",
     "--threads",
     type=int,
@@ -78,7 +89,7 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
     help="annotated bam output  [default: stdout]",
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(model, threads, output_bam, input_bam):
+def main(model, pbi, threads, output_bam, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
@@ -94,6 +105,12 @@ def main(model, threads, output_bam, input_bam):
         logger.info(f"Using pretrained annotation model {model}")
     else:
         logger.info("Using default annotation model")
+
+    pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
+    read_count = None
+    if os.path.exists(pbi):
+        read_count = _load_read_count(pbi)
+        logger.info("Annotating %d reads", read_count)
 
     # Create queues for data:
     queue_size = threads * 2 if threads < 10 else 20
@@ -141,7 +158,7 @@ def main(model, threads, output_bam, input_bam):
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
         output_worker = mp.Process(
-            target=_write_thread_fn, args=(results, out_header, output_bam, not sys.stdin.isatty(), res)
+            target=_write_thread_fn, args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count)
         )
         output_worker.start()
 
@@ -177,7 +194,7 @@ def main(model, threads, output_bam, input_bam):
                 f"Overall processing rate: {res['num_reads_annotated']/(et - t_start):2.2f} reads/s.")
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count):
     """Thread / process fn to write out all our data."""
 
     with pysam.AlignmentFile(
@@ -188,6 +205,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
         colour="green",
         file=sys.stderr,
         disable=disable_pbar,
+        total=read_count
     ) as pbar:
 
         while True:
@@ -315,3 +333,29 @@ def _segment_read(read, model):
         logger.debug("Sequence scored better in RC: %s", read.query_name)
 
     return read.to_string(), ppath, logp, is_rc
+
+
+def _load_read_count(pbi_file):
+    """
+    Compute file offsets for specified read names
+    """
+
+    # Decode PacBio .pbi file.  This is not a full decode of the index, only the parts we need
+    # until we get to the read count.
+    # More on index format at https://pacbiofileformats.readthedocs.io/en/9.0/PacBioBamIndex.html .
+
+    fmt = Struct(
+        # Header
+        "magic" / Const(b"PBI\x01"),
+        "version_patch" / Int8ul,
+        "version_minor" / Int8ul,
+        "version_major" / Int8ul,
+        "version_empty" / Int8ul,
+        "pbi_flags" / Int16ul,
+        "n_reads" / Int32ul,
+        )
+
+    with gzip.open(pbi_file, "rb") as f:
+        idx_contents = fmt.parse_stream(f)
+
+        return idx_contents.n_reads
