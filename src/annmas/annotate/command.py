@@ -16,7 +16,6 @@ import pysam
 import multiprocessing as mp
 
 import gzip
-from collections import OrderedDict
 from construct import *
 
 from ..utils.model import build_default_model
