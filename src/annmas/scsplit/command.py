@@ -99,9 +99,6 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
 
     logger.info("Invoked via: annmas %s", " ".join(sys.argv[1:]))
 
-    # Make sure we're given an input bam file we can work with:
-    _validate_input_bam(input_bam)
-
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
@@ -131,6 +128,9 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
+
+        # Make sure we're given an input bam file we can work with:
+        _validate_input_bam(bam_file.header)
 
         # Start output worker:
         res = manager.dict({"num_reads_processed": 0})
@@ -168,30 +168,27 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
     with open(f"{output_base_name}{__OUT_WHITELIST_FILE_SUFFIX}", "w") as f:
         f.write(f"{cell_barcode}\n")
 
-    logger.info(f"Processed {res['num_reads_segmented']} reads.")
+    logger.info(f"Processed {res['num_reads_processed']} reads.")
     logger.info(f"CBC length: {len(cell_barcode)}.")
     logger.info(f"UMI length: {umi_length}.")
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def _validate_input_bam(input_bam_path):
-    """Assert that the given input_bam was created by `annmas segment`."""
-    with pysam.AlignmentFile(
-            input_bam_path, "rb", check_sq=False, require_index=False
-    ) as bam_file:
-        in_bam_header_dict = bam_file.header.to_dict()
-        if "PG" not in in_bam_header_dict:
-            logger.warn("Could not find PG entry in header.  Cannot confirm that this file is compatible.")
-        else:
-            found_segment_cmd = False
-            for info in [item for item in in_bam_header_dict["PG"] if item["PN"] == "annmas"]:
-                if info["ID"].split("-")[1] == "segment":
-                    found_segment_cmd = True
-                    break
-            if not found_segment_cmd:
-                logger.error(
-                    "Input bam file header does not indicate that it was created by annmas segment.  This tool requires `annmas segment` reads as input data.")
-                sys.exit(1)
+def _validate_input_bam(input_bam_header):
+    """Assert that the given input_bam_header contains an `annmas segment` program group."""
+    in_bam_header_dict = input_bam_header.to_dict()
+    if "PG" not in in_bam_header_dict:
+        logger.warn("Could not find PG entry in header.  Cannot confirm that this file is compatible.")
+    else:
+        found_segment_cmd = False
+        for info in [item for item in in_bam_header_dict["PG"] if item["PN"] == "annmas"]:
+            if info["ID"].split("-")[1] == "segment":
+                found_segment_cmd = True
+                break
+        if not found_segment_cmd:
+            logger.error(
+                "Input bam file header does not indicate that it was created by annmas segment.  This tool requires `annmas segment` reads as input data.")
+            sys.exit(1)
 
 
 def _get_named_segment_from_list(seg_list, name, read_name):
@@ -243,13 +240,15 @@ def _sub_process_work_fn(in_queue, out_queue, umi_length):
         umi_start = tenx_adapter_segment.end+1
         umi_end = umi_start + umi_length
         umi_bases = read.query_sequence[umi_start:umi_end+1]
-        umi_quals = read.query_alignment_qualities[umi_start:umi_end+1]
+        umi_quals = "".join([chr(i + 33) for i in read.query_alignment_qualities[umi_start:umi_end+1]])
 
         transcript_bases = read.query_sequence[umi_end+1:poly_a_segment.start]
-        transcript_quals = read.query_alignment_qualities[umi_end+1:poly_a_segment.start]
+        transcript_quals = "".join(
+            [chr(i + 33) for i in read.query_alignment_qualities[umi_end+1:poly_a_segment.start]]
+        )
 
         # Place our data on the output queue:
-        out_queue.put(tuple(read.query_name, umi_bases, umi_quals, transcript_bases, transcript_quals))
+        out_queue.put(tuple([read.query_name, umi_bases, umi_quals, transcript_bases, transcript_quals]))
 
 
 def _sub_process_write_fn(
@@ -289,7 +288,9 @@ def _sub_process_write_fn(
 
             # Write out mates1 and mates2 records:
             mates1_file.write(str(mates_1_record))
+            mates1_file.write("\n")
             mates2_file.write(str(mates_2_record))
+            mates2_file.write("\n")
 
             # Increment our counters:
             res["num_reads_processed"] += 1

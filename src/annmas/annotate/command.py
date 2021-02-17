@@ -27,7 +27,7 @@ from ..meta import VERSION
 SEGMENTS_TAG = "SG"
 SEGMENTS_RC_TAG = "RC"
 
-__SEGMENT_TAG_DELIMITER = "|"
+__SEGMENT_TAG_DELIMITER = ","
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("annotate")

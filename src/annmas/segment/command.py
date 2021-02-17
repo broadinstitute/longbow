@@ -18,6 +18,7 @@ from ..utils.model import array_element_structure
 from ..annotate.command import SegmentInfo
 from ..annotate.command import SEGMENTS_TAG
 from ..annotate.command import _get_segments
+from ..annotate.command import __SEGMENT_TAG_DELIMITER
 
 from ..meta import VERSION
 
@@ -514,7 +515,7 @@ def _write_split_array_element(
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         SEGMENTS_TAG,
-        ",".join([ s.to_tag() for s in out_segments ]),
+        __SEGMENT_TAG_DELIMITER.join([ s.to_tag() for s in out_segments ]),
     )
 
     bam_out.write(a)
