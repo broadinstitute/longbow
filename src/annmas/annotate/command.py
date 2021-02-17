@@ -24,13 +24,10 @@ from ..utils.model import annotate
 
 from ..meta import VERSION
 
-__SLEEP_LEN_S = 0.000001
-__MP_BUFFER_LEN_BYTES = 5 * 1024 * 1024  # 5 Meg buffer
-__MP_MESSAGE_DELIMITER = 0xDEADBEEF
-__SENTINEL_VALUE = r"THE _MOST_ CROMULENT SENTINEL VALUE."
-
 SEGMENTS_TAG = "SG"
 SEGMENTS_RC_TAG = "RC"
+
+__SEGMENT_TAG_DELIMITER = "|"
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("annotate")
@@ -162,12 +159,12 @@ def main(model, pbi, threads, output_bam, input_bam):
         )
         output_worker.start()
 
-        # Add in a `None` sentinel value at the end of the queue - one for each subprocess - so we guarantee
+        # Add in a sentinel value at the end of the queue - one for each subprocess - so we guarantee
         # that all subprocesses will exit:
-        iter_data = itertools.chain(bam_file, (__SENTINEL_VALUE,) * threads)
+        iter_data = itertools.chain(bam_file, (None,) * threads)
         for r in iter_data:
             # We have to adjust for our sentinel value if we've got to it:
-            if r is not __SENTINEL_VALUE:
+            if r is not None:
                 r = r.to_string()
             input_data_queue.put(r)
 
@@ -183,7 +180,7 @@ def main(model, pbi, threads, output_bam, input_bam):
 
         # Now that our input processes are done, we can add our exit sentinel onto the output queue and
         # wait for that process to end:
-        results.put(__SENTINEL_VALUE)
+        results.put(None)
         output_worker.join()
 
     logger.info(
@@ -213,7 +210,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             raw_data = out_queue.get()
 
             # Check for exit sentinel:
-            if raw_data == __SENTINEL_VALUE:
+            if raw_data is None:
                 break
             # Should really never be None, but just in case:
             elif raw_data is None:
@@ -236,7 +233,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             )
 
             # Set our tag and write out the read to the annotated file:
-            read.set_tag(SEGMENTS_TAG, "|".join([s.to_tag() for s in segments]))
+            read.set_tag(SEGMENTS_TAG, __SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
 
             # If we're reverse complemented, we make it easy and just reverse complement the read and add a tag saying
             # that the read was RC:
@@ -269,7 +266,7 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
         raw_data = in_queue.get()
 
         # Check for exit sentinel:
-        if raw_data == __SENTINEL_VALUE:
+        if raw_data is None:
             break
         # Should really never be None, but just in case:
         elif raw_data is None:
@@ -359,3 +356,9 @@ def _load_read_count(pbi_file):
         idx_contents = fmt.parse_stream(f)
 
         return idx_contents.n_reads
+
+def _get_segments(read):
+    """Get the segments corresponding to a particular read by reading the segments tag information."""
+    return read.to_string(), [
+        SegmentInfo.from_tag(s) for s in read.get_tag(SEGMENTS_TAG).split(__SEGMENT_TAG_DELIMITER)
+    ]
