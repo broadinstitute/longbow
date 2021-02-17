@@ -52,17 +52,8 @@ click_log.basic_config(logger)
     help="Do splitting of reads based on splitter delimiters, rather than whole array structure. "
     "This splitting will cause delimiter sequences to be repeated in each read they bound.",
 )
-@click.option(
-    "-k",
-    "--keep-delimiters",
-    required=False,
-    is_flag=True,
-    default=False,
-    help="If True, will keep the delimiter sequences in the resulting reads.  Otherwise the delimiter sequence "
-    "information will be removed from the resulting reads (the annotations for the delimiters will be preserved).",
-)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, do_simple_splitting, keep_delimiters, input_bam):
+def main(threads, output_bam, do_simple_splitting, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
@@ -132,7 +123,6 @@ def main(threads, output_bam, do_simple_splitting, keep_delimiters, input_bam):
                 output_bam,
                 pbar,
                 do_simple_splitting,
-                keep_delimiters,
                 res,
             ),
         )
@@ -191,7 +181,6 @@ def _sub_process_write_fn(
     out_bam_file_name,
     pbar,
     do_simple_splitting,
-    keep_delimiters,
     res,
 ):
     """Thread / process fn to write out all our data."""
@@ -230,7 +219,6 @@ def _sub_process_write_fn(
                 read,
                 segments,
                 do_simple_splitting,
-                keep_delimiters,
                 delimiters,
                 out_bam_file,
             )
@@ -267,7 +255,7 @@ def _create_simple_delimiters(num_seqs_from_each_array_element=1):
 
 
 def _write_segmented_read(
-    read, segments, do_simple_splitting, keep_delimiters, delimiters, bam_out
+    read, segments, do_simple_splitting, delimiters, bam_out
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -278,9 +266,6 @@ def _write_segmented_read(
     :param do_simple_splitting: Flag to control how reads should be split.
                                 If True, will use simple delimiters.
                                 If False, will require reads to appear as expected in model.array_element_structure.
-    :param keep_delimiters: If True, will keep the delimiter sequences in the resulting reads.
-                            Otherwise the delimiter sequence information will be removed from the resulting reads
-                            (the annotations for the delimiters will be preserved).
     :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
     :return: the number of segments written.
@@ -339,35 +324,33 @@ def _write_segmented_read(
         ]
         seg_delimiters.sort(key=lambda dtuple: dtuple[1].start)
 
+        # Now we can go through our split sequences and write them out.
+        # However we need to account for the "extra" sequences leading and trailing each array element.
+        # These are caused by the delimiter sequences taking the first and second halves from different array elements
+        # to increase splitting sensitivity.
+
         cur_read_base_index = 0
         prev_delim_name = "START"
 
         for i, (di, start_seg, end_seg_tuple) in enumerate(seg_delimiters):
 
-            seg_start_coord = cur_read_base_index
-            seg_end_coord = end_seg_tuple[1].end
-            delim_name = "/".join(delimiters[di])
-
-            start_coord = seg_start_coord
-            end_coord = seg_end_coord if keep_delimiters else start_seg.start - 1
+            start_coord = cur_read_base_index
+            end_coord = end_seg_tuple[0].end
+            delim_name = end_seg_tuple[0].name
 
             # Write our segment here:
             _write_split_array_element(
                 bam_out,
                 start_coord,
                 end_coord,
-                seg_start_coord,
-                seg_end_coord,
                 read,
                 segments,
                 delim_name,
                 prev_delim_name,
             )
 
-            cur_read_base_index = (
-                end_seg_tuple[0].start if keep_delimiters else end_seg_tuple[1].end + 1
-            )
-            prev_delim_name = delim_name
+            cur_read_base_index = end_seg_tuple[1].start
+            prev_delim_name = end_seg_tuple[1].name
 
         # Now we have to write out the last segment:
         seg_start_coord = cur_read_base_index
@@ -383,8 +366,6 @@ def _write_segmented_read(
             bam_out,
             start_coord,
             end_coord,
-            seg_start_coord,
-            seg_end_coord,
             read,
             segments,
             delim_name,
@@ -397,8 +378,18 @@ def _write_segmented_read(
         # This requires each read to conform to the expected read structure as defined in the model.
         # The process is similar to what is done above for simple splitting.
 
-        # Create our delimiter list.
+        # Create our delimiter list:
         delimiters = array_element_structure
+
+        # Modify the delimiter sequences for this library.
+        # NOTE: this is an artifact of some library preparation steps and should be removed in the next
+        #       iteration of the library.
+        # We must change to a list here so we cna modify it:
+        delimiters = list(delimiters)
+        # The first sequence doesn't actually have an 'A' element:
+        delimiters[0] = delimiters[0][1:]
+        # The last sequence doesn't actually have a 'P' element:
+        delimiters[-1] = delimiters[-1][:-1]
 
         # We need to go through our segments and split them up.
         # Note: we assume each full array element can occur only once and they do not overlap.
@@ -462,13 +453,8 @@ def _write_segmented_read(
 
                 start_seg = seg_list[0]
                 end_seg = seg_list[-1]
-
-                # If we don't want to keep delimiters we chop off the start and end segments
-                # under the assumption that those are the delimiters we want to skip:
-                start_coord = start_seg.start if keep_delimiters else seg_list[1].start
-                end_coord = end_seg.end if keep_delimiters else seg_list[-2].end
-                start_seg_coord = start_seg.start
-                end_seg_coord = end_seg.end
+                start_coord = start_seg.start
+                end_coord = end_seg.end
 
                 start_delim_name = seg_list[0].name
                 end_delim_name = seg_list[-1].name
@@ -478,8 +464,6 @@ def _write_segmented_read(
                     bam_out,
                     start_coord,
                     end_coord,
-                    start_seg_coord,
-                    end_seg_coord,
                     read,
                     seg_list,
                     end_delim_name,
@@ -500,8 +484,6 @@ def _write_split_array_element(
     bam_out,
     start_coord,
     end_coord,
-    seg_start_coord,
-    seg_end_coord,
     read,
     segments,
     delim_name,
@@ -514,7 +496,7 @@ def _write_split_array_element(
     )
     # Add one to end_coord because coordinates are inclusive:
     a.query_sequence = f"{read.query_sequence[start_coord:end_coord+1]}"
-    a.query_qualities = read.query_alignment_qualities[start_coord : end_coord + 1]
+    a.query_qualities = read.query_alignment_qualities[start_coord: end_coord + 1]
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
@@ -526,7 +508,7 @@ def _write_split_array_element(
             [
                 s.to_tag()
                 for s in segments
-                if seg_start_coord <= s.start <= seg_end_coord
+                if start_coord <= s.start <= end_coord
             ]
         ),
     )

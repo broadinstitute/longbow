@@ -18,7 +18,7 @@ setup(
         "\n"
     ),
     tests_require=["coverage", "pytest"],
-    python_requires=">=3.6",
+    python_requires=">=3.6, <=3.7.9",
     packages=find_packages("src"),
     package_dir={"": "src"},
     classifiers=[
