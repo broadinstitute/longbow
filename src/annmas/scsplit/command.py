@@ -76,7 +76,7 @@ __OUT_WHITELIST_FILE_SUFFIX = "_whitelist.txt"
     type=click.File("rb"),
 )
 def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
-    f"""Create a set of files suitable for use in `alevin` for single-cell analysis.
+    """Create files for use in `alevin` for single-cell analysis.
     This tool coerces a set of reads from a single source into a format that `alevin` can ingest.
     
     Segment names are assumed to be those in the default model (utils/model.py).
@@ -84,14 +84,14 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
     INPUT_BAM should contain reads that have been processed by `annmas segment`.
 
     The output from this tool consists of several files:
-        {__DEFAULT_OUT_BASE_NAME}{__OUT_READ_FILE_SUFFIX}1.fastq: 
+        OUTPUT_BASE_NAME_mates_1.fastq:
             A file containing partial sequences for all reads in the given input file.  These partial reads consist of the 
             dummy cell barcode + detected UMI for each read in the given input file.
-        {__DEFAULT_OUT_BASE_NAME}{__OUT_READ_FILE_SUFFIX}2.fastq: 
+        OUTPUT_BASE_NAME_mates_2.fastq:
             A file containing partial sequences for all reads in the given input file.  These partial reads consist of the 
             transcript sequences for all reads in the given input file.  Transcript sequences include data after the UMI 
             and before the Poly-A tail.  All bases outside of this range are excluded from the output.
-        {__DEFAULT_OUT_BASE_NAME}{__OUT_WHITELIST_FILE_SUFFIX}: 
+        OUTPUT_BASE_NAME_whitelist.txt:
             A whitelist file for alevin containing the given dummy cell barcode. 
     """
 
@@ -239,12 +239,12 @@ def _sub_process_work_fn(in_queue, out_queue, umi_length):
         # Note: Positions are inclusive so we must add 1 to the end position to get that base as well:
         umi_start = tenx_adapter_segment.end+1
         umi_end = umi_start + umi_length
-        umi_bases = read.query_sequence[umi_start:umi_end+1]
-        umi_quals = "".join([chr(i + 33) for i in read.query_alignment_qualities[umi_start:umi_end+1]])
+        umi_bases = read.query_sequence[umi_start:umi_end]
+        umi_quals = "".join([chr(i + 33) for i in read.query_alignment_qualities[umi_start:umi_end]])
 
-        transcript_bases = read.query_sequence[umi_end+1:poly_a_segment.start]
+        transcript_bases = read.query_sequence[umi_end:poly_a_segment.start]
         transcript_quals = "".join(
-            [chr(i + 33) for i in read.query_alignment_qualities[umi_end+1:poly_a_segment.start]]
+            [chr(i + 33) for i in read.query_alignment_qualities[umi_end:poly_a_segment.start]]
         )
 
         # Place our data on the output queue:
