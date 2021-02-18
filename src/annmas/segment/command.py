@@ -17,6 +17,8 @@ from ..utils.model import array_element_structure
 
 from ..annotate.command import SegmentInfo
 from ..annotate.command import SEGMENTS_TAG
+from ..annotate.command import _get_segments
+from ..annotate.command import __SEGMENT_TAG_DELIMITER
 
 from ..meta import VERSION
 
@@ -128,7 +130,7 @@ def main(threads, output_bam, do_simple_splitting, input_bam):
         )
         output_worker.start()
 
-        # Add in a `None` sentinel value at the end of the queue - one for each subprocess - so we guarantee
+        # Add in a sentinel value at the end of the queue - one for each subprocess - so we guarantee
         # that all subprocesses will exit:
         iter_data = itertools.chain(bam_file, (None,) * threads)
         for r in iter_data:
@@ -501,23 +503,19 @@ def _write_split_array_element(
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
 
+    # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
+    # this array element / read segment:
+    out_segments = []
+    for s in segments:
+        if start_coord <= s.start <= end_coord:
+            out_segments.append(
+                SegmentInfo(s.name, s.start - start_coord, s.end - start_coord)
+            )
+
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         SEGMENTS_TAG,
-        ",".join(
-            [
-                s.to_tag()
-                for s in segments
-                if start_coord <= s.start <= end_coord
-            ]
-        ),
+        __SEGMENT_TAG_DELIMITER.join([ s.to_tag() for s in out_segments ]),
     )
 
     bam_out.write(a)
-
-
-def _get_segments(read):
-    """Get the segments corresponding to a particular read by reading the segments tag information."""
-    return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(SEGMENTS_TAG).split("|")
-    ]

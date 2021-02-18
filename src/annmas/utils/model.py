@@ -9,25 +9,6 @@ from matplotlib import transforms
 from pomegranate import *
 from pomegranate.callbacks import History, ModelCheckpoint
 
-# NOTE: Use this definition when 5p_TSO is uncommented from the adapters list:
-# array_element_structure = (
-#     ("A", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("B", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("C", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("D", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("E", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("F", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("G", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("H", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("I", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("J", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("K", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("L", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("M", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("N", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter"),
-#     ("O", "10x_Adapter", "random", "5p_TSO", "random", "Poly_A", "3p_Adapter", "P"),
-# )
-
 array_element_structure = (
     # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
     ("A", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
@@ -51,7 +32,7 @@ array_element_structure = (
 adapters = {
     "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
     # "5p_TSO": "TTTCTTATATGGG",
-    "Poly_A": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "Poly_A": "A" * 30,
     "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
     "A": "AGCTTACTTGTGAAGA",
     "B": "ACTTGTAAGCTGTCTA",

@@ -16,7 +16,7 @@ pomegranate
 pandas
 numpy
 matplotlib
-pysam
+pysam>=0.16.0.1
 progress
 construct
 pathos
