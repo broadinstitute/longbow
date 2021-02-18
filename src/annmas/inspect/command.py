@@ -180,10 +180,7 @@ def annotate_read(read, m):
     if read.has_tag("SG"):
         tag = re.split(",", read.get_tag("SG"))
 
-        # At the moment, we need to slice the tag array because the
-        # first and last elements listed in the state sequence aren't
-        # actually in the segmented reads.
-        for e in tag[1:len(tag)-1]:
+        for e in tag:
             state, rrange = re.split(":", e)
             qStart, qEnd = re.split("-", rrange)
             qLen = int(qEnd) - int(qStart) + 1
