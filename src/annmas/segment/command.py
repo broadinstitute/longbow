@@ -13,7 +13,7 @@ import multiprocessing as mp
 
 from inspect import getframeinfo, currentframe, getdoc
 
-from ..utils.model import array_element_structure
+from ..utils.model import LibraryModel
 
 from ..annotate.command import SegmentInfo
 from ..annotate.command import SEGMENTS_TAG
@@ -54,8 +54,15 @@ click_log.basic_config(logger)
     help="Do splitting of reads based on splitter delimiters, rather than whole array structure. "
     "This splitting will cause delimiter sequences to be repeated in each read they bound.",
 )
+@click.option(
+    '--m10',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Use the 10 array element MAS-seq model."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, do_simple_splitting, input_bam):
+def main(threads, output_bam, do_simple_splitting, m10, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
@@ -105,8 +112,8 @@ def main(threads, output_bam, do_simple_splitting, input_bam):
             "ID": f"annmas-{logger.name}-{VERSION}",
             "PN": "annmas",
             "VN": f"{VERSION}",
-            # Use reflection to get the doc string for this main function for our header:
-            "DS": getdoc(globals()[getframeinfo(currentframe()).function]),
+            # Use reflection to get the first line of the doc string for this main function for our header:
+            "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
             "CL": " ".join(sys.argv),
         }
         if "PG" in out_bam_header_dict:
@@ -125,6 +132,7 @@ def main(threads, output_bam, do_simple_splitting, input_bam):
                 output_bam,
                 pbar,
                 do_simple_splitting,
+                m10,
                 res,
             ),
         )
@@ -183,12 +191,21 @@ def _sub_process_write_fn(
     out_bam_file_name,
     pbar,
     do_simple_splitting,
+    use_mas_seq_10_model,
     res,
 ):
     """Thread / process fn to write out all our data."""
 
+    # get our model:
+    if use_mas_seq_10_model:
+        logger.info("Using MAS-seq 10 array element annotation model.")
+        model = LibraryModel.build_and_return_mas_seq_10_model()
+    else:
+        logger.info("Using MAS-seq default annotation model.")
+        model = LibraryModel.build_and_return_mas_seq_model()
+
     # Create our delimiter sequences for simple splitting if we have to:
-    delimiters = _create_simple_delimiters() if do_simple_splitting else None
+    delimiters = _create_simple_delimiters(model) if do_simple_splitting else None
 
     if do_simple_splitting:
         logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
@@ -218,6 +235,7 @@ def _sub_process_write_fn(
 
             # Write out our segmented reads:
             res["num_segments"] += _write_segmented_read(
+                model,
                 read,
                 segments,
                 do_simple_splitting,
@@ -230,9 +248,10 @@ def _sub_process_write_fn(
             pbar.update(1)
 
 
-def _create_simple_delimiters(num_seqs_from_each_array_element=1):
+def _create_simple_delimiters(model, num_seqs_from_each_array_element=1):
     """Create delimiters for simple splitting.
 
+    :param model: Model to use for array structure.
     :param num_seqs_from_each_array_element: The number of sequences from each array element to use as delimiters.
     The more sequences used, the more specific the delimiter sequences will be.  A value of 1 will result in delimiter
     tuples that are each 2 sequences long - the last sequence from the leading array element and the first from the
@@ -247,22 +266,23 @@ def _create_simple_delimiters(num_seqs_from_each_array_element=1):
 
     # Collect the delimiters by grabbing the inner bounding regions of each array element in the order
     # that we expect to see them in the overall library:
-    for i in range(1, len(array_element_structure)):
+    for i in range(1, len(model.array_element_structure)):
         delimiters.append(
-            tuple(array_element_structure[i - 1][-num_seqs_from_each_array_element:])
-            + tuple(array_element_structure[i][0:num_seqs_from_each_array_element])
+            tuple(model.array_element_structure[i - 1][-num_seqs_from_each_array_element:])
+            + tuple(model.array_element_structure[i][0:num_seqs_from_each_array_element])
         )
 
     return delimiters
 
 
 def _write_segmented_read(
-    read, segments, do_simple_splitting, delimiters, bam_out
+    model, read, segments, do_simple_splitting, delimiters, bam_out
 ):
     """Split and write out the segments of each read to the given bam output file.
 
     NOTE: Assumes that all given data are in the forward direction.
 
+    :param model: The model to use for the array segment information.
     :param read: A pysam.AlignedSegment object containing a read that has been segmented.
     :param segments: A list of SegmentInfo objects representing the segments of the given reads.
     :param do_simple_splitting: Flag to control how reads should be split.
@@ -381,7 +401,7 @@ def _write_segmented_read(
         # The process is similar to what is done above for simple splitting.
 
         # Create our delimiter list:
-        delimiters = array_element_structure
+        delimiters = model.array_element_structure
 
         # Modify the delimiter sequences for this library.
         # NOTE: this is an artifact of some library preparation steps and should be removed in the next

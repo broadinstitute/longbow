@@ -20,3 +20,4 @@ pysam>=0.16.0.1
 progress
 construct
 pathos
+ssw==0.4.1

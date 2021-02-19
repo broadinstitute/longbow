@@ -1,5 +1,7 @@
 import logging
 import time
+import math
+import sys
 
 import click
 import click_log
@@ -8,7 +10,10 @@ import tqdm
 import multiprocessing as mp
 import concurrent.futures
 
-from ..utils.model import *
+import pysam
+
+from ..utils.model import LibraryModel
+from ..utils.model import reverse_complement
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("train")
@@ -48,9 +53,16 @@ click_log.basic_config(logger)
     type=click.Path(exists=False),
     help="trained model",
 )
+@click.option(
+    '--m10',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Use the 10 array element MAS-seq model."
+)
 @click.argument("training-bam", type=click.Path(exists=True))
 def main(
-    num_training_samples, max_training_iterations, threads, output_yaml, training_bam
+    num_training_samples, max_training_iterations, threads, output_yaml, m10, training_bam
 ):
     """Train transition and emission probabilities on real data."""
 
@@ -61,7 +73,12 @@ def main(
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
-    m = build_default_model()
+    if m10:
+        logger.info("Using MAS-seq 10 array element annotation model.")
+        m = LibraryModel.build_and_return_mas_seq_10_model()
+    else:
+        logger.info("Using MAS-seq default annotation model.")
+        m = LibraryModel.build_and_return_mas_seq_model()
     training_seqs = load_training_seqs(m, num_training_samples, threads, training_bam)
 
     logger.info("Loaded %d training sequences", len(training_seqs))
@@ -123,7 +140,7 @@ def select_read(read, model):
     # Use the untrained model to determine if we should add this training
     # example in the forward or reverse-complement orientation.
     for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
-        logp, ppath = annotate(model, seq, smooth_islands=True)
+        logp, ppath = model.annotate(seq, smooth_islands=True)
 
         if logp > flogp:
             flogp = logp

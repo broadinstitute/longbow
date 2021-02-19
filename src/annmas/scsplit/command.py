@@ -13,13 +13,9 @@ import multiprocessing as mp
 
 from inspect import getframeinfo, currentframe, getdoc
 
-from ..utils.model import array_element_structure
+from ..utils.model import LibraryModel
 
-from ..annotate.command import SegmentInfo
-from ..annotate.command import SEGMENTS_TAG
 from ..annotate.command import _get_segments
-
-from ..utils.constants import __SENTINEL_VALUE
 
 from ..meta import VERSION
 
@@ -70,12 +66,30 @@ __OUT_WHITELIST_FILE_SUFFIX = "_whitelist.txt"
     show_default=True,
     help=f"length of the UMI from this library",
 )
-@click.argument(
-    "input-bam",
-    default="-" if not sys.stdin.isatty() else None,
-    type=click.File("rb"),
+@click.option(
+    "-b",
+    "--write-bam",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help=f"Write out an annotated bam file in addition to the mates files.",
 )
-def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
+@click.option(
+    '--force',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Force scsplit to run on the input bam without checking for compatibility."
+)
+@click.option(
+    '--m10',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Use the 10 array element MAS-seq model."
+)
+@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
+def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_bam, input_bam):
     """Create files for use in `alevin` for single-cell analysis.
     This tool coerces a set of reads from a single source into a format that `alevin` can ingest.
     
@@ -102,6 +116,14 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
+    # get our model:
+    if m10:
+        logger.info("Using MAS-seq 10 array element annotation model.")
+        model = LibraryModel.build_and_return_mas_seq_10_model()
+    else:
+        logger.info("Using MAS-seq default annotation model.")
+        model = LibraryModel.build_and_return_mas_seq_model()
+
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -112,7 +134,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
     worker_process_pool = []
     for _ in range(threads):
         p = mp.Process(
-            target=_sub_process_work_fn, args=(process_input_data_queue, results, umi_length)
+            target=_sub_process_work_fn, args=(process_input_data_queue, results, umi_length, model, write_bam)
         )
         p.start()
         worker_process_pool.append(p)
@@ -128,9 +150,38 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
+        if force:
+            logger.info("Force mode - skipping bam header check for compatibility")
+        else:
+            # Make sure we're given an input bam file we can work with:
+            if not _validate_input_bam(bam_file.header):
+                # Bad news - we have to quit.
+                # let's try to do it nicely:
+                for r in (None,) * threads:
+                    process_input_data_queue.put(r)
 
-        # Make sure we're given an input bam file we can work with:
-        _validate_input_bam(bam_file.header)
+                # Wait for our input jobs to finish:
+                for p in worker_process_pool:
+                    p.join()
+                sys.exit(1)
+
+        # Get our header from the input bam file:
+        out_bam_header_dict = bam_file.header.to_dict()
+
+        # Add our program group to it:
+        pg_dict = {
+            "ID": f"annmas-{logger.name}-{VERSION}",
+            "PN": "annmas",
+            "VN": f"{VERSION}",
+            # Use reflection to get the first line of the doc string for this main function for our header:
+            "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
+            "CL": " ".join(sys.argv),
+        }
+        if "PG" in out_bam_header_dict:
+            out_bam_header_dict["PG"].append(pg_dict)
+        else:
+            out_bam_header_dict["PG"] = [pg_dict]
+        out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
 
         # Start output worker:
         res = manager.dict({"num_reads_processed": 0})
@@ -142,6 +193,8 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
                 cell_barcode,
                 pbar,
                 res,
+                write_bam,
+                out_header
             ),
         )
         output_worker.start()
@@ -175,20 +228,24 @@ def main(threads, output_base_name, cell_barcode, umi_length, input_bam):
 
 
 def _validate_input_bam(input_bam_header):
-    """Assert that the given input_bam_header contains an `annmas segment` program group."""
+    """Check that the given input_bam_header contains an `annmas segment` program group."""
     in_bam_header_dict = input_bam_header.to_dict()
     if "PG" not in in_bam_header_dict:
         logger.warn("Could not find PG entry in header.  Cannot confirm that this file is compatible.")
     else:
         found_segment_cmd = False
-        for info in [item for item in in_bam_header_dict["PG"] if item["PN"] == "annmas"]:
-            if info["ID"].split("-")[1] == "segment":
+        for info in [item for item in in_bam_header_dict["PG"]]:
+            if "PN" not in info:
+                continue
+            if info["PN"] == "annmas" and info["ID"].split("-")[1] == "segment":
                 found_segment_cmd = True
                 break
         if not found_segment_cmd:
             logger.error(
-                "Input bam file header does not indicate that it was created by annmas segment.  This tool requires `annmas segment` reads as input data.")
-            sys.exit(1)
+                "Input bam file header does not indicate that it was created by annmas segment.  "
+                "This tool requires `annmas segment` reads as input data.")
+            return False
+    return True
 
 
 def _get_named_segment_from_list(seg_list, name, read_name):
@@ -196,14 +253,18 @@ def _get_named_segment_from_list(seg_list, name, read_name):
     If multiple items have the given name a warning is logged and None is returned."""
 
     found_segments = [s for s in seg_list if s.name == name]
-    if len(found_segments) != 1:
-        logger.warn("Could not process read: %s - multiple %s annotations are present (%d)",
+    if len(found_segments) < 1:
+        logger.warn("Could not process read: %s - %s annotation is not present!",
+                    read_name, name)
+        return None
+    elif len(found_segments) > 1:
+        logger.warn("Could not process read: %s - multiple %s annotations are present (%d)!",
                     read_name, name, len(found_segments))
         return None
     return found_segments[0]
 
 
-def _sub_process_work_fn(in_queue, out_queue, umi_length):
+def _sub_process_work_fn(in_queue, out_queue, umi_length, array_model, do_bam_out):
     """Function to run in each subprocess.
     Extracts and returns all segments from an input read."""
     while True:
@@ -223,32 +284,41 @@ def _sub_process_work_fn(in_queue, out_queue, umi_length):
         )
         _, segments = _get_segments(read)
 
-        # Get the 10x adapter position:
-        tenx_adapter_segment = _get_named_segment_from_list(segments, "10x_Adapter", read.query_name)
-        if tenx_adapter_segment is None:
+        # Get start element position
+        # (for MAS-seq it's the 10x adapter)
+        start_segment = _get_named_segment_from_list(segments, array_model.start_element_name, read.query_name)
+        if start_segment is None:
             continue
 
-        # Get the Poly-A position:
-        poly_a_segment = _get_named_segment_from_list(segments, "Poly_A", read.query_name)
-        if poly_a_segment is None:
+        # Get the end element position:
+        # (for MAS-seq it's the Poly-a)
+        end_segment = _get_named_segment_from_list(segments, array_model.end_element_name, read.query_name)
+        if end_segment is None:
             continue
 
         # Now we grab the bases just after the 10x adapter as the UMI
         # and the bases between the UMI and the poly A for the transcript
 
         # Note: Positions are inclusive so we must add 1 to the end position to get that base as well:
-        umi_start = tenx_adapter_segment.end+1
+        umi_start = start_segment.end+1
         umi_end = umi_start + umi_length
         umi_bases = read.query_sequence[umi_start:umi_end]
         umi_quals = "".join([chr(i + 33) for i in read.query_alignment_qualities[umi_start:umi_end]])
 
-        transcript_bases = read.query_sequence[umi_end:poly_a_segment.start]
+        transcript_bases = read.query_sequence[umi_end:end_segment.start]
         transcript_quals = "".join(
-            [chr(i + 33) for i in read.query_alignment_qualities[umi_end:poly_a_segment.start]]
+            [chr(i + 33) for i in read.query_alignment_qualities[umi_end:end_segment.start]]
         )
 
         # Place our data on the output queue:
-        out_queue.put(tuple([read.query_name, umi_bases, umi_quals, transcript_bases, transcript_quals]))
+        if do_bam_out:
+            out_queue.put(
+                tuple([read.query_name, umi_bases, umi_quals, transcript_bases, transcript_quals, read.to_string()])
+            )
+        else:
+            out_queue.put(
+                tuple([read.query_name, umi_bases, umi_quals, transcript_bases, transcript_quals])
+            )
 
 
 def _sub_process_write_fn(
@@ -257,44 +327,65 @@ def _sub_process_write_fn(
     cell_barcode,
     pbar,
     res,
+    do_bam_out,
+    out_bam_header
 ):
     """Thread / process fn to write out all our data."""
 
-    with open(f"{out_base_name}{__OUT_READ_FILE_SUFFIX}1.fastq", "w") as mates1_file, \
-         open(f"{out_base_name}{__OUT_READ_FILE_SUFFIX}2.fastq", "w") as mates2_file:
+    try:
+        if do_bam_out:
+            out_bam_file = pysam.AlignmentFile(f"{out_base_name}.cbc_umi_annotated.bam", "wb", header=out_bam_header)
+        with open(f"{out_base_name}{__OUT_READ_FILE_SUFFIX}1.fastq", "w") as mates1_file, \
+             open(f"{out_base_name}{__OUT_READ_FILE_SUFFIX}2.fastq", "w") as mates2_file:
 
-        while True:
-            # Wait for some output data:
-            raw_data = out_queue.get()
+            while True:
+                # Wait for some output data:
+                raw_data = out_queue.get()
 
-            # Check for exit sentinel:
-            if raw_data is None:
-                break
+                # Check for exit sentinel:
+                if raw_data is None:
+                    break
 
-            # Unpack data:
-            read_name, umi_bases, umi_quals, transcript_bases, transcript_quals = raw_data
+                # Unpack data:
+                if do_bam_out:
+                    read_name, umi_bases, umi_quals, transcript_bases, transcript_quals, read_string = raw_data
+                else:
+                    read_name, umi_bases, umi_quals, transcript_bases, transcript_quals = raw_data
 
-            # Create mates1 and mates2 records:
-            mates_1_record = pysam.FastxRecord(
-                name=read_name,
-                sequence=cell_barcode + umi_bases,
-                quality=(chr(33 + 60) * len(cell_barcode)) + umi_quals
-            )
-            mates_2_record = pysam.FastxRecord(
-                name=read_name,
-                sequence=transcript_bases,
-                quality=transcript_quals
-            )
+                # Create mates1 and mates2 records:
+                mates_1_record = pysam.FastxRecord(
+                    name=read_name,
+                    sequence=cell_barcode + umi_bases,
+                    quality=(chr(33 + 60) * len(cell_barcode)) + umi_quals
+                )
+                mates_2_record = pysam.FastxRecord(
+                    name=read_name,
+                    sequence=transcript_bases,
+                    quality=transcript_quals
+                )
 
-            # Write out mates1 and mates2 records:
-            mates1_file.write(str(mates_1_record))
-            mates1_file.write("\n")
-            mates2_file.write(str(mates_2_record))
-            mates2_file.write("\n")
+                # Write out mates1 and mates2 records:
+                mates1_file.write(str(mates_1_record))
+                mates1_file.write("\n")
+                mates2_file.write(str(mates_2_record))
+                mates2_file.write("\n")
 
-            # Increment our counters:
-            res["num_reads_processed"] += 1
-            pbar.update(1)
+                if do_bam_out:
+                    read = pysam.AlignedSegment.fromstring(
+                        read_string, pysam.AlignmentHeader.from_dict(dict())
+                    )
 
-            # Obligatory log message:
-            logger.debug("Processed read: %s", read_name)
+                    read.set_tag("CR", cell_barcode)
+                    read.set_tag("UR", umi_bases)
+
+                    out_bam_file.write(read)
+
+                # Increment our counters:
+                res["num_reads_processed"] += 1
+                pbar.update(1)
+
+                # Obligatory log message:
+                logger.debug("Processed read: %s", read_name)
+    finally:
+        if do_bam_out:
+            out_bam_file.close()

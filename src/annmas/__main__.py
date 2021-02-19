@@ -10,6 +10,7 @@ from .segment import command as segment
 from .annotate import command as annotate
 from .train import command as train
 from .scsplit import command as scsplit
+from .discriminate import command as discriminate
 
 from .meta import VERSION
 
@@ -39,6 +40,7 @@ main_entry.add_command(segment.main)
 main_entry.add_command(train.main)
 main_entry.add_command(inspect.main)
 main_entry.add_command(scsplit.main)
+main_entry.add_command(discriminate.main)
 
 
 if __name__ == "__main__":

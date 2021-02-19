@@ -5,6 +5,7 @@ import re
 import time
 import collections
 import os
+import math
 
 from inspect import getframeinfo, currentframe, getdoc
 
@@ -15,9 +16,6 @@ import tqdm
 import pysam
 import multiprocessing as mp
 
-import gzip
-from construct import *
-
 from ..utils import read_utils
 from ..utils.model import reverse_complement
 from ..utils.model import LibraryModel
@@ -27,10 +25,13 @@ from ..meta import VERSION
 SEGMENTS_TAG = "SG"
 SEGMENTS_RC_TAG = "RC"
 
+READ_MODEL_NAME_TAG = "YN"
+READ_MODEL_SCORE_TAG = "YS"
+
 __SEGMENT_TAG_DELIMITER = ","
 
 logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("annotate")
+logger = logging.getLogger("discriminate")
 click_log.basic_config(logger)
 
 
@@ -57,13 +58,6 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
 @click.option(
-    "-m",
-    "--model",
-    required=False,
-    type=click.Path(exists=True),
-    help="pre-trained model to apply",
-)
-@click.option(
     "-p",
     "--pbi",
     required=False,
@@ -80,21 +74,16 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
 )
 @click.option(
     "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="annotated bam output  [default: stdout]",
-)
-@click.option(
-    '--m10',
-    is_flag=True,
-    default=False,
+    "--out-base-name",
+    default="longbow_discriminated",
+    required=False,
     show_default=True,
-    help="Use the 10 array element MAS-seq model."
+    type=str,
+    help="base name for output files",
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(model, pbi, threads, output_bam, m10, input_bam):
-    """Annotate reads in a BAM file with segments from the model."""
+def main(pbi, out_base_name, threads, input_bam):
+    """Separate reads into files based on which model they fit best."""
 
     t_start = time.time()
 
@@ -102,16 +91,6 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
-
-    if model is not None:
-        logger.info(f"Using pretrained annotation model {model}")
-        m = LibraryModel.from_yaml(model)
-    elif m10:
-        logger.info("Using MAS-seq 10 array element annotation model.")
-        m = LibraryModel.build_and_return_mas_seq_10_model()
-    else:
-        logger.info("Using MAS-seq default annotation model.")
-        m = LibraryModel.build_and_return_mas_seq_model()
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
@@ -125,12 +104,18 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
     input_data_queue = manager.Queue(maxsize=queue_size)
     results = manager.Queue()
 
+    # Create a dictionary of models to use to annotate and score our reads:
+    model_dict = {
+        "mas15": LibraryModel.build_and_return_mas_seq_model(),
+        "mas10": LibraryModel.build_and_return_mas_seq_10_model(),
+    }
+
     # Start worker sub-processes:
     worker_pool = []
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m)
+            target=_worker_segmentation_fn, args=(input_data_queue, results, model_dict, i)
         )
         p.start()
         worker_pool.append(p)
@@ -145,7 +130,7 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
 
         # Add our program group to it:
         pg_dict = {
-            "ID": f"annmas-annotate-{VERSION}",
+            "ID": f"annmas-discriminate-{VERSION}",
             "PN": "annmas",
             "VN": f"{VERSION}",
             # Use reflection to get the first line of the doc string for this main function for our header:
@@ -159,9 +144,10 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
         out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
 
         # Start output worker:
-        res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
+        res = manager.dict({"num_reads_annotated": 0, "num_sections": 0,
+                            "model_reads_annotated_count_dict": dict()})
         output_worker = mp.Process(
-            target=_write_thread_fn, args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count)
+            target=_write_thread_fn, args=(results, out_header, out_base_name, model_dict, res, read_count)
         )
         output_worker.start()
 
@@ -192,75 +178,89 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
     logger.info(
         f"Annotated {res['num_reads_annotated']} reads with {res['num_sections']} total sections."
     )
+    for model_name, count in res["model_reads_annotated_count_dict"].items():
+        logger.info(f"Model {model_name} annotated {count} reads.")
+
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
                 f"Overall processing rate: {res['num_reads_annotated']/(et - t_start):2.2f} reads/s.")
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_dict, res, read_count):
     """Thread / process fn to write out all our data."""
 
-    with pysam.AlignmentFile(
-        out_bam_file_name, "wb", header=out_bam_header
-    ) as out_bam_file, tqdm.tqdm(
-        desc="Progress",
-        unit=" read",
-        colour="green",
-        file=sys.stderr,
-        disable=disable_pbar,
-        total=read_count
-    ) as pbar:
+    try:
+        out_file_dict = {name: pysam.AlignmentFile(f"{out_bam_base_name}_{name}.bam", "wb", header=out_bam_header) for
+                         name in model_dict.keys()}
+        with tqdm.tqdm(
+            desc="Progress",
+            unit=" read",
+            colour="green",
+            file=sys.stderr,
+            total=read_count
+        ) as pbar:
 
-        while True:
-            # Wait for some output data:
-            raw_data = out_queue.get()
+            while True:
+                # Wait for some output data:
+                raw_data = out_queue.get()
 
-            # Check for exit sentinel:
-            if raw_data is None:
-                break
-            # Should really never be None, but just in case:
-            elif raw_data is None:
-                continue
+                # Check for exit sentinel:
+                if raw_data is None:
+                    break
+                # Should really never be None, but just in case:
+                elif raw_data is None:
+                    continue
 
-            # Unpack data:
-            read, ppath, logp, is_rc = raw_data
-            read = pysam.AlignedSegment.fromstring(read, out_bam_header)
+                # Unpack data:
+                read, ppath, logp, is_rc, model_name = raw_data
+                read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
-            # Condense the output annotations so we can write them out with indices:
-            segments = _collapse_annotations(ppath)
+                # Condense the output annotations so we can write them out with indices:
+                segments = _collapse_annotations(ppath)
 
-            # Obligatory log message:
-            logger.debug(
-                "Path for read %s (%2.2f)%s: %s",
-                read.query_name,
-                logp,
-                " (RC)" if is_rc else "",
-                segments,
-            )
+                # Obligatory log message:
+                logger.debug(
+                    "Path for read %s (%2.2f)%s: %s",
+                    read.query_name,
+                    logp,
+                    " (RC)" if is_rc else "",
+                    segments,
+                )
 
-            # Set our tag and write out the read to the annotated file:
-            read.set_tag(SEGMENTS_TAG, __SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
+                # Set our tag and write out the read to the annotated file:
+                read.set_tag(SEGMENTS_TAG, __SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
 
-            # If we're reverse complemented, we make it easy and just reverse complement the read and add a tag saying
-            # that the read was RC:
-            read.set_tag(SEGMENTS_RC_TAG, is_rc)
-            if is_rc:
-                quals = read.query_qualities[::-1]
-                seq = reverse_complement(read.query_sequence)
-                read.query_sequence = seq
-                read.query_qualities = quals
-            out_bam_file.write(read)
+                # If we're reverse complemented, we make it easy and just reverse complement the read and add a
+                # tag saying that the read was RC:
+                read.set_tag(SEGMENTS_RC_TAG, is_rc)
+                read.set_tag(READ_MODEL_SCORE_TAG, logp)
+                read.set_tag(READ_MODEL_NAME_TAG, model_name)
+                if is_rc:
+                    quals = read.query_qualities[::-1]
+                    seq = reverse_complement(read.query_sequence)
+                    read.query_sequence = seq
+                    read.query_qualities = quals
+                out_file_dict[model_name].write(read)
 
-            # Increment our counters:
-            res["num_reads_annotated"] += 1
-            res["num_sections"] += len(segments)
+                # Increment our counters:
+                res["num_reads_annotated"] += 1
+                res["num_sections"] += len(segments)
+                count_dict = res["model_reads_annotated_count_dict"]
+                try:
+                    count_dict[model_name] += 1
+                except KeyError:
+                    count_dict[model_name] = 1
+                res["model_reads_annotated_count_dict"] = count_dict
 
-            pbar.update(1)
+                pbar.update(1)
+    finally:
+        for out_file in out_file_dict.values():
+            out_file.close()
 
 
-def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
+def _worker_segmentation_fn(in_queue, out_queue, model_dict, worker_num):
     """Function to run in each subthread / subprocess.
-    Segments each read and place the segments in the output queue."""
+    Annotates each read with both models and assigns the read to the model with the better score."""
 
     num_reads_segmented = 0
 
@@ -285,7 +285,7 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
         )
 
         # Process and place our data on the output queue:
-        segment_info = _segment_read(read, model)
+        segment_info = _annotate_and_assign_read_to_model(read, model_dict)
 
         out_queue.put(segment_info)
         num_reads_segmented += 1
@@ -311,7 +311,41 @@ def _collapse_annotations(path):
     return segments
 
 
-def _segment_read(read, model):
+def _annotate_and_assign_read_to_model(read, model_dict):
+    """Annotate the given read with all given models and assign the read to the model with the best score."""
+
+    best_model = ""
+    best_logp = -math.inf
+    best_path = None
+    best_fit_is_rc = False
+    model_scores = dict()
+    for name, model in model_dict.items():
+
+        _, ppath, logp, is_rc = _annotate_read(read, model)
+
+        model_scores[name] = logp
+
+        if logp > best_logp:
+            best_model = name
+            best_logp = logp
+            best_path = ppath
+            best_fit_is_rc = is_rc
+
+    # Provide some info as to which model was chosen:
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("%s model scores: %s", read.query_name, str(model_scores))
+        logger.debug(
+            "Sequence %s scored best with model%s: %s (%2.4f)",
+            read.query_name,
+            " in RC " if best_fit_is_rc else "",
+            best_model,
+            best_logp
+        )
+
+    return read.to_string(), best_path, best_logp, best_fit_is_rc, best_model
+
+
+def _annotate_read(read, model):
     is_rc = False
     logp, ppath = model.annotate(read.query_sequence)
 
@@ -320,13 +354,5 @@ def _segment_read(read, model):
         logp = rc_logp
         ppath = rc_ppath
         is_rc = True
-        logger.debug("Sequence scored better in RC: %s", read.query_name)
 
     return read.to_string(), ppath, logp, is_rc
-
-
-def _get_segments(read):
-    """Get the segments corresponding to a particular read by reading the segments tag information."""
-    return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(SEGMENTS_TAG).split(__SEGMENT_TAG_DELIMITER)
-    ]
