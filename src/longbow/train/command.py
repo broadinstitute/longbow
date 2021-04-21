@@ -68,7 +68,7 @@ def main(
 
     t_start = time.time()
 
-    logger.info("Invoked via: annmas %s", " ".join(sys.argv[1:]))
+    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")

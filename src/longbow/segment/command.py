@@ -67,7 +67,7 @@ def main(threads, output_bam, do_simple_splitting, m10, input_bam):
 
     t_start = time.time()
 
-    logger.info("Invoked via: annmas %s", " ".join(sys.argv[1:]))
+    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
@@ -109,8 +109,8 @@ def main(threads, output_bam, do_simple_splitting, m10, input_bam):
 
         # Add our program group to it:
         pg_dict = {
-            "ID": f"annmas-{logger.name}-{VERSION}",
-            "PN": "annmas",
+            "ID": f"longbow-{logger.name}-{VERSION}",
+            "PN": "longbow",
             "VN": f"{VERSION}",
             # Use reflection to get the first line of the doc string for this main function for our header:
             "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],

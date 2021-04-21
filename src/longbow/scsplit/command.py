@@ -95,7 +95,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
     
     Segment names are assumed to be those in the default model (utils/model.py).
     
-    INPUT_BAM should contain reads that have been processed by `annmas segment`.
+    INPUT_BAM should contain reads that have been processed by `longbow segment`.
 
     The output from this tool consists of several files:
         OUTPUT_BASE_NAME_mates_1.fastq:
@@ -111,7 +111,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
 
     t_start = time.time()
 
-    logger.info("Invoked via: annmas %s", " ".join(sys.argv[1:]))
+    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
@@ -170,8 +170,8 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
 
         # Add our program group to it:
         pg_dict = {
-            "ID": f"annmas-{logger.name}-{VERSION}",
-            "PN": "annmas",
+            "ID": f"longbow-{logger.name}-{VERSION}",
+            "PN": "longbow",
             "VN": f"{VERSION}",
             # Use reflection to get the first line of the doc string for this main function for our header:
             "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
@@ -228,7 +228,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
 
 
 def _validate_input_bam(input_bam_header):
-    """Check that the given input_bam_header contains an `annmas segment` program group."""
+    """Check that the given input_bam_header contains an `longbow segment` program group."""
     in_bam_header_dict = input_bam_header.to_dict()
     if "PG" not in in_bam_header_dict:
         logger.warn("Could not find PG entry in header.  Cannot confirm that this file is compatible.")
@@ -237,13 +237,13 @@ def _validate_input_bam(input_bam_header):
         for info in [item for item in in_bam_header_dict["PG"]]:
             if "PN" not in info:
                 continue
-            if info["PN"] == "annmas" and info["ID"].split("-")[1] == "segment":
+            if info["PN"] == "longbow" and info["ID"].split("-")[1] == "segment":
                 found_segment_cmd = True
                 break
         if not found_segment_cmd:
             logger.error(
-                "Input bam file header does not indicate that it was created by annmas segment.  "
-                "This tool requires `annmas segment` reads as input data.")
+                "Input bam file header does not indicate that it was created by longbow segment.  "
+                "This tool requires `longbow segment` reads as input data.")
             return False
     return True
 
