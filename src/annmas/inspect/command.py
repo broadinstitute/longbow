@@ -1,14 +1,24 @@
 import logging
 import time
+import sys
+import os
+import re
+import math
+import ssw
 
 import click
 import click_log
 
 import gzip
+import pysam
 from collections import OrderedDict
 from construct import *
 
-from ..utils.model import *
+import matplotlib.pyplot as plt
+from matplotlib import transforms
+
+from ..utils.model import LibraryModel
+from ..utils.model import reverse_complement
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("inspect")
@@ -53,8 +63,22 @@ click_log.basic_config(logger)
     type=click.Path(exists=False),
     help="Output directory",
 )
+@click.option(
+    '--m10',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Use the 10 array element MAS-seq model."
+)
+@click.option(
+    '--seg-score',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Display alignment score for annotated segments."
+)
 @click.argument("input-bam", type=click.Path(exists=True))
-def main(read_names, model, pbi, file_format, outdir, input_bam):
+def main(read_names, model, pbi, file_format, outdir, m10, seg_score, input_bam):
     """Inspect the classification results on specified reads."""
 
     t_start = time.time()
@@ -68,29 +92,44 @@ def main(read_names, model, pbi, file_format, outdir, input_bam):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    m = build_default_model()
     if model is not None:
-        m.from_yaml(model)
         logger.info(f"Using pretrained annotation model {model}")
+        lb_model = LibraryModel.from_yaml(model)
+    elif m10:
+        logger.info("Using MAS-seq 10 array element annotation model.")
+        lb_model = LibraryModel.build_and_return_mas_seq_10_model()
     else:
-        logger.info(f"Using default annotation model")
+        logger.info("Using MAS-seq default annotation model.")
+        lb_model = LibraryModel.build_and_return_mas_seq_model()
 
-    file_offsets = load_read_offsets(pbi, load_read_names(read_names))
+    # Create an aligner if we are scoring our segments:
+    ssw_aligner = ssw.Aligner() if seg_score else None
 
+    # Open our bam file:
     pysam.set_verbosity(0)
-    bf = pysam.Samfile(input_bam, "rb", check_sq=False, require_index=False)
+    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bf:
+        # If we have read names, we should use them to inspect the file:
+        if len(read_names) > 0:
+            file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
-    for z in file_offsets:
-        bf.seek(file_offsets[z]["offset"])
-        read = bf.__next__()
+            for z in file_offsets:
+                bf.seek(file_offsets[z]["offset"])
+                read = bf.__next__()
 
-        out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
-        seq, path, logp = annotate_read(read, m)
+                out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
+                seq, path, logp = annotate_read(read, lb_model)
 
-        logger.info("Drawing read '%s' to '%s'", read.query_name, out)
-        draw_state_sequence(seq, path, read, out, size=13, family="monospace")
+                logger.info("Drawing read '%s' to '%s'", read.query_name, out)
+                draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
+        else:
+            # Without read names we just inspect every read in the file:
+            logger.info("No read names given.  Inspecting every read in the input bam file.")
+            for read in bf:
+                out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
+                seq, path, logp = annotate_read(read, lb_model)
 
-    bf.close()
+                logger.info("Drawing read '%s' to '%s'", read.query_name, out)
+                draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
@@ -188,7 +227,7 @@ def annotate_read(read, m):
             fppath.extend([state] * qLen)
     else:
         for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
-            logp, ppath = annotate(m, seq)
+            logp, ppath = m.annotate(seq)
 
             if logp > flogp:
                 fseq = seq
@@ -198,7 +237,8 @@ def annotate_read(read, m):
     return fseq, fppath, flogp
 
 
-def format_state_sequence(seq, path):
+def format_state_sequence(seq, path, line_length=150):
+    # TODO: Must tie this into the model itself.  We shouldn't re-define our segments here.
     color_hash = {
         "10x_Adapter": "#334D5C",
         "5p_TSO": "#334D5C",
@@ -220,6 +260,8 @@ def format_state_sequence(seq, path):
         "N": "#DF5A49",
         "O": "#DF5A49",
         "P": "#DF5A49",
+        "Q": "#DF5A49",
+        "R": "#DF5A49",
         "random": "#aaaaaa",
     }
 
@@ -227,11 +269,11 @@ def format_state_sequence(seq, path):
     state_labels = []
     state_colors = []
 
-    for i in range(0, len(path), 150):
+    for i in range(0, len(path), line_length):
         bases = []
         label = path[i]
 
-        for j in range(i, min(i + 150, len(path))):
+        for j in range(i, min(i + line_length, len(path))):
             a = seq[j]
             b = path[j]
 
@@ -252,8 +294,11 @@ def format_state_sequence(seq, path):
     return labelled_bases, state_colors, state_labels
 
 
-def draw_state_sequence(seq, path, read, out, **kwargs):
-    strings, colors, labels = format_state_sequence(seq, path)
+def draw_state_sequence(seq, path, logp, read, out, show_seg_score, model, ssw_aligner, **kwargs):
+
+    line_length = 150
+
+    base_strings, colors, labels = format_state_sequence(seq, path, line_length=line_length)
 
     f = plt.figure(figsize=(24, 24))
 
@@ -261,12 +306,18 @@ def draw_state_sequence(seq, path, read, out, **kwargs):
     t = ax.transData
     canvas = ax.figure.canvas
 
-    f.suptitle(f"{read.query_name} ({len(read.query_sequence)} bp)", fontsize=16)
+    qual_string = f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    " if read.has_tag("rq") else ""
+    np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
+
+    f.suptitle(
+        f"{read.query_name}\n{qual_string}{np_string}[{len(read.query_sequence)} bp]    [model score: {logp:.2f}]",
+        fontsize=16
+    )
 
     f.patch.set_visible(False)
     ax.axis("off")
 
-    columns = 150
+    columns = line_length
     rows = 4 * 80
 
     plt.xlim([0, columns])
@@ -277,17 +328,17 @@ def draw_state_sequence(seq, path, read, out, **kwargs):
     column = 0
     n = 0
 
-    for s, c, l in zip(strings, colors, labels):
+    for base_string, color, lbl in zip(base_strings, colors, labels):
         if column == 0:
             ytic = ax.text(0, rows - row, f"{n}  ", transform=t, ha="right")
 
         text = ax.text(
             0,
             rows - row,
-            s,
-            color=c,
+            base_string,
+            color=color,
             transform=t,
-            bbox=dict(facecolor=f"{c}22", edgecolor=f"{c}22", pad=0),
+            bbox=dict(facecolor=f"{color}22", edgecolor=f"{color}22", pad=0),
             **kwargs,
         )
 
@@ -303,11 +354,22 @@ def draw_state_sequence(seq, path, read, out, **kwargs):
         )
 
         # Write state label
-        if l != "random":
+        if lbl != "random":
+
+            # If we want to show the segment scores, we calculate them here:
+            seg_score_string = ""
+            if show_seg_score:
+                known_segment_seq = model.adapter_dict[lbl]
+                alignment = ssw_aligner.align(base_string.upper(), known_segment_seq)
+                optimal_score = alignment.score
+                # The max score is the match score * the length of the reference segment
+                max_score = len(known_segment_seq) * ssw_aligner.matrix.get_match()
+                seg_score_string = f" ({optimal_score}/{max_score})"
+
             ax.text(
-                0 - (len(s) / 2),
+                0 - (len(base_string) / 2),
                 rows - row - 3.5,
-                l,
+                f"{lbl}{seg_score_string}",
                 transform=t,
                 va="bottom",
                 ha="center",
@@ -315,14 +377,14 @@ def draw_state_sequence(seq, path, read, out, **kwargs):
                 bbox=dict(facecolor="white", edgecolor="black"),
             )
 
-        if l == "10x_Adapter":
+        if lbl == "10x_Adapter":
             for o in range(10, 50, 10):
-                if letters_seen + len(s) + o < 150:
+                if letters_seen + len(base_string) + o < line_length:
                     ax.text(0, rows - row + 1.7, f"{' ' * o}'", transform=t, **kwargs)
 
         # Decide whether we need to break into a new row
-        letters_seen += len(s)
-        n += len(s)
+        letters_seen += len(base_string)
+        n += len(base_string)
         column += 1
 
         if letters_seen >= columns:
