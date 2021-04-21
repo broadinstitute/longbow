@@ -95,7 +95,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
     
     Segment names are assumed to be those in the default model (utils/model.py).
     
-    INPUT_BAM should contain reads that have been processed by `annmas segment`.
+    INPUT_BAM should contain reads that have been processed by `longbow segment`.
 
     The output from this tool consists of several files:
         OUTPUT_BASE_NAME_mates_1.fastq:
@@ -111,7 +111,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
 
     t_start = time.time()
 
-    logger.info("Invoked via: annmas %s", " ".join(sys.argv[1:]))
+    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
@@ -170,8 +170,8 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
 
         # Add our program group to it:
         pg_dict = {
-            "ID": f"annmas-{logger.name}-{VERSION}",
-            "PN": "annmas",
+            "ID": f"longbow-{logger.name}-{VERSION}",
+            "PN": "longbow",
             "VN": f"{VERSION}",
             # Use reflection to get the first line of the doc string for this main function for our header:
             "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
@@ -228,40 +228,53 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
 
 
 def _validate_input_bam(input_bam_header):
-    """Check that the given input_bam_header contains an `annmas segment` program group."""
+    """Check that the given input_bam_header contains an `longbow segment` program group."""
     in_bam_header_dict = input_bam_header.to_dict()
     if "PG" not in in_bam_header_dict:
-        logger.warn("Could not find PG entry in header.  Cannot confirm that this file is compatible.")
+        logger.warning("Could not find PG entry in header.  Cannot confirm that this file is compatible.")
     else:
         found_segment_cmd = False
         for info in [item for item in in_bam_header_dict["PG"]]:
             if "PN" not in info:
                 continue
-            if info["PN"] == "annmas" and info["ID"].split("-")[1] == "segment":
+            if info["PN"] == "longbow" and info["ID"].split("-")[1] == "segment":
                 found_segment_cmd = True
                 break
         if not found_segment_cmd:
             logger.error(
-                "Input bam file header does not indicate that it was created by annmas segment.  "
-                "This tool requires `annmas segment` reads as input data.")
+                "Input bam file header does not indicate that it was created by longbow segment.  "
+                "This tool requires `longbow segment` reads as input data.")
             return False
     return True
 
 
-def _get_named_segment_from_list(seg_list, name, read_name):
-    """Get the segment with the given name from the list of SegmentInfo objects.
-    If multiple items have the given name a warning is logged and None is returned."""
+def _get_start_segment_from_list(seg_list, model, read_name):
+    """Get the start segment segment from the list of SegmentInfo objects based on the given model.
+    If no start segment is found, returns None."""
 
-    found_segments = [s for s in seg_list if s.name == name]
-    if len(found_segments) < 1:
-        logger.warn("Could not process read: %s - %s annotation is not present!",
-                    read_name, name)
-        return None
-    elif len(found_segments) > 1:
-        logger.warn("Could not process read: %s - multiple %s annotations are present (%d)!",
-                    read_name, name, len(found_segments))
-        return None
-    return found_segments[0]
+    # The start segment should be the first matching segment:
+    for s in seg_list:
+        if s.name in model.start_element_names:
+            return s
+
+    logger.warning("Could not process read: %s - No start segment found (start names: %s).",
+                   read_name, model.start_element_names)
+    return None
+
+
+def _get_end_segment_from_list(seg_list, model, read_name):
+    """Get the end segment segment from the list of SegmentInfo objects based on the given model.
+    If no start segment is found, returns None."""
+
+    # The end segment should be the last matching segment, so we
+    # iterate from the end to the start of the list:
+    for s in reversed(seg_list):
+        if s.name in model.end_element_names:
+            return s
+
+    logger.warning("Could not process read: %s - No end segment found (end names: %s).",
+                   read_name, model.start_element_names)
+    return None
 
 
 def _sub_process_work_fn(in_queue, out_queue, umi_length, array_model, do_bam_out):
@@ -286,13 +299,13 @@ def _sub_process_work_fn(in_queue, out_queue, umi_length, array_model, do_bam_ou
 
         # Get start element position
         # (for MAS-seq it's the 10x adapter)
-        start_segment = _get_named_segment_from_list(segments, array_model.start_element_name, read.query_name)
+        start_segment = _get_start_segment_from_list(segments, array_model, read.query_name)
         if start_segment is None:
             continue
 
         # Get the end element position:
         # (for MAS-seq it's the Poly-a)
-        end_segment = _get_named_segment_from_list(segments, array_model.end_element_name, read.query_name)
+        end_segment = _get_end_segment_from_list(segments, array_model, read.query_name)
         if end_segment is None:
             continue
 

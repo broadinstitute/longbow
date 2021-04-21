@@ -83,7 +83,7 @@ def main(read_names, model, pbi, file_format, outdir, m10, seg_score, input_bam)
 
     t_start = time.time()
 
-    logger.info("Invoked via: annmas %s", " ".join(sys.argv[1:]))
+    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     pbi = f"{input_bam}.pbi" if pbi is None else pbi
     if not os.path.exists(pbi):

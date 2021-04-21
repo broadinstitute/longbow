@@ -1,5 +1,5 @@
 [run]
-source = carrot_cli 
+source = longbow
 branch = True
 
 [report]

@@ -22,15 +22,15 @@ logger.handlers[0].formatter = logging.Formatter(
 )
 
 
-@click.group(name="annmas")
+@click.group(name="longbow")
 def main_entry():
-    logger.info("Invoked via: annmas %s", " ".join(sys.argv))
+    logger.info("Invoked via: longbow %s", " ".join(sys.argv))
 
 
 @main_entry.command()
 @click_log.simple_verbosity_option(logger)
 def version():
-    """Print the version of annmas."""
+    """Print the version of longbow."""
     click.echo(VERSION)
 
 
