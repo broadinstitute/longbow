@@ -48,6 +48,8 @@ class LibraryModel:
         self.end_element_names = end_element_names
 
         self.hmm = None
+        self.key_segments = self._create_key_segment_order()
+        self.key_segment_set = set(self.key_segment_order)
 
         if do_build:
             self.build()
@@ -77,7 +79,35 @@ class LibraryModel:
 
         return logp, ppath
 
+    def validate_segment_order(self, ordered_segment_names):
+        """Validate the order of the given segments against the expected order in this model."""
+
+        # Iterate through our given segment names and check if they occur in order:
+        num_key_elements_found = 0
+        key_seg_indx = 0
+        for i, n in enumerate(ordered_segment_names):
+            # Ignore all segment names that do not characterize our library:
+            if n in self.key_segment_set:
+
+                # If this is our first segment, we should allow for the possibility that our array begins
+                # somewhere after the first element.  We must find the starting point:
+                if i == 0:
+                    while n != self.key_segments[key_seg_indx]:
+                        key_seg_indx += 1
+
+                # Check our key segments here:
+                if n == self.key_segments[key_seg_indx]:
+                    key_seg_indx += 1
+                    num_key_elements_found += 1
+                else:
+                    # This read does not conform to the model!
+                    return False
+
+        # If we've made it here and we have seen at least 1 key element, then we have a valid array:
+        return True if num_key_elements_found > 0 else False
+
     def build(self):
+        """Build the HMM underlying this model given our segment information."""
         self.hmm = LibraryModel._make_random_repeat_model()
         for k, v in self.adapter_dict.items():
             self.hmm.add_model(LibraryModel._make_global_alignment_model(v, k))
@@ -129,6 +159,19 @@ class LibraryModel:
                 self.hmm.add_transition(s, self.hmm.end, LibraryModel.SUDDEN_END_PROB)
 
         self.hmm.bake()
+
+    def _create_key_segment_order(self):
+        """Setup an ordered list of key segments that characterize the correct array element order."""
+
+        # TODO: Generalize this for all library types / segment names!
+        # Assumption: self.array_element_structure contains the array elements in our library in the order in which
+        #             they appear in the data.
+        # Heuristic: The segments that characterize the array elements themselves all have single-character names, so we
+        #            filter out all segments from self.array_element_structure with names longer than 1 char.  We then
+        #            use these in order to characterize the reads.
+
+        ordered_key_segments = [s for array in self.array_element_structure for s in array if len(s) == 1]
+        return ordered_key_segments
 
     @staticmethod
     def _make_global_alignment_model(target, name=None):

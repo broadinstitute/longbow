@@ -6,8 +6,6 @@ import time
 import collections
 import os
 
-from inspect import getframeinfo, currentframe, getdoc
-
 import click
 import click_log
 import tqdm
@@ -18,16 +16,10 @@ import multiprocessing as mp
 import gzip
 from construct import *
 
-from ..utils import read_utils
+from ..utils import bam_utils
 from ..utils.model import reverse_complement
 from ..utils.model import LibraryModel
 
-from ..meta import VERSION
-
-SEGMENTS_TAG = "SG"
-SEGMENTS_RC_TAG = "RC"
-
-__SEGMENT_TAG_DELIMITER = ","
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("annotate")
@@ -56,13 +48,6 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
 
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
-@click.option(
-    "-m",
-    "--model",
-    required=False,
-    type=click.Path(exists=True),
-    help="pre-trained model to apply",
-)
 @click.option(
     "-p",
     "--pbi",
@@ -93,7 +78,7 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
     help="Use the 10 array element MAS-seq model."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(model, pbi, threads, output_bam, m10, input_bam):
+def main(pbi, threads, output_bam, m10, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
@@ -103,10 +88,7 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
-    if model is not None:
-        logger.info(f"Using pretrained annotation model {model}")
-        m = LibraryModel.from_yaml(model)
-    elif m10:
+    if m10:
         logger.info("Using MAS-seq 10 array element annotation model.")
         m = LibraryModel.build_and_return_mas_seq_10_model()
     else:
@@ -116,7 +98,7 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
     if os.path.exists(pbi):
-        read_count = read_utils.load_read_count(pbi)
+        read_count = bam_utils.load_read_count(pbi)
         logger.info("Annotating %d reads", read_count)
 
     # Create queues for data:
@@ -141,22 +123,7 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
     ) as bam_file:
 
         # Get our header from the input bam file:
-        out_bam_header_dict = bam_file.header.to_dict()
-
-        # Add our program group to it:
-        pg_dict = {
-            "ID": f"longbow-annotate-{VERSION}",
-            "PN": "longbow",
-            "VN": f"{VERSION}",
-            # Use reflection to get the first line of the doc string for this main function for our header:
-            "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
-            "CL": " ".join(sys.argv),
-        }
-        if "PG" in out_bam_header_dict:
-            out_bam_header_dict["PG"].append(pg_dict)
-        else:
-            out_bam_header_dict["PG"] = [pg_dict]
-        out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
+        out_header = bam_utils.create_bam_header_with_program_group("annotate", bam_file.header)
 
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
@@ -195,6 +162,13 @@ def main(model, pbi, threads, output_bam, m10, input_bam):
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
                 f"Overall processing rate: {res['num_reads_annotated']/(et - t_start):2.2f} reads/s.")
+
+
+def get_segments(read):
+    """Get the segments corresponding to a particular read by reading the segments tag information."""
+    return read.to_string(), [
+        SegmentInfo.from_tag(s) for s in read.get_tag(bam_utils.SEGMENTS_TAG).split(bam_utils.SEGMENT_TAG_DELIMITER)
+    ]
 
 
 def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count):
@@ -239,11 +213,11 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             )
 
             # Set our tag and write out the read to the annotated file:
-            read.set_tag(SEGMENTS_TAG, __SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
+            read.set_tag(bam_utils.SEGMENTS_TAG, bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
 
             # If we're reverse complemented, we make it easy and just reverse complement the read and add a tag saying
             # that the read was RC:
-            read.set_tag(SEGMENTS_RC_TAG, is_rc)
+            read.set_tag(bam_utils.SEGMENTS_RC_TAG, is_rc)
             if is_rc:
                 quals = read.query_qualities[::-1]
                 seq = reverse_complement(read.query_sequence)
@@ -323,10 +297,3 @@ def _segment_read(read, model):
         logger.debug("Sequence scored better in RC: %s", read.query_name)
 
     return read.to_string(), ppath, logp, is_rc
-
-
-def _get_segments(read):
-    """Get the segments corresponding to a particular read by reading the segments tag information."""
-    return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(SEGMENTS_TAG).split(__SEGMENT_TAG_DELIMITER)
-    ]

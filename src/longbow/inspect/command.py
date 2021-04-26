@@ -35,13 +35,6 @@ click_log.basic_config(logger)
     help="read names (or file(s) of read names) to inspect",
 )
 @click.option(
-    "-m",
-    "--model",
-    required=False,
-    type=click.Path(exists=True),
-    help="pre-trained model to apply",
-)
-@click.option(
     "-p",
     "--pbi",
     required=False,
@@ -78,7 +71,7 @@ click_log.basic_config(logger)
     help="Display alignment score for annotated segments."
 )
 @click.argument("input-bam", type=click.Path(exists=True))
-def main(read_names, model, pbi, file_format, outdir, m10, seg_score, input_bam):
+def main(read_names, pbi, file_format, outdir, m10, seg_score, input_bam):
     """Inspect the classification results on specified reads."""
 
     t_start = time.time()
@@ -92,10 +85,7 @@ def main(read_names, model, pbi, file_format, outdir, m10, seg_score, input_bam)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    if model is not None:
-        logger.info(f"Using pretrained annotation model {model}")
-        lb_model = LibraryModel.from_yaml(model)
-    elif m10:
+    if m10:
         logger.info("Using MAS-seq 10 array element annotation model.")
         lb_model = LibraryModel.build_and_return_mas_seq_10_model()
     else:

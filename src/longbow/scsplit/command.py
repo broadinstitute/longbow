@@ -13,9 +13,10 @@ import multiprocessing as mp
 
 from inspect import getframeinfo, currentframe, getdoc
 
+from ..utils import bam_utils
 from ..utils.model import LibraryModel
 
-from ..annotate.command import _get_segments
+from ..annotate.command import get_segments
 
 from ..meta import VERSION
 
@@ -166,22 +167,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
                 sys.exit(1)
 
         # Get our header from the input bam file:
-        out_bam_header_dict = bam_file.header.to_dict()
-
-        # Add our program group to it:
-        pg_dict = {
-            "ID": f"longbow-{logger.name}-{VERSION}",
-            "PN": "longbow",
-            "VN": f"{VERSION}",
-            # Use reflection to get the first line of the doc string for this main function for our header:
-            "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
-            "CL": " ".join(sys.argv),
-        }
-        if "PG" in out_bam_header_dict:
-            out_bam_header_dict["PG"].append(pg_dict)
-        else:
-            out_bam_header_dict["PG"] = [pg_dict]
-        out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
+        out_header = bam_utils.create_bam_header_with_program_group("scsplit", bam_file.header)
 
         # Start output worker:
         res = manager.dict({"num_reads_processed": 0})
@@ -295,7 +281,7 @@ def _sub_process_work_fn(in_queue, out_queue, umi_length, array_model, do_bam_ou
         read = pysam.AlignedSegment.fromstring(
             raw_data, pysam.AlignmentHeader.from_dict(dict())
         )
-        _, segments = _get_segments(read)
+        _, segments = get_segments(read)
 
         # Get start element position
         # (for MAS-seq it's the 10x adapter)
