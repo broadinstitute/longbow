@@ -89,7 +89,7 @@ def main(pbi, out_prefix, m10, force, input_bam):
     logger.info(f"Writing reads that conform to the model to: {passing_out_name}")
     logger.info(f"Writing reads that do not conform to the model to: {failing_out_name}")
 
-    logger.info(f"Filtering according to {model_name} model ordered key segments: {', '.join(lb_model.key_segments)}")
+    logger.info(f"Filtering according to {model_name} model ordered key adapters: {', '.join(lb_model.key_adapters)}")
 
     # Open our input bam file:
     pysam.set_verbosity(0)
@@ -113,6 +113,8 @@ def main(pbi, out_prefix, m10, force, input_bam):
             num_passed = 0
             num_failed = 0
 
+            tot_num_valid_adapters = 0
+
             for read in bam_file:
                 # Get our read segments:
                 try:
@@ -127,27 +129,32 @@ def main(pbi, out_prefix, m10, force, input_bam):
 
                 # Check to see if the read is valid by this model and write it out:
                 segment_names = [s.name for s in segments]
-                is_valid, num_valid_segments, first_valid_segment_index = \
+                is_valid, num_valid_adapters, first_valid_adapter_index = \
                     lb_model.validate_segment_order(segment_names)
 
                 if is_valid:
-                    logger.debug("Read is %s valid: %s: first key segment: [%d, %s], # key segments: %d",
+                    logger.debug("Read is %s valid: %s: first key adapter: [%d, %s], # key adapters: %d",
                                  model_name,
                                  read.query_name,
-                                 first_valid_segment_index,
-                                 lb_model.key_segments[first_valid_segment_index],
-                                 num_valid_segments)
+                                 first_valid_adapter_index,
+                                 lb_model.key_adapters[first_valid_adapter_index],
+                                 num_valid_adapters)
 
                     read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, True)
-                    read.set_tag(bam_utils.READ_NUM_KEY_SEGMENTS_TAG, num_valid_segments)
-                    read.set_tag(bam_utils.READ_FIRST_KEY_SEG_TAG, lb_model.key_segments[first_valid_segment_index])
+                    read.set_tag(bam_utils.READ_NUM_KEY_SEGMENTS_TAG, num_valid_adapters)
+                    read.set_tag(bam_utils.READ_FIRST_KEY_SEG_TAG, lb_model.key_adapters[first_valid_adapter_index])
                     passing_bam_file.write(read)
+                    tot_num_valid_adapters += num_valid_adapters
                     num_passed += 1
                 else:
                     if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug("Read is not %s valid: %s: key segments detected: %s",
+                        logger.debug("Read is not %s valid: %s: first key adapter: [%d, %s], # key adapters: %d, "
+                                     "key adapters detected: %s",
                                      model_name,
                                      read.query_name,
+                                     first_valid_adapter_index,
+                                     lb_model.key_adapters[first_valid_adapter_index],
+                                     num_valid_adapters,
                                      lb_model.extract_key_segment_names(segment_names))
 
                     read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, False)
@@ -159,3 +166,4 @@ def main(pbi, out_prefix, m10, force, input_bam):
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
     logger.info(f"Num Reads Passing Model Filter: %d", num_passed)
     logger.info(f"Num Reads Failing Model Filter: %d", num_failed)
+    logger.info(f"Avg num key adapters per passing read: %2.4f", tot_num_valid_adapters/num_passed)

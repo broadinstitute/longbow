@@ -48,8 +48,8 @@ class LibraryModel:
         self.end_element_names = end_element_names
 
         self.hmm = None
-        self.key_segments = self._create_key_segment_order()
-        self.key_segment_set = set(self.key_segments)
+        self.key_adapters = self._create_key_adapter_order()
+        self.key_adapter_set = set(self.key_adapters)
 
         if do_build:
             self.build()
@@ -79,42 +79,53 @@ class LibraryModel:
 
         return logp, ppath
 
-    def validate_segment_order(self, ordered_segment_names):
+    def validate_segment_order(self, ordered_segment_names, allow_missing_first_adapter=True):
         """Validate the order of the given segments against the expected order in this model.
 
-        Returns: (True|False, # key elements found, first key element index)"""
+        Returns: (True|False, # key adapters found, first key adapter index)"""
 
         # Iterate through our given segment names and check if they occur in order:
-        num_key_elements_found = 0
-        key_seg_indx = 0
-        first_key_seg_index = 0
-        for i, n in enumerate(ordered_segment_names):
+        num_key_adapters_found = 0
+        key_adapter_indx = 0
+        first_key_adapter_index = 0
+        found_first_key = False
+        for n in ordered_segment_names:
             # Ignore all segment names that do not characterize our library:
-            if n in self.key_segment_set:
+            if n in self.key_adapter_set:
 
                 # If this is our first segment, we should allow for the possibility that our array begins
                 # somewhere after the first element.  We must find the starting point:
-                if i == 0:
-                    while n != self.key_segments[key_seg_indx]:
-                        key_seg_indx += 1
-                    first_key_seg_index = key_seg_indx
+                if not found_first_key:
+                    while n != self.key_adapters[key_adapter_indx]:
+                        key_adapter_indx += 1
+                    first_key_adapter_index = key_adapter_indx
+                    found_first_key = True
+
+                    # TODO: This can be eliminated for newer datasets, but is here because we're still testing with
+                    #       older data that does not have the first MAS-seq overhang.  The model has already been
+                    #       updated to handle these segments.
+                    if allow_missing_first_adapter and (key_adapter_indx == 1) and \
+                            (ordered_segment_names[0] == "10x_Adapter"):
+                        num_key_adapters_found += 1
+                        first_key_adapter_index = 0
 
                 # Check our key segments here:
-                if n == self.key_segments[key_seg_indx]:
-                    key_seg_indx += 1
-                    num_key_elements_found += 1
+                # NOTE: it's possible that we can start matching in the middle of an array, but at the start of a read,
+                #       and so we have to do a bounds check here:
+                if key_adapter_indx < len(self.key_adapters) and (n == self.key_adapters[key_adapter_indx]):
+                    key_adapter_indx += 1
+                    num_key_adapters_found += 1
                 else:
-
                     # This read does not conform to the model!
-                    return False, 0, None
+                    return False, num_key_adapters_found, first_key_adapter_index
 
-        # If we've made it here and we have seen at least 1 key element, then we have a valid array:
-        is_valid = True if num_key_elements_found > 0 else False
-        return is_valid, num_key_elements_found, first_key_seg_index if is_valid else None
+        # If we've made it here and we have seen at least 1 key adapter, then we have a valid array:
+        is_valid = True if num_key_adapters_found > 0 else False
+        return is_valid, num_key_adapters_found, first_key_adapter_index
 
     def extract_key_segment_names(self, segment_names):
         """Return a list of key segment names from the given list of segment_names."""
-        return [n for n in segment_names if n in self.key_segment_set]
+        return [n for n in segment_names if n in self.key_adapter_set]
 
     def build(self):
         """Build the HMM underlying this model given our segment information."""
@@ -170,7 +181,7 @@ class LibraryModel:
 
         self.hmm.bake()
 
-    def _create_key_segment_order(self):
+    def _create_key_adapter_order(self):
         """Setup an ordered list of key segments that characterize the correct array element order."""
 
         # TODO: Generalize this for all library types / segment names!

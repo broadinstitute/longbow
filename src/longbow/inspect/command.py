@@ -105,23 +105,25 @@ def main(read_names, pbi, file_format, outdir, m10, seg_score, input_bam):
             for z in file_offsets:
                 bf.seek(file_offsets[z]["offset"])
                 read = bf.__next__()
-
-                out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
-                seq, path, logp = annotate_read(read, lb_model)
-
-                logger.info("Drawing read '%s' to '%s'", read.query_name, out)
-                draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
+                __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner)
         else:
             # Without read names we just inspect every read in the file:
             logger.info("No read names given.  Inspecting every read in the input bam file.")
             for read in bf:
-                out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
-                seq, path, logp = annotate_read(read, lb_model)
-
-                logger.info("Drawing read '%s' to '%s'", read.query_name, out)
-                draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
+                __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+
+
+def __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner):
+    """Create a figure for the given read."""
+
+    out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
+
+    seq, path, logp = annotate_read(read, lb_model)
+
+    logger.info("Drawing read '%s' to '%s'", read.query_name, out)
+    draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
 
 
 def load_read_names(read_names):
@@ -267,6 +269,7 @@ def format_state_sequence(seq, path, line_length=150):
             a = seq[j]
             b = path[j]
 
+            # Handle the line breaks:
             if label == b:
                 bases.append(a)
             elif label != b:
@@ -347,7 +350,6 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, model, ssw_a
         if lbl != "random":
 
             # If we want to show the segment scores, we calculate them here:
-            seg_score_string = ""
             if show_seg_score:
                 known_segment_seq = model.adapter_dict[lbl]
                 alignment = ssw_aligner.align(base_string.upper(), known_segment_seq)
@@ -355,6 +357,8 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, model, ssw_a
                 # The max score is the match score * the length of the reference segment
                 max_score = len(known_segment_seq) * ssw_aligner.matrix.get_match()
                 seg_score_string = f" ({optimal_score}/{max_score})"
+            else:
+                seg_score_string = ""
 
             ax.text(
                 0 - (len(base_string) / 2),
