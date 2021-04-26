@@ -1,6 +1,6 @@
 import logging
 import time
-import re
+import os
 import sys
 
 import click
@@ -32,7 +32,7 @@ click_log.basic_config(logger)
     "-o",
     "--out-prefix",
     default=".",
-    required=False,
+    required=True,
     type=str,
     help="Output file prefix",
 )
@@ -110,7 +110,12 @@ def main(pbi, out_prefix, m10, force, input_bam):
 
             for read in bam_file:
                 # Get our read segments:
-                segments = get_segments(read)
+                try:
+                    segments = get_segments(read)
+                except KeyError:
+                    logger.error(f"Input bam file does not contain longbow segmented reads!  "
+                                 f"No {bam_utils.SEGMENTS_TAG} tag detected on read {read.query_name} !")
+                    sys.exit(1)
 
                 # Annotate the read with the model that was used in its validation:
                 read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model_name)

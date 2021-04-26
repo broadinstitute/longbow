@@ -49,7 +49,7 @@ class LibraryModel:
 
         self.hmm = None
         self.key_segments = self._create_key_segment_order()
-        self.key_segment_set = set(self.key_segment_order)
+        self.key_segment_set = set(self.key_segments)
 
         if do_build:
             self.build()

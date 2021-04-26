@@ -1,5 +1,7 @@
 import sys
 import gzip
+import inspect
+
 from construct import *
 from inspect import getframeinfo, currentframe, getdoc
 
@@ -44,10 +46,15 @@ def load_read_count(pbi_file):
 def create_bam_header_with_program_group(command_name, base_bam_header, description=None):
     """Create a pysam.AlignmentHeader object with program group (PG) information populated by the given arguments.
 
-    This function is intended to be called from the main function of a longbow subcommand because it uses reflection to
-    pull in the first line of the docstring from the main method as the description (DS field)."""
+    This function is intended to be called from the 'main' function of a longbow subcommand because it uses reflection
+    to pull in the first line of the docstring from the main function as the description (DS field)."""
 
     bam_header_dict = base_bam_header.to_dict()
+
+    if not description:
+        prev_frame = currentframe().f_back
+        description = getdoc(prev_frame.f_globals['main']).split("\n")[0]
+        # description = getdoc(globals()[getframeinfo(prev_frame).function]).split("\n")[0]
 
     # Add our program group to it:
     pg_dict = {
@@ -55,7 +62,7 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
         "PN": "longbow",
         "VN": f"{VERSION}",
         # Use reflection to get the first line of the doc string the caller - the main function for our header:
-        "DS": description if description else getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
+        "DS": description,
         "CL": " ".join(sys.argv),
     }
     if "PG" in bam_header_dict:
