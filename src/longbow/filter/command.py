@@ -89,6 +89,8 @@ def main(pbi, out_prefix, m10, force, input_bam):
     logger.info(f"Writing reads that conform to the model to: {passing_out_name}")
     logger.info(f"Writing reads that do not conform to the model to: {failing_out_name}")
 
+    logger.info(f"Filtering according to {model_name} model ordered key segments: {', '.join(lb_model.key_segments)}")
+
     # Open our input bam file:
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file, \
@@ -108,10 +110,13 @@ def main(pbi, out_prefix, m10, force, input_bam):
         with pysam.AlignmentFile(passing_out_name, "wb", header=out_header) as passing_bam_file, \
                 pysam.AlignmentFile(failing_out_name, "wb", header=out_header) as failing_bam_file:
 
+            num_passed = 0
+            num_failed = 0
+
             for read in bam_file:
                 # Get our read segments:
                 try:
-                    segments = get_segments(read)
+                    _, segments = get_segments(read)
                 except KeyError:
                     logger.error(f"Input bam file does not contain longbow segmented reads!  "
                                  f"No {bam_utils.SEGMENTS_TAG} tag detected on read {read.query_name} !")
@@ -121,13 +126,36 @@ def main(pbi, out_prefix, m10, force, input_bam):
                 read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model_name)
 
                 # Check to see if the read is valid by this model and write it out:
-                if lb_model.validate_segment_order([s.name for s in segments]):
+                segment_names = [s.name for s in segments]
+                is_valid, num_valid_segments, first_valid_segment_index = \
+                    lb_model.validate_segment_order(segment_names)
+
+                if is_valid:
+                    logger.debug("Read is %s valid: %s: first key segment: [%d, %s], # key segments: %d",
+                                 model_name,
+                                 read.query_name,
+                                 first_valid_segment_index,
+                                 lb_model.key_segments[first_valid_segment_index],
+                                 num_valid_segments)
+
                     read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, True)
+                    read.set_tag(bam_utils.READ_NUM_KEY_SEGMENTS_TAG, num_valid_segments)
+                    read.set_tag(bam_utils.READ_FIRST_KEY_SEG_TAG, lb_model.key_segments[first_valid_segment_index])
                     passing_bam_file.write(read)
+                    num_passed += 1
                 else:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug("Read is not %s valid: %s: key segments detected: %s",
+                                     model_name,
+                                     read.query_name,
+                                     lb_model.extract_key_segment_names(segment_names))
+
                     read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, False)
                     failing_bam_file.write(read)
+                    num_failed += 1
 
                 pbar.update(1)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+    logger.info(f"Num Reads Passing Model Filter: %d", num_passed)
+    logger.info(f"Num Reads Failing Model Filter: %d", num_failed)

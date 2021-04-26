@@ -17,6 +17,8 @@ SEGMENT_TAG_DELIMITER = ","
 READ_MODEL_NAME_TAG = "YN"
 READ_MODEL_SCORE_TAG = "YS"
 READ_IS_VALID_FOR_MODEL_TAG = "YV"
+READ_FIRST_KEY_SEG_TAG = "YK"
+READ_NUM_KEY_SEGMENTS_TAG = "YG"
 
 
 def load_read_count(pbi_file):
@@ -54,7 +56,6 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
     if not description:
         prev_frame = currentframe().f_back
         description = getdoc(prev_frame.f_globals['main']).split("\n")[0]
-        # description = getdoc(globals()[getframeinfo(prev_frame).function]).split("\n")[0]
 
     # Add our program group to it:
     pg_dict = {

@@ -80,11 +80,14 @@ class LibraryModel:
         return logp, ppath
 
     def validate_segment_order(self, ordered_segment_names):
-        """Validate the order of the given segments against the expected order in this model."""
+        """Validate the order of the given segments against the expected order in this model.
+
+        Returns: (True|False, # key elements found, first key element index)"""
 
         # Iterate through our given segment names and check if they occur in order:
         num_key_elements_found = 0
         key_seg_indx = 0
+        first_key_seg_index = 0
         for i, n in enumerate(ordered_segment_names):
             # Ignore all segment names that do not characterize our library:
             if n in self.key_segment_set:
@@ -94,17 +97,24 @@ class LibraryModel:
                 if i == 0:
                     while n != self.key_segments[key_seg_indx]:
                         key_seg_indx += 1
+                    first_key_seg_index = key_seg_indx
 
                 # Check our key segments here:
                 if n == self.key_segments[key_seg_indx]:
                     key_seg_indx += 1
                     num_key_elements_found += 1
                 else:
+
                     # This read does not conform to the model!
-                    return False
+                    return False, 0, None
 
         # If we've made it here and we have seen at least 1 key element, then we have a valid array:
-        return True if num_key_elements_found > 0 else False
+        is_valid = True if num_key_elements_found > 0 else False
+        return is_valid, num_key_elements_found, first_key_seg_index if is_valid else None
+
+    def extract_key_segment_names(self, segment_names):
+        """Return a list of key segment names from the given list of segment_names."""
+        return [n for n in segment_names if n in self.key_segment_set]
 
     def build(self):
         """Build the HMM underlying this model given our segment information."""
