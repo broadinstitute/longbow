@@ -1,6 +1,7 @@
 import sys
 import gzip
 import inspect
+import re
 
 from construct import *
 from inspect import getframeinfo, currentframe, getdoc
@@ -9,6 +10,7 @@ import pysam
 
 from ..meta import VERSION
 
+PB_READ_NAME_RE = re.compile("m[0-9]+e?_[0-9]{6}_[0-9]{6}/[0-9]+/.*")
 
 # Constants for bam file reading / writing:
 SEGMENTS_TAG = "SG"

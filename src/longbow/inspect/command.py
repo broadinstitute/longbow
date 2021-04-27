@@ -19,6 +19,7 @@ from matplotlib import transforms
 
 from ..utils.model import LibraryModel
 from ..utils.model import reverse_complement
+from ..utils import bam_utils
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("inspect")
@@ -102,7 +103,12 @@ def main(read_names, pbi, file_format, outdir, m10, seg_score, input_bam):
         if len(read_names) > 0:
             file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
-            for z in file_offsets:
+            for i, z in enumerate(file_offsets):
+
+                if not file_offsets[z]["offset"]:
+                    logger.error("Read not in index file: %s", read_names[i])
+                    sys.exit(1)
+
                 bf.seek(file_offsets[z]["offset"])
                 read = bf.__next__()
                 __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner)
@@ -126,20 +132,30 @@ def __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_ali
     draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
 
 
-def load_read_names(read_names):
-    rn = []
+def load_read_names(read_name_args):
+    read_names = []
 
-    for r in read_names:
+    for r in read_name_args:
         if os.path.exists(r):
             with open(r, "r") as f:
-                for line in f:
+                for i, line in enumerate(f):
                     # Space / Tab / Newline / Line feed are all forbidden in read names by the sam spec, so we can
                     # trim it all off:
-                    rn.append(line.strip())
-        else:
-            rn.append(r)
+                    rn = line.strip()
+                    if not bam_utils.PB_READ_NAME_RE.match(rn):
+                        logger.error(
+                            "Read name on line %d of file %s doesn't appear to be a PacBio read: %s", i, r, rn
+                        )
+                        sys.exit(1)
 
-    return rn
+                    read_names.append(rn)
+        else:
+            if not bam_utils.PB_READ_NAME_RE.match(r):
+                logger.error("Read name doesn't appear to be a PacBio read: %s", r)
+                sys.exit(1)
+            read_names.append(r)
+
+    return read_names
 
 
 def load_read_offsets(pbi_file, read_names):
