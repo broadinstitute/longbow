@@ -73,7 +73,9 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(pbi, out_base_name, threads, input_bam):
-    """Separate reads into files based on which model they fit best."""
+    """Separate reads into files based on which model they fit best.
+
+    Resulting reads will be annotated with the model they best fit as well as the score and segments for that model."""
 
     t_start = time.time()
 

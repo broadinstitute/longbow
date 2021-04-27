@@ -191,8 +191,8 @@ class LibraryModel:
         #            filter out all segments from self.array_element_structure with names longer than 1 char.  We then
         #            use these in order to characterize the reads.
 
-        ordered_key_segments = [s for array in self.array_element_structure for s in array if len(s) == 1]
-        return ordered_key_segments
+        ordered_key_adapters = [s for array in self.array_element_structure for s in array if len(s) == 1]
+        return ordered_key_adapters
 
     @staticmethod
     def _make_global_alignment_model(target, name=None):
