@@ -16,19 +16,9 @@ import tqdm
 import pysam
 import multiprocessing as mp
 
-from ..utils import read_utils
+from ..utils import bam_utils
 from ..utils.model import reverse_complement
 from ..utils.model import LibraryModel
-
-from ..meta import VERSION
-
-SEGMENTS_TAG = "SG"
-SEGMENTS_RC_TAG = "RC"
-
-READ_MODEL_NAME_TAG = "YN"
-READ_MODEL_SCORE_TAG = "YS"
-
-__SEGMENT_TAG_DELIMITER = ","
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("discriminate")
@@ -95,7 +85,7 @@ def main(pbi, out_base_name, threads, input_bam):
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
     if os.path.exists(pbi):
-        read_count = read_utils.load_read_count(pbi)
+        read_count = bam_utils.load_read_count(pbi)
         logger.info("Annotating %d reads", read_count)
 
     # Create queues for data:
@@ -126,22 +116,7 @@ def main(pbi, out_base_name, threads, input_bam):
     ) as bam_file:
 
         # Get our header from the input bam file:
-        out_bam_header_dict = bam_file.header.to_dict()
-
-        # Add our program group to it:
-        pg_dict = {
-            "ID": f"longbow-discriminate-{VERSION}",
-            "PN": "longbow",
-            "VN": f"{VERSION}",
-            # Use reflection to get the first line of the doc string for this main function for our header:
-            "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
-            "CL": " ".join(sys.argv),
-        }
-        if "PG" in out_bam_header_dict:
-            out_bam_header_dict["PG"].append(pg_dict)
-        else:
-            out_bam_header_dict["PG"] = [pg_dict]
-        out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
+        out_header = bam_utils.create_bam_header_with_program_group("discriminate", bam_file.header)
 
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0,
@@ -228,13 +203,15 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_dict, r
                 )
 
                 # Set our tag and write out the read to the annotated file:
-                read.set_tag(SEGMENTS_TAG, __SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
+                read.set_tag(
+                    bam_utils.SEGMENTS_TAG, bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments])
+                )
 
                 # If we're reverse complemented, we make it easy and just reverse complement the read and add a
                 # tag saying that the read was RC:
-                read.set_tag(SEGMENTS_RC_TAG, is_rc)
-                read.set_tag(READ_MODEL_SCORE_TAG, logp)
-                read.set_tag(READ_MODEL_NAME_TAG, model_name)
+                read.set_tag(bam_utils.SEGMENTS_RC_TAG, is_rc)
+                read.set_tag(bam_utils.READ_MODEL_SCORE_TAG, logp)
+                read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model_name)
                 if is_rc:
                     quals = read.query_qualities[::-1]
                     seq = reverse_complement(read.query_sequence)

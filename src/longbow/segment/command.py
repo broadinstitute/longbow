@@ -11,16 +11,11 @@ import tqdm
 import pysam
 import multiprocessing as mp
 
-from inspect import getframeinfo, currentframe, getdoc
-
+from ..utils import bam_utils
 from ..utils.model import LibraryModel
 
 from ..annotate.command import SegmentInfo
-from ..annotate.command import SEGMENTS_TAG
-from ..annotate.command import _get_segments
-from ..annotate.command import __SEGMENT_TAG_DELIMITER
-
-from ..meta import VERSION
+from ..annotate.command import get_segments
 
 
 logging.basicConfig(stream=sys.stderr)
@@ -105,22 +100,7 @@ def main(threads, output_bam, do_simple_splitting, m10, input_bam):
     ) as pbar:
 
         # Get our header from the input bam file:
-        out_bam_header_dict = bam_file.header.to_dict()
-
-        # Add our program group to it:
-        pg_dict = {
-            "ID": f"longbow-{logger.name}-{VERSION}",
-            "PN": "longbow",
-            "VN": f"{VERSION}",
-            # Use reflection to get the first line of the doc string for this main function for our header:
-            "DS": getdoc(globals()[getframeinfo(currentframe()).function]).split("\n")[0],
-            "CL": " ".join(sys.argv),
-        }
-        if "PG" in out_bam_header_dict:
-            out_bam_header_dict["PG"].append(pg_dict)
-        else:
-            out_bam_header_dict["PG"] = [pg_dict]
-        out_header = pysam.AlignmentHeader.from_dict(out_bam_header_dict)
+        out_header = bam_utils.create_bam_header_with_program_group("segment", bam_file.header)
 
         # Start output worker:
         res = manager.dict({"num_reads_segmented": 0, "num_segments": 0})
@@ -182,7 +162,7 @@ def _sub_process_work_fn(in_queue, out_queue):
         )
 
         # Process and place our data on the output queue:
-        out_queue.put(_get_segments(read))
+        out_queue.put(get_segments(read))
 
 
 def _sub_process_write_fn(
@@ -534,8 +514,8 @@ def _write_split_array_element(
 
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
-        SEGMENTS_TAG,
-        __SEGMENT_TAG_DELIMITER.join([ s.to_tag() for s in out_segments ]),
+        bam_utils.SEGMENTS_TAG,
+        bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
     )
 
     bam_out.write(a)
