@@ -78,13 +78,16 @@ def main(pbi, out_prefix, m10, force, input_bam):
     failing_out_name = f"{out_prefix}_longbow_filter_failed.bam"
 
     # Check to see if the output files exist:
+    is_file_exist_error = False
     for f in [passing_out_name, failing_out_name]:
         if os.path.exists(f):
             if force:
                 logger.warning(f"Output file exists: {f}.  Overwriting.")
             else:
-                logger.error(f"Output file exists: {f}.")
-                sys.exit(1)
+                logger.error(f"Output file already exists: {f}!")
+                is_file_exist_error = True
+    if is_file_exist_error:
+        sys.exit(1)
 
     logger.info(f"Writing reads that conform to the model to: {passing_out_name}")
     logger.info(f"Writing reads that do not conform to the model to: {failing_out_name}")
@@ -114,6 +117,7 @@ def main(pbi, out_prefix, m10, force, input_bam):
             num_failed = 0
 
             tot_num_valid_adapters = 0
+            tot_num_failed_adapters = 0
 
             for read in bam_file:
                 # Get our read segments:
@@ -159,11 +163,16 @@ def main(pbi, out_prefix, m10, force, input_bam):
 
                     read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, False)
                     failing_bam_file.write(read)
+                    tot_num_failed_adapters += num_valid_adapters
                     num_failed += 1
 
                 pbar.update(1)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
-    logger.info(f"Num Reads Passing Model Filter: %d", num_passed)
-    logger.info(f"Num Reads Failing Model Filter: %d", num_failed)
-    logger.info(f"Avg num key adapters per passing read: %2.4f", tot_num_valid_adapters/num_passed)
+    logger.info(f"Total Reads Processed: %d", num_passed + num_failed)
+    logger.info(f"# Reads Passing Model Filter: %d (%2.2f%%)", num_passed, 100*num_passed / (num_passed + num_failed))
+    logger.info(f"# Reads Failing Model Filter: %d (%2.2f%%)", num_failed, 100*num_failed / (num_passed + num_failed))
+    logger.info(f"Avg # correctly ordered key adapters per passing read: %2.4f [%d]",
+                tot_num_valid_adapters/num_passed, len(lb_model.key_adapters))
+    logger.info(f"Avg # correctly ordered key adapters per failing read: %2.4f [%d]",
+                tot_num_failed_adapters/num_failed, len(lb_model.key_adapters))
