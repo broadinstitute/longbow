@@ -1,6 +1,6 @@
 import sys
+import os
 import gzip
-import inspect
 import re
 import logging
 import click_log
