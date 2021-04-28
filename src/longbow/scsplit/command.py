@@ -26,7 +26,7 @@ click_log.basic_config(logger)
 
 
 __DEFAULT_DUMMY_CBC = "CTGCCTAACCTGATCC"
-__DEFAULT_OUT_BASE_NAME = "scsplit"
+__DEFAULT_OUT_BASE_NAME = logger.name
 __DEFAULT_UMI_LENGTH = 10
 
 
@@ -167,7 +167,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
                 sys.exit(1)
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group("scsplit", bam_file.header)
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
 
         # Start output worker:
         res = manager.dict({"num_reads_processed": 0})

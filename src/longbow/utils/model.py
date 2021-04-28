@@ -57,16 +57,6 @@ class LibraryModel:
         if do_build:
             self.build()
 
-    @staticmethod
-    def from_yaml(path):
-        """Initialize a LibraryModel from a given yaml file."""
-        # TODO: Pull out the other parameters from the YAML file.
-        new_model = LibraryModel(do_build=False)
-        _hmm = HiddenMarkovModel()
-        _hmm.from_yaml(path)
-        new_model.hmm = _hmm
-        return new_model
-
     def annotate(self, seq):
         """Annotate the given segment using this model."""
         logp, path = self.hmm.viterbi(seq)
@@ -324,6 +314,21 @@ class LibraryModel:
         model.bake(merge="None")
 
         return model
+
+    # TODO: FINISH THIS!
+    def to_json(self, outfile=None):
+        """Serialize this model to a json object and return that json object.
+        If outfile is not none, will write the json object to the given file path."""
+        raise NotImplementedError("LibraryModel.to_json is not yet implemented!")
+
+    # TODO: FINISH THIS!
+    @staticmethod
+    def from_json(self, json):
+        """Create a LibraryModel instance from the given json data.
+        If json is a json object, this method will use the data in the object accordingly.
+        If json is a file / string / path, this method will open the file at that location
+        and use the data in that file to create a LibraryModel."""
+        raise NotImplementedError("LibraryModel.from_json is not yet implemented!")
 
     @staticmethod
     def build_and_return_mas_seq_model():

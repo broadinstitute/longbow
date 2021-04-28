@@ -123,7 +123,7 @@ def main(pbi, threads, output_bam, m10, input_bam):
     ) as bam_file:
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group("annotate", bam_file.header)
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
 
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
