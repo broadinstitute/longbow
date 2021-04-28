@@ -1,13 +1,9 @@
 import logging
 import sys
 import itertools
-import re
 import time
-import collections
 import os
 import math
-
-from inspect import getframeinfo, currentframe, getdoc
 
 import click
 import click_log
@@ -16,6 +12,8 @@ import tqdm
 import pysam
 import multiprocessing as mp
 
+from ..annotate.command import SegmentInfo
+from ..annotate.command import _collapse_annotations
 from ..utils import bam_utils
 from ..utils.model import reverse_complement
 from ..utils.model import LibraryModel
@@ -23,26 +21,6 @@ from ..utils.model import LibraryModel
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("discriminate")
 click_log.basic_config(logger)
-
-
-# Named tuple to store alignment information:
-class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"])):
-
-    _tag_regex = re.compile(r"(.*?):(\d+)-(\d+)")
-
-    def __len__(self):
-        return self.end - self.start
-
-    def __str__(self):
-        return f"SegmentInfo({self.to_tag()})"
-
-    def to_tag(self):
-        return f"{self.name}:{self.start}-{self.end}"
-
-    @classmethod
-    def from_tag(cls, tag_string):
-        match = cls._tag_regex.match(tag_string)
-        return SegmentInfo(match[1], int(match[2]), int(match[3]))
 
 
 @click.command(name=logger.name)
@@ -73,7 +51,9 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(pbi, out_base_name, threads, input_bam):
-    """Separate reads into files based on which model they fit best."""
+    """Separate reads into files based on which model they fit best.
+
+    Resulting reads will be annotated with the model they best fit as well as the score and segments for that model."""
 
     t_start = time.time()
 
@@ -95,17 +75,17 @@ def main(pbi, out_base_name, threads, input_bam):
     results = manager.Queue()
 
     # Create a dictionary of models to use to annotate and score our reads:
-    model_dict = {
-        "mas15": LibraryModel.build_and_return_mas_seq_model(),
-        "mas10": LibraryModel.build_and_return_mas_seq_10_model(),
-    }
+    model_list = [
+        LibraryModel.build_and_return_mas_seq_model(),
+        LibraryModel.build_and_return_mas_seq_10_model(),
+    ]
 
     # Start worker sub-processes:
     worker_pool = []
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_segmentation_fn, args=(input_data_queue, results, model_dict, i)
+            target=_worker_discrimination_fn, args=(input_data_queue, results, model_list, i)
         )
         p.start()
         worker_pool.append(p)
@@ -122,7 +102,7 @@ def main(pbi, out_base_name, threads, input_bam):
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0,
                             "model_reads_annotated_count_dict": dict()})
         output_worker = mp.Process(
-            target=_write_thread_fn, args=(results, out_header, out_base_name, model_dict, res, read_count)
+            target=_write_thread_fn, args=(results, out_header, out_base_name, model_list, res, read_count)
         )
         output_worker.start()
 
@@ -161,12 +141,15 @@ def main(pbi, out_base_name, threads, input_bam):
                 f"Overall processing rate: {res['num_reads_annotated']/(et - t_start):2.2f} reads/s.")
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_dict, res, read_count):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_list, res, read_count):
     """Thread / process fn to write out all our data."""
 
     try:
-        out_file_dict = {name: pysam.AlignmentFile(f"{out_bam_base_name}_{name}.bam", "wb", header=out_bam_header) for
-                         name in model_dict.keys()}
+        out_file_dict = {
+            model.name: pysam.AlignmentFile(f"{out_bam_base_name}_{model.name}.bam", "wb", header=out_bam_header)
+            for model in model_list
+        }
+
         with tqdm.tqdm(
             desc="Progress",
             unit=" read",
@@ -235,7 +218,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_dict, r
             out_file.close()
 
 
-def _worker_segmentation_fn(in_queue, out_queue, model_dict, worker_num):
+def _worker_discrimination_fn(in_queue, out_queue, model_list, worker_num):
     """Function to run in each subthread / subprocess.
     Annotates each read with both models and assigns the read to the model with the better score."""
 
@@ -262,7 +245,7 @@ def _worker_segmentation_fn(in_queue, out_queue, model_dict, worker_num):
         )
 
         # Process and place our data on the output queue:
-        segment_info = _annotate_and_assign_read_to_model(read, model_dict)
+        segment_info = _annotate_and_assign_read_to_model(read, model_list)
 
         out_queue.put(segment_info)
         num_reads_segmented += 1
@@ -270,25 +253,7 @@ def _worker_segmentation_fn(in_queue, out_queue, model_dict, worker_num):
     logger.debug(f"Worker %d: Num reads segmented: %d", worker_num, num_reads_segmented)
 
 
-def _collapse_annotations(path):
-    """Collapses given path into a list of SegmentInfo objects."""
-    last = ""
-    start = 0
-    segments = []
-    i = 0
-    for i, seg in enumerate(path):
-        if seg != last:
-            if i != 0:
-                segments.append(SegmentInfo(last, start, i - 1))
-            last = seg
-            start = i
-    # Don't forget the last one:
-    segments.append(SegmentInfo(last, start, i))
-
-    return segments
-
-
-def _annotate_and_assign_read_to_model(read, model_dict):
+def _annotate_and_assign_read_to_model(read, model_list):
     """Annotate the given read with all given models and assign the read to the model with the best score."""
 
     best_model = ""
@@ -296,14 +261,14 @@ def _annotate_and_assign_read_to_model(read, model_dict):
     best_path = None
     best_fit_is_rc = False
     model_scores = dict()
-    for name, model in model_dict.items():
+    for model in model_list:
 
         _, ppath, logp, is_rc = _annotate_read(read, model)
 
-        model_scores[name] = logp
+        model_scores[model.name] = logp
 
         if logp > best_logp:
-            best_model = name
+            best_model = model.name
             best_logp = logp
             best_path = ppath
             best_fit_is_rc = is_rc

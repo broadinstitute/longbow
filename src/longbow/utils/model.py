@@ -33,12 +33,15 @@ class LibraryModel:
     MATCH_END_PROB = 0.1
 
     def __init__(self,
+                 name,
                  array_element_structure,
                  adapters,
                  direct_connections,
                  start_element_names,
                  end_element_names,
                  do_build=True):
+
+        self.name = name
 
         self.array_element_structure = array_element_structure
         self.adapter_dict = adapters
@@ -191,8 +194,8 @@ class LibraryModel:
         #            filter out all segments from self.array_element_structure with names longer than 1 char.  We then
         #            use these in order to characterize the reads.
 
-        ordered_key_segments = [s for array in self.array_element_structure for s in array if len(s) == 1]
-        return ordered_key_segments
+        ordered_key_adapters = [s for array in self.array_element_structure for s in array if len(s) == 1]
+        return ordered_key_adapters
 
     @staticmethod
     def _make_global_alignment_model(target, name=None):
@@ -326,6 +329,7 @@ class LibraryModel:
     def build_and_return_mas_seq_model():
         """Create and return the model for the standard 15 element MAS-seq array."""
         return LibraryModel(
+            name="mas15",
             array_element_structure=(
                 # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
                 ("A", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
@@ -411,6 +415,7 @@ class LibraryModel:
     def build_and_return_mas_seq_10_model():
         """Create and return the model for the 10 element MAS-seq array."""
         return LibraryModel(
+            name="mas10",
             array_element_structure=(
                 ("Q", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
                 ("C", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
