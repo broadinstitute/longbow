@@ -44,7 +44,7 @@ click_log.basic_config(logger)
     help="Force overwrite of the output files if they exist."
 )
 @click.option(
-    "-p",
+    "-b",
     "--base-padding",
     default=2,
     required=False,
