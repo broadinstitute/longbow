@@ -78,16 +78,7 @@ def main(pbi, out_prefix, m10, force, input_bam):
     failing_out_name = f"{out_prefix}_longbow_filter_failed.bam"
 
     # Check to see if the output files exist:
-    is_file_exist_error = False
-    for f in [passing_out_name, failing_out_name]:
-        if os.path.exists(f):
-            if force:
-                logger.warning(f"Output file exists: {f}.  Overwriting.")
-            else:
-                logger.error(f"Output file already exists: {f}!")
-                is_file_exist_error = True
-    if is_file_exist_error:
-        sys.exit(1)
+    bam_utils.check_for_preexisting_files([passing_out_name, failing_out_name], exist_ok=force)
 
     logger.info(f"Writing reads that conform to the model to: {passing_out_name}")
     logger.info(f"Writing reads that do not conform to the model to: {failing_out_name}")
@@ -107,7 +98,7 @@ def main(pbi, out_prefix, m10, force, input_bam):
             ) as pbar:
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group("filter", bam_file.header)
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
 
         # Setup output files:
         with pysam.AlignmentFile(passing_out_name, "wb", header=out_header) as passing_bam_file, \

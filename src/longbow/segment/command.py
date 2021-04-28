@@ -100,7 +100,7 @@ def main(threads, output_bam, do_simple_splitting, m10, input_bam):
     ) as pbar:
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group("segment", bam_file.header)
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
 
         # Start output worker:
         res = manager.dict({"num_reads_segmented": 0, "num_segments": 0})

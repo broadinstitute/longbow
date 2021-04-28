@@ -2,6 +2,8 @@ import sys
 import gzip
 import inspect
 import re
+import logging
+import click_log
 
 from construct import *
 from inspect import getframeinfo, currentframe, getdoc
@@ -9,6 +11,10 @@ from inspect import getframeinfo, currentframe, getdoc
 import pysam
 
 from ..meta import VERSION
+
+logging.basicConfig(stream=sys.stderr)
+logger = logging.getLogger("bam_utils")
+click_log.basic_config(logger)
 
 PB_READ_NAME_RE = re.compile("m[0-9]+e?_[0-9]{6}_[0-9]{6}/[0-9]+/.*")
 
@@ -21,6 +27,8 @@ READ_MODEL_SCORE_TAG = "YS"
 READ_IS_VALID_FOR_MODEL_TAG = "YV"
 READ_FIRST_KEY_SEG_TAG = "YK"
 READ_NUM_KEY_SEGMENTS_TAG = "YG"
+
+READ_UMI_TAG = ""
 
 
 def load_read_count(pbi_file):
@@ -75,3 +83,25 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
     out_header = pysam.AlignmentHeader.from_dict(bam_header_dict)
 
     return out_header
+
+
+def check_for_preexisting_files(file_list, exist_ok=False):
+    """Checks if the files in the given file_list exist.
+    If any file exists and exist_ok is False, this will exit the program.
+    If any file exists and exist_ok is True, the program will continue.
+    """
+
+    # Allow users to be a little lazy with what input types they give:
+    if not isinstance(file_list, list) and not isinstance(file_list, set):
+        file_list = [file_list]
+
+    do_files_exist = False
+    for f in file_list:
+        if os.path.exists(f):
+            if exist_ok:
+                logger.warning(f"Output file exists: {f}.  Overwriting.")
+            else:
+                logger.error(f"Output file already exists: {f}!")
+                do_files_exist = True
+    if do_files_exist:
+        sys.exit(1)
