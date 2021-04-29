@@ -95,6 +95,10 @@ def main(pbi, threads, output_bam, m10, input_bam):
         logger.info("Using MAS-seq default annotation model.")
         m = LibraryModel.build_and_return_mas_seq_model()
 
+
+    print(m.to_json())
+    sys.exit(22)
+
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
     if os.path.exists(pbi):
