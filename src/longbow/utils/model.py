@@ -324,7 +324,6 @@ class LibraryModel:
 
         return model
 
-    # TODO: FINISH THIS!
     def to_json(self, outfile=None, indent=4):
         """Serialize this model to a json object and return that json object.
         If outfile is not none, will write the json object to the given file path."""
