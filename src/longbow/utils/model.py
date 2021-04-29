@@ -325,7 +325,7 @@ class LibraryModel:
         return model
 
     # TODO: FINISH THIS!
-    def to_json(self, outfile=None):
+    def to_json(self, outfile=None, indent=4):
         """Serialize this model to a json object and return that json object.
         If outfile is not none, will write the json object to the given file path."""
 
@@ -333,16 +333,16 @@ class LibraryModel:
             "name": self.name,
             "array_element_structure": self.array_element_structure,
             "adapters": self.adapter_dict,
-            "direct_connections": self.direct_connections_dict,
-            "start_element_names": self.start_element_names,
-            "end_element_names": self.end_element_names
+            "direct_connections": {k: list(v) for k, v in self.direct_connections_dict.items()},
+            "start_element_names": list(self.start_element_names),
+            "end_element_names": list(self.end_element_names)
         }
 
         if outfile:
             with open(outfile, 'w') as f:
-                json.dump(model_data, f)
+                json.dump(model_data, f, indent=indent)
 
-        return json.dumps(model_data)
+        return json.dumps(model_data, indent=indent)
 
     # TODO: FINISH THIS!
     @staticmethod
@@ -357,14 +357,23 @@ class LibraryModel:
             logger.error(f"File does not exist: {json_file}")
             sys.exit(1)
 
-        return LibraryModel(
-            name = json_data["name"],
-            array_element_structure = json_data["array_element_structure"],
-            adapters = json_data["adapters"],
-            direct_connections = json_data["direct_connections"],
-            start_element_names = json_data["start_element_names"],
-            end_element_names = json_data["end_element_names"],
+        m = LibraryModel(
+            name=json_data["name"],
+            array_element_structure=tuple(tuple(v) for v in json_data["array_element_structure"]),
+            adapters=json_data["adapters"],
+            direct_connections={k: set(v) for k, v in json_data["direct_connections"].items()},
+            start_element_names=set(json_data["start_element_names"]),
+            end_element_names=set(json_data["end_element_names"]),
         )
+
+        print(m.name)
+        print(m.array_element_structure)
+        print(m.adapter_dict)
+        print(m.direct_connections_dict)
+        print(m.start_element_names)
+        print(m.end_element_names)
+
+        return m
 
     @staticmethod
     def build_and_return_mas_seq_model():
@@ -448,8 +457,8 @@ class LibraryModel:
                 "O": {"10x_Adapter"},
                 "P": {"10x_Adapter"},
             },
-            start_element_names=["A", "10x_Adapter"],
-            end_element_names=["Poly_A", "P"],
+            start_element_names={"A", "10x_Adapter"},
+            end_element_names={"Poly_A", "P"},
         )
 
     @staticmethod
@@ -513,8 +522,8 @@ class LibraryModel:
                 "Q": {"10x_Adapter"},
                 "R": {"10x_Adapter"},
             },
-            start_element_names=["Q", "10x_Adapter"],
-            end_element_names=["Poly_A", "R"],
+            start_element_names={"Q", "10x_Adapter"},
+            end_element_names={"Poly_A", "R"},
         )
 
 
