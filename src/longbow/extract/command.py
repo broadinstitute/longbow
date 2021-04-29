@@ -44,7 +44,7 @@ click_log.basic_config(logger)
     help="Force overwrite of the output files if they exist."
 )
 @click.option(
-    "-p",
+    "-b",
     "--base-padding",
     default=2,
     required=False,
@@ -165,9 +165,12 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
                             read, segments[si + 1], start_offset, base_padding
                         )
 
-                        extracted_bam_file.write(aligned_segment)
-                        num_segments_extracted += 1
-                        extracted_segment = True
+                        if aligned_segment:
+                            extracted_bam_file.write(aligned_segment)
+                            num_segments_extracted += 1
+                            extracted_segment = True
+                        else:
+                            num_segments_skipped += 1
                     else:
                         if start_marker.end >= end_marker.start:
                             logger.warning("Read %s: start marker segment (i=%d) occurs at or after end segment (i=%d):"
@@ -206,6 +209,26 @@ def _create_extracted_aligned_segment(read, seg_to_extract, start_offset, base_p
     start_coord = seg_to_extract.start + start_offset - base_padding
     end_coord = seg_to_extract.end + base_padding
 
+    # Bounds check our coords:
+    if start_coord < 0:
+        logger.debug("Calculated start for %s would start before read begins.  Setting to 0.", read.query_name)
+        start_coord = 0
+    elif start_coord >= len(read.query_sequence):
+        logger.warning("Start coord for %s would start after read.  Cannot process.", read.query_name)
+        return None
+
+    if end_coord < 0:
+        logger.warning("End coord for %s would start before read.  Cannot process.", read.query_name)
+        return None
+    elif end_coord >= len(read.query_sequence):
+        logger.debug("Calculated end for %s would start after read ends.  Setting to 0.", read.query_name)
+        end_coord = len(read.query_sequence)-1
+
+    if end_coord <= start_coord:
+        logger.warning("Start coord for %s would start at or after end coord.  Cannot process.", read.query_name)
+        return None
+
+    # Create our segment:
     a = pysam.AlignedSegment()
     a.query_name = (
         f"{read.query_name}/{start_coord}_{end_coord}"
