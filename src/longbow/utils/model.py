@@ -364,13 +364,6 @@ class LibraryModel:
             end_element_names=set(json_data["end_element_names"]),
         )
 
-        print(m.name)
-        print(m.array_element_structure)
-        print(m.adapter_dict)
-        print(m.direct_connections_dict)
-        print(m.start_element_names)
-        print(m.end_element_names)
-
         return m
 
     @staticmethod
