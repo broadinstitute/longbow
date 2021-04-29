@@ -1,10 +1,19 @@
 import re
+import json
+import logging
+
+import click_log
 
 import numpy as np
 import pandas as pd
 
 from pomegranate import *
 from pomegranate.callbacks import History, ModelCheckpoint
+
+
+logging.basicConfig(stream=sys.stderr)
+logger = logging.getLogger(__name__)
+click_log.basic_config(logger)
 
 
 class LibraryModel:
@@ -315,20 +324,47 @@ class LibraryModel:
 
         return model
 
-    # TODO: FINISH THIS!
-    def to_json(self, outfile=None):
+    def to_json(self, outfile=None, indent=4):
         """Serialize this model to a json object and return that json object.
         If outfile is not none, will write the json object to the given file path."""
-        raise NotImplementedError("LibraryModel.to_json is not yet implemented!")
 
-    # TODO: FINISH THIS!
+        model_data = {
+            "name": self.name,
+            "array_element_structure": self.array_element_structure,
+            "adapters": self.adapter_dict,
+            "direct_connections": {k: list(v) for k, v in self.direct_connections_dict.items()},
+            "start_element_names": list(self.start_element_names),
+            "end_element_names": list(self.end_element_names)
+        }
+
+        if outfile:
+            with open(outfile, 'w') as f:
+                json.dump(model_data, f, indent=indent)
+
+        return json.dumps(model_data, indent=indent)
+
     @staticmethod
-    def from_json(self, json):
+    def from_json_file(json_file):
         """Create a LibraryModel instance from the given json data.
-        If json is a json object, this method will use the data in the object accordingly.
-        If json is a file / string / path, this method will open the file at that location
-        and use the data in that file to create a LibraryModel."""
-        raise NotImplementedError("LibraryModel.from_json is not yet implemented!")
+        This method will open the file at the given location and use the data in that file to create a LibraryModel."""
+
+        try:
+            with open(json_file) as f:
+                json_data = json.load(f)
+        except FileNotFoundError:
+            logger.error(f"File does not exist: {json_file}")
+            sys.exit(1)
+
+        m = LibraryModel(
+            name=json_data["name"],
+            array_element_structure=tuple(tuple(v) for v in json_data["array_element_structure"]),
+            adapters=json_data["adapters"],
+            direct_connections={k: set(v) for k, v in json_data["direct_connections"].items()},
+            start_element_names=set(json_data["start_element_names"]),
+            end_element_names=set(json_data["end_element_names"]),
+        )
+
+        return m
 
     @staticmethod
     def build_and_return_mas_seq_model():
@@ -412,8 +448,8 @@ class LibraryModel:
                 "O": {"10x_Adapter"},
                 "P": {"10x_Adapter"},
             },
-            start_element_names=["A", "10x_Adapter"],
-            end_element_names=["Poly_A", "P"],
+            start_element_names={"A", "10x_Adapter"},
+            end_element_names={"Poly_A", "P"},
         )
 
     @staticmethod
@@ -477,8 +513,8 @@ class LibraryModel:
                 "Q": {"10x_Adapter"},
                 "R": {"10x_Adapter"},
             },
-            start_element_names=["Q", "10x_Adapter"],
-            end_element_names=["Poly_A", "R"],
+            start_element_names={"Q", "10x_Adapter"},
+            end_element_names={"Poly_A", "R"},
         )
 
 
