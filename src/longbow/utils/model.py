@@ -343,7 +343,6 @@ class LibraryModel:
 
         return json.dumps(model_data, indent=indent)
 
-    # TODO: FINISH THIS!
     @staticmethod
     def from_json_file(json_file):
         """Create a LibraryModel instance from the given json data.
