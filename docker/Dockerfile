@@ -18,7 +18,7 @@ RUN apt-get install -y libtcmalloc-minimal4
 RUN echo 'export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"' >> ~/.bashrc
 
 RUN git clone https://github.com/broadinstitute/longbow.git && \
-		cd longbow && \
+    cd longbow && \
     python3 -mvenv venv && \
     . venv/bin/activate && \
     pip install -r dev-requirements.txt && \
@@ -29,4 +29,3 @@ RUN echo "source /longbow/venv/bin/activate" >> ~/.bashrc
 
 # We want this to be interactive:
 CMD ["/bin/bash"]
-
