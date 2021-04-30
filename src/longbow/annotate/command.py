@@ -215,6 +215,10 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             # Set our tag and write out the read to the annotated file:
             read.set_tag(bam_utils.SEGMENTS_TAG, bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
 
+            # Set the model info tags:
+            read.set_tag(bam_utils.READ_MODEL_SCORE_TAG, logp)
+            read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model_name)
+
             # If we're reverse complemented, we make it easy and just reverse complement the read and add a tag saying
             # that the read was RC:
             read.set_tag(bam_utils.SEGMENTS_RC_TAG, is_rc)
