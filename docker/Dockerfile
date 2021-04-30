@@ -19,7 +19,7 @@ RUN echo 'export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
 
 RUN git clone https://github.com/broadinstitute/longbow.git && \
     cd longbow && \
-    git checkout v0.1.3 && \
+    git checkout v0.1.4 && \
     python3 -mvenv venv && \
     . venv/bin/activate && \
     pip install -r dev-requirements.txt && \
