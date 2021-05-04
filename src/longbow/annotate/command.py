@@ -128,7 +128,8 @@ def main(pbi, threads, output_bam, m10, input_bam):
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
         output_worker = mp.Process(
-            target=_write_thread_fn, args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count)
+            target=_write_thread_fn,
+            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, m.name)
         )
         output_worker.start()
 
@@ -171,7 +172,7 @@ def get_segments(read):
     ]
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, model_name):
     """Thread / process fn to write out all our data."""
 
     with pysam.AlignmentFile(
