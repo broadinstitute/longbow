@@ -55,7 +55,7 @@ def load_read_count(pbi_file):
         return idx_contents.n_reads
 
 
-def create_bam_header_with_program_group(command_name, base_bam_header, description=None):
+def create_bam_header_with_program_group(command_name, base_bam_header, description=None, models=None):
     """Create a pysam.AlignmentHeader object with program group (PG) information populated by the given arguments.
 
     This function is intended to be called from the 'main' function of a longbow subcommand because it uses reflection
@@ -66,6 +66,10 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
     if not description:
         prev_frame = currentframe().f_back
         description = getdoc(prev_frame.f_globals['main']).split("\n")[0]
+
+    # If we have a model here, we should add the description of the model to our program group:
+    if models:
+        description = description + "  MODEL(s): " + ", ".join([m.to_json(indent=None) for m in models])
 
     # Add our program group to it:
     pg_dict = {

@@ -100,7 +100,13 @@ def main(threads, output_bam, do_simple_splitting, m10, input_bam):
     ) as pbar:
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
+        if m10:
+            logger.info("Using MAS-seq 10 array element annotation model.")
+            model = LibraryModel.build_and_return_mas_seq_10_model()
+        else:
+            logger.info("Using MAS-seq default annotation model.")
+            model = LibraryModel.build_and_return_mas_seq_model()
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[model])
 
         # Start output worker:
         res = manager.dict({"num_reads_segmented": 0, "num_segments": 0})
