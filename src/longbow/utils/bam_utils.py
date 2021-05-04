@@ -69,7 +69,7 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
 
     # If we have a model here, we should add the description of the model to our program group:
     if models:
-        description = description + "  MODEL: " + ", ".join([m.to_json(indent=None) for m in models])
+        description = description + "  MODEL(s): " + ", ".join([m.to_json(indent=None) for m in models])
 
     # Add our program group to it:
     pg_dict = {
