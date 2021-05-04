@@ -98,7 +98,7 @@ def main(pbi, out_prefix, m10, force, input_bam):
             ) as pbar:
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Setup output files:
         with pysam.AlignmentFile(passing_out_name, "wb", header=out_header) as passing_bam_file, \
