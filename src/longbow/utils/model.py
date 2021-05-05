@@ -517,6 +517,59 @@ class LibraryModel:
             end_element_names={"Poly_A", "R"},
         )
 
+    @staticmethod
+    def build_and_return_mas_seq_8_model():
+        """Create and return the model for the prototype 8 element MAS-seq array."""
+        return LibraryModel(
+            name="mas8prototype",
+            array_element_structure=(
+                # NOTE: the first element may not have the "A" adapter in this version of the library.
+                ("A", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
+                ("B", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
+                ("C", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
+                ("D", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
+                ("E", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
+                ("F", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
+                ("G", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
+                ("H", "10x_Adapter", "random", "Poly_T", "random", "TSO", "A"),
+            ),
+            adapters={
+                "10x_Adapter": "CTACACGACGCTCTTCCGATCT",
+                "Poly_T": "T" * 30,
+                "TSO": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "A": "ACGTACAG",
+                "B": "AAACTGCA",
+                "C": "AGAGTCAC",
+                "D": "AGCAAGTT",
+                "E": "AAGTGGTG",
+                "F": "AGTGGACT",
+                "G": "ACAGGTTA",
+                "H": "ATCTCACA",
+            },
+            direct_connections={
+                "TSO": {
+                    "A",
+                    "B",
+                    "C",
+                    "D",
+                    "E",
+                    "F",
+                    "G",
+                    "H",
+                },
+                "A": {"10x_Adapter"},
+                "B": {"10x_Adapter"},
+                "C": {"10x_Adapter"},
+                "D": {"10x_Adapter"},
+                "E": {"10x_Adapter"},
+                "F": {"10x_Adapter"},
+                "G": {"10x_Adapter"},
+                "H": {"10x_Adapter"},
+            },
+            start_element_names={"A", "10x_Adapter"},
+            end_element_names={"Poly_T", "A"},
+        )
+
 
 # IUPAC RC's from: http://arep.med.harvard.edu/labgc/adnan/projects/Utilities/revcomp.html
 # and https://www.dnabaser.com/articles/IUPAC%20ambiguity%20codes.html
