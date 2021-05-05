@@ -567,7 +567,7 @@ class LibraryModel:
                 "H": {"10x_Adapter"},
             },
             start_element_names={"A", "10x_Adapter"},
-            end_element_names={"Poly_T", "A"},
+            end_element_names={"TSO", "A"},
         )
 
 
