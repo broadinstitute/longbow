@@ -1,3 +1,4 @@
+import sys
 import re
 import json
 import logging
@@ -43,6 +44,7 @@ class LibraryModel:
 
     def __init__(self,
                  name,
+                 version,
                  array_element_structure,
                  adapters,
                  direct_connections,
@@ -51,6 +53,7 @@ class LibraryModel:
                  do_build=True):
 
         self.name = name
+        self.version = version
 
         self.array_element_structure = array_element_structure
         self.adapter_dict = adapters
@@ -330,6 +333,7 @@ class LibraryModel:
 
         model_data = {
             "name": self.name,
+            "version": self.version,
             "array_element_structure": self.array_element_structure,
             "adapters": self.adapter_dict,
             "direct_connections": {k: list(v) for k, v in self.direct_connections_dict.items()},
@@ -357,6 +361,7 @@ class LibraryModel:
 
         m = LibraryModel(
             name=json_data["name"],
+            version=json_data["version"],
             array_element_structure=tuple(tuple(v) for v in json_data["array_element_structure"]),
             adapters=json_data["adapters"],
             direct_connections={k: set(v) for k, v in json_data["direct_connections"].items()},
@@ -371,6 +376,7 @@ class LibraryModel:
         """Create and return the model for the standard 15 element MAS-seq array."""
         return LibraryModel(
             name="mas15",
+            version="1.0.0",
             array_element_structure=(
                 # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
                 ("A", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
@@ -457,6 +463,7 @@ class LibraryModel:
         """Create and return the model for the 10 element MAS-seq array."""
         return LibraryModel(
             name="mas10",
+            version="1.0.0",
             array_element_structure=(
                 ("Q", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
                 ("C", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
@@ -522,6 +529,7 @@ class LibraryModel:
         """Create and return the model for the prototype 8 element MAS-seq array."""
         return LibraryModel(
             name="mas8prototype",
+            version="1.0.0",
             array_element_structure=(
                 # NOTE: the first element may not have the "A" adapter in this version of the library.
                 ("A", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
