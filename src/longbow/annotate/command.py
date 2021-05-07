@@ -10,6 +10,8 @@ import click
 import click_log
 import tqdm
 
+import ssw
+
 import pysam
 import multiprocessing as mp
 
@@ -129,7 +131,7 @@ def main(pbi, threads, output_bam, m10, input_bam):
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
         output_worker = mp.Process(
             target=_write_thread_fn,
-            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, m.name)
+            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, m)
         )
         output_worker.start()
 
@@ -172,7 +174,7 @@ def get_segments(read):
     ]
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, model_name):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, model):
     """Thread / process fn to write out all our data."""
 
     with pysam.AlignmentFile(
@@ -185,6 +187,8 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
         disable=disable_pbar,
         total=read_count
     ) as pbar:
+
+        ssw_aligner = ssw.Aligner()
 
         while True:
             # Wait for some output data:
@@ -218,7 +222,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
 
             # Set the model info tags:
             read.set_tag(bam_utils.READ_MODEL_SCORE_TAG, logp)
-            read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model_name)
+            read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model.name)
 
             # If we're reverse complemented, we make it easy and just reverse complement the read and add a tag saying
             # that the read was RC:
@@ -228,6 +232,23 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
                 seq = reverse_complement(read.query_sequence)
                 read.query_sequence = seq
                 read.query_qualities = quals
+
+            # Get our segment scores and set them:
+            total_score = 0
+            total_max_score = 0
+            score_strings = []
+            for s in segments:
+                score, max_score = get_segment_score(read.query_sequence, s, model, ssw_aligner)
+                score_strings.append(f"{score}/{max_score}")
+                total_score += score
+                total_max_score += max_score
+
+            read.set_tag(bam_utils.SEGMENTS_QUAL_TAG, bam_utils.SEGMENT_TAG_DELIMITER.join(score_strings))
+            if total_max_score != 0:
+                read.set_tag(bam_utils.READ_APPROX_QUAL_TAG, f"{total_score/total_max_score:.4f}")
+            else:
+                read.set_tag(bam_utils.READ_APPROX_QUAL_TAG, f"0.0")
+
             out_bam_file.write(read)
 
             # Increment our counters:
@@ -302,3 +323,24 @@ def _segment_read(read, model):
         logger.debug("Sequence scored better in RC: %s", read.query_name)
 
     return read.to_string(), ppath, logp, is_rc
+
+
+def get_segment_score(read_sequence, segment, model, ssw_aligner=None):
+    """Get the alignment score of the given segment against the read sequence."""
+
+    # We don't score random segments:
+    if segment.name == "random":
+        return 0, 0
+
+    # Create a default aligner if we weren't given one:
+    if not ssw_aligner:
+        ssw_aligner = ssw.Aligner()
+
+    # Get our alignment and our score:
+    alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], model.adapter_dict[segment.name])
+    optimal_score = alignment.score
+
+    # The max score is the match score * the length of the reference segment
+    max_score = (segment.end - segment.start) * ssw_aligner.matrix.get_match()
+
+    return optimal_score, max_score

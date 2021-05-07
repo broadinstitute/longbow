@@ -9,10 +9,13 @@ import click
 import click_log
 import tqdm
 
+import ssw
+
 import pysam
 import multiprocessing as mp
 
 from ..annotate.command import SegmentInfo
+from ..annotate.command import get_segment_score
 from ..annotate.command import _collapse_annotations
 from ..utils import bam_utils
 from ..utils.model import reverse_complement
@@ -158,6 +161,8 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_list, r
             total=read_count
         ) as pbar:
 
+            ssw_aligner = ssw.Aligner()
+
             while True:
                 # Wait for some output data:
                 raw_data = out_queue.get()
@@ -200,6 +205,33 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_list, r
                     seq = reverse_complement(read.query_sequence)
                     read.query_sequence = seq
                     read.query_qualities = quals
+
+                # Get our segment scores and set them:
+                total_score = 0
+                total_max_score = 0
+                score_strings = []
+
+                # Get our model for this read.
+                # NOTE: We should always have a model after this code because all models that can be assigned to the
+                #       reads are in the model_list.
+                model = None
+                for m in model_list:
+                    if m.name == model_name:
+                        model = m
+                        break
+
+                for s in segments:
+                    score, max_score = get_segment_score(read.query_sequence, s, model, ssw_aligner)
+                    score_strings.append(f"{score}/{max_score}")
+                    total_score += score
+                    total_max_score += max_score
+
+                read.set_tag(bam_utils.SEGMENTS_QUAL_TAG, bam_utils.SEGMENT_TAG_DELIMITER.join(score_strings))
+                if total_max_score != 0:
+                    read.set_tag(bam_utils.READ_APPROX_QUAL_TAG, f"{total_score / total_max_score:.4f}")
+                else:
+                    read.set_tag(bam_utils.READ_APPROX_QUAL_TAG, f"0.0")
+
                 out_file_dict[model_name].write(read)
 
                 # Increment our counters:
