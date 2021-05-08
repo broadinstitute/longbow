@@ -1,3 +1,13 @@
 pytest
 pytest-cov
 coverage >= 4.5
+click
+click_log
+tqdm
+ssw
+pysam
+construct
+numpy
+pandas
+pomegranate
+matplotlib

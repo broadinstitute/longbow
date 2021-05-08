@@ -4,6 +4,8 @@ import gzip
 import re
 import logging
 import click_log
+import collections
+import re
 
 from construct import *
 from inspect import getframeinfo, currentframe, getdoc
@@ -11,6 +13,7 @@ from inspect import getframeinfo, currentframe, getdoc
 import pysam
 
 from ..meta import VERSION
+from ..utils.model import reverse_complement
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("bam_utils")
@@ -20,6 +23,7 @@ PB_READ_NAME_RE = re.compile("m[0-9]+e?_[0-9]{6}_[0-9]{6}/[0-9]+/.*")
 
 # Constants for bam file reading / writing:
 SEGMENTS_TAG = "SG"
+SEGMENTS_QUAL_TAG = "XQ"
 SEGMENTS_RC_TAG = "RC"
 SEGMENT_TAG_DELIMITER = ","
 READ_MODEL_NAME_TAG = "YN"
@@ -27,8 +31,29 @@ READ_MODEL_SCORE_TAG = "YS"
 READ_IS_VALID_FOR_MODEL_TAG = "YV"
 READ_FIRST_KEY_SEG_TAG = "YK"
 READ_NUM_KEY_SEGMENTS_TAG = "YG"
+READ_APPROX_QUAL_TAG = "YQ"
 
 READ_UMI_TAG = ""
+
+
+# Named tuple to store alignment information:
+class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"])):
+
+    _tag_regex = re.compile(r"(.*?):(\d+)-(\d+)")
+
+    def __len__(self):
+        return self.end - self.start
+
+    def __str__(self):
+        return f"SegmentInfo({self.to_tag()})"
+
+    def to_tag(self):
+        return f"{self.name}:{self.start}-{self.end}"
+
+    @classmethod
+    def from_tag(cls, tag_string):
+        match = cls._tag_regex.match(tag_string)
+        return SegmentInfo(match[1], int(match[2]), int(match[3]))
 
 
 def load_read_count(pbi_file):
@@ -109,3 +134,89 @@ def check_for_preexisting_files(file_list, exist_ok=False):
                 do_files_exist = True
     if do_files_exist:
         sys.exit(1)
+
+
+def get_segment_score(read_sequence, segment, model, ssw_aligner=None):
+    """Get the alignment score of the given segment against the read sequence."""
+
+    # We don't score random segments:
+    if segment.name == "random":
+        return 0, 0
+
+    # Create a default aligner if we weren't given one:
+    if not ssw_aligner:
+        ssw_aligner = ssw.Aligner()
+
+    # Get our alignment and our score:
+    alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], model.adapter_dict[segment.name])
+    optimal_score = alignment.score
+
+    # The max score is the match score * the length of the reference segment
+    max_score = (segment.end - segment.start) * ssw_aligner.matrix.get_match()
+
+    return optimal_score, max_score
+
+
+def collapse_annotations(path):
+    """Collapses given path into a list of SegmentInfo objects."""
+    last = ""
+    start = 0
+    segments = []
+    i = 0
+    for i, seg in enumerate(path):
+        if seg != last:
+            if i != 0:
+                segments.append(SegmentInfo(last, start, i - 1))
+            last = seg
+            start = i
+    # Don't forget the last one:
+    segments.append(SegmentInfo(last, start, i))
+
+    return segments
+
+
+def write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_bam_file):
+    """Write the given pysam.AlignedSegment read object to the given file with the given metadata."""
+
+    # Obligatory log message:
+    logger.debug(
+        "Path for read %s (%2.2f)%s: %s",
+        read.query_name,
+        logp,
+        " (RC)" if is_rc else "",
+        segments,
+    )
+
+    # Set our tag and write out the read to the annotated file:
+    read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
+
+    # Set the model info tags:
+    read.set_tag(READ_MODEL_SCORE_TAG, logp)
+    read.set_tag(READ_MODEL_NAME_TAG, model.name)
+
+    # If we're reverse complemented, we make it easy and just reverse complement the read and add a tag saying
+    # that the read was RC:
+    read.set_tag(SEGMENTS_RC_TAG, is_rc)
+    if is_rc:
+        quals = read.query_qualities[::-1]
+        seq = reverse_complement(read.query_sequence)
+        read.query_sequence = seq
+        read.query_qualities = quals
+
+    # Get our segment scores and set them:
+    total_score = 0
+    total_max_score = 0
+    score_strings = []
+    for s in segments:
+        score, max_score = get_segment_score(read.query_sequence, s, model, ssw_aligner)
+        score_strings.append(f"{score}/{max_score}")
+        total_score += score
+        total_max_score += max_score
+
+    read.set_tag(SEGMENTS_QUAL_TAG, SEGMENT_TAG_DELIMITER.join(score_strings))
+    if total_max_score != 0:
+        read.set_tag(READ_APPROX_QUAL_TAG, f"{total_score / total_max_score:.4f}")
+    else:
+        read.set_tag(READ_APPROX_QUAL_TAG, f"0.0")
+
+    out_bam_file.write(read)

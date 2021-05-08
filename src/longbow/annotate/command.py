@@ -3,12 +3,13 @@ import sys
 import itertools
 import re
 import time
-import collections
 import os
 
 import click
 import click_log
 import tqdm
+
+import ssw
 
 import pysam
 import multiprocessing as mp
@@ -17,33 +18,13 @@ import gzip
 from construct import *
 
 from ..utils import bam_utils
-from ..utils.model import reverse_complement
+from ..utils.bam_utils import SegmentInfo
 from ..utils.model import LibraryModel
 
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("annotate")
 click_log.basic_config(logger)
-
-
-# Named tuple to store alignment information:
-class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"])):
-
-    _tag_regex = re.compile(r"(.*?):(\d+)-(\d+)")
-
-    def __len__(self):
-        return self.end - self.start
-
-    def __str__(self):
-        return f"SegmentInfo({self.to_tag()})"
-
-    def to_tag(self):
-        return f"{self.name}:{self.start}-{self.end}"
-
-    @classmethod
-    def from_tag(cls, tag_string):
-        match = cls._tag_regex.match(tag_string)
-        return SegmentInfo(match[1], int(match[2]), int(match[3]))
 
 
 @click.command(name=logger.name)
@@ -129,7 +110,7 @@ def main(pbi, threads, output_bam, m10, input_bam):
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
         output_worker = mp.Process(
             target=_write_thread_fn,
-            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, m.name)
+            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, m)
         )
         output_worker.start()
 
@@ -172,7 +153,7 @@ def get_segments(read):
     ]
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, model_name):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, model):
     """Thread / process fn to write out all our data."""
 
     with pysam.AlignmentFile(
@@ -185,6 +166,8 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
         disable=disable_pbar,
         total=read_count
     ) as pbar:
+
+        ssw_aligner = ssw.Aligner()
 
         while True:
             # Wait for some output data:
@@ -199,10 +182,11 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
 
             # Unpack data:
             read, ppath, logp, is_rc = raw_data
-            read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
             # Condense the output annotations so we can write them out with indices:
-            segments = _collapse_annotations(ppath)
+            segments = bam_utils.collapse_annotations(ppath)
+
+            read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
             # Obligatory log message:
             logger.debug(
@@ -213,22 +197,8 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
                 segments,
             )
 
-            # Set our tag and write out the read to the annotated file:
-            read.set_tag(bam_utils.SEGMENTS_TAG, bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
-
-            # Set the model info tags:
-            read.set_tag(bam_utils.READ_MODEL_SCORE_TAG, logp)
-            read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model_name)
-
-            # If we're reverse complemented, we make it easy and just reverse complement the read and add a tag saying
-            # that the read was RC:
-            read.set_tag(bam_utils.SEGMENTS_RC_TAG, is_rc)
-            if is_rc:
-                quals = read.query_qualities[::-1]
-                seq = reverse_complement(read.query_sequence)
-                read.query_sequence = seq
-                read.query_qualities = quals
-            out_bam_file.write(read)
+            # Write our our read:
+            bam_utils.write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_bam_file)
 
             # Increment our counters:
             res["num_reads_annotated"] += 1
@@ -272,29 +242,11 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
     logger.debug(f"Worker %d: Num reads segmented: %d", worker_num, num_reads_segmented)
 
 
-def _collapse_annotations(path):
-    """Collapses given path into a list of SegmentInfo objects."""
-    last = ""
-    start = 0
-    segments = []
-    i = 0
-    for i, seg in enumerate(path):
-        if seg != last:
-            if i != 0:
-                segments.append(SegmentInfo(last, start, i - 1))
-            last = seg
-            start = i
-    # Don't forget the last one:
-    segments.append(SegmentInfo(last, start, i))
-
-    return segments
-
-
 def _segment_read(read, model):
     is_rc = False
     logp, ppath = model.annotate(read.query_sequence)
 
-    rc_logp, rc_ppath = model.annotate(reverse_complement(read.query_sequence))
+    rc_logp, rc_ppath = model.annotate(bam_utils.reverse_complement(read.query_sequence))
     if rc_logp > logp:
         logp = rc_logp
         ppath = rc_ppath
