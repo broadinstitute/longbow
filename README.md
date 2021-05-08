@@ -49,6 +49,9 @@ the following commands:
 
     # run only (fast) unit tests
     tox -e unit
+    
+    # run only integration tests
+    tox -e integration
 
     # run only linting
     tox -e lint
