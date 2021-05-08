@@ -194,52 +194,6 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_list, r
                     read, segments, is_rc, logp, model, ssw_aligner, out_file_dict[model_name]
                 )
 
-                # # Obligatory log message:
-                # logger.debug(
-                #     "Path for read %s (%2.2f)%s: %s",
-                #     read.query_name,
-                #     logp,
-                #     " (RC)" if is_rc else "",
-                #     segments,
-                # )
-                #
-                # # Set our tag and write out the read to the annotated file:
-                # read.set_tag(
-                #     bam_utils.SEGMENTS_TAG, bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments])
-                # )
-                #
-                # # Set the model info tags:
-                # read.set_tag(bam_utils.READ_MODEL_SCORE_TAG, logp)
-                # read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model_name)
-                #
-                # # If we're reverse complemented, we make it easy and just reverse complement the read and add a
-                # # tag saying that the read was RC:
-                # read.set_tag(bam_utils.SEGMENTS_RC_TAG, is_rc)
-                # if is_rc:
-                #     quals = read.query_qualities[::-1]
-                #     seq = reverse_complement(read.query_sequence)
-                #     read.query_sequence = seq
-                #     read.query_qualities = quals
-                #
-                # # Get our segment scores and set them:
-                # total_score = 0
-                # total_max_score = 0
-                # score_strings = []
-                #
-                # for s in segments:
-                #     score, max_score = bam_utils.get_segment_score(read.query_sequence, s, model, ssw_aligner)
-                #     score_strings.append(f"{score}/{max_score}")
-                #     total_score += score
-                #     total_max_score += max_score
-                #
-                # read.set_tag(bam_utils.SEGMENTS_QUAL_TAG, bam_utils.SEGMENT_TAG_DELIMITER.join(score_strings))
-                # if total_max_score != 0:
-                #     read.set_tag(bam_utils.READ_APPROX_QUAL_TAG, f"{total_score / total_max_score:.4f}")
-                # else:
-                #     read.set_tag(bam_utils.READ_APPROX_QUAL_TAG, f"0.0")
-                #
-                # out_file_dict[model_name].write(read)
-
                 # Increment our counters:
                 res["num_reads_annotated"] += 1
                 res["num_sections"] += len(segments)
