@@ -126,6 +126,13 @@ class LibraryModel:
 
         # If we've made it here and we have seen at least 1 key adapter, then we have a valid array:
         is_valid = True if num_key_adapters_found > 0 else False
+
+        # Except!  If we have an array singleton and it's the terminal overhang adapter,
+        # then we do NOT have a valid array:
+        if is_valid and (num_key_adapters_found == 1) and \
+                (self.key_adapters[first_key_adapter_index] == self.array_element_structure[-1][-1]):
+            is_valid = False
+
         return is_valid, num_key_adapters_found, first_key_adapter_index
 
     def extract_key_segment_names(self, segment_names):
@@ -196,7 +203,8 @@ class LibraryModel:
         #            filter out all segments from self.array_element_structure with names longer than 1 char.  We then
         #            use these in order to characterize the reads.
 
-        ordered_key_adapters = [s for array in self.array_element_structure for s in array if len(s) == 1]
+        ordered_key_adapters = [s for array in self.array_element_structure
+                                for s in array if len(s) == 1]
         return ordered_key_adapters
 
     @staticmethod
@@ -526,7 +534,10 @@ class LibraryModel:
 
     @staticmethod
     def build_and_return_mas_seq_8_model():
-        """Create and return the model for the prototype 8 element MAS-seq array."""
+        """Create and return the model for the prototype 8 element MAS-seq array.
+
+        Included for completeness, but for now this SHOULD NOT BE USED.
+        """
         return LibraryModel(
             name="mas8prototype",
             version="1.0.0",

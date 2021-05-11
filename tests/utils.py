@@ -7,6 +7,7 @@ def assert_bam_files_equal(file1, file2, order_matters=False, compare_header=Fal
 
     if order_matters and compare_header:
         assert filecmp.cmp(file1, file2)
+        return
 
     with pysam.AlignmentFile(file1, "rb", check_sq=False, require_index=False) as bam1, \
         pysam.AlignmentFile(file2, "rb", check_sq=False, require_index=False) as bam2:

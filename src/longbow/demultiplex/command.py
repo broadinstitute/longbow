@@ -20,7 +20,7 @@ from ..utils.model import LibraryModel
 
 
 logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("discriminate")
+logger = logging.getLogger("demultiplex")
 click_log.basic_config(logger)
 
 
@@ -44,7 +44,7 @@ click_log.basic_config(logger)
 @click.option(
     "-o",
     "--out-base-name",
-    default="longbow_discriminated",
+    default="longbow_demultiplexed",
     required=False,
     show_default=True,
     type=str,
@@ -86,7 +86,7 @@ def main(pbi, out_base_name, threads, input_bam):
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_discrimination_fn, args=(input_data_queue, results, model_list, i)
+            target=_worker_demux_fn, args=(input_data_queue, results, model_list, i)
         )
         p.start()
         worker_pool.append(p)
@@ -210,7 +210,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_list, r
             out_file.close()
 
 
-def _worker_discrimination_fn(in_queue, out_queue, model_list, worker_num):
+def _worker_demux_fn(in_queue, out_queue, model_list, worker_num):
     """Function to run in each subthread / subprocess.
     Annotates each read with both models and assigns the read to the model with the better score."""
 
