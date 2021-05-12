@@ -142,9 +142,12 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
                 end_marker_list = [(i, s) for i, s in enumerate(segments) if s.name == trailing_adapter]
 
                 if len(start_marker_list) != len(end_marker_list):
-                    logger.warning(f"Found %d start markers and %d end markers.  Only looking at first %d pairs.",
+                    logger.warning(f"Found %d start markers and %d end markers.  Only looking at first %d pairs.  "
+                                   f"(starts: %s, ends: %s)",
                                    len(start_marker_list), len(end_marker_list),
-                                   min(len(start_marker_list), len(end_marker_list)))
+                                   min(len(start_marker_list), len(end_marker_list)),
+                                   " ".join([f"{i}:{s.name}" for i, s in start_marker_list]),
+                                   " ".join([f"{i}:{s.name}" for i, s in end_marker_list]))
 
                 extracted_segment = False
 
