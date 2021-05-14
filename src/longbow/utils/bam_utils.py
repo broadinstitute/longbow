@@ -148,11 +148,14 @@ def get_segment_score(read_sequence, segment, model, ssw_aligner=None):
         ssw_aligner = ssw.Aligner()
 
     # Get our alignment and our score:
-    alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], model.adapter_dict[segment.name])
-    optimal_score = alignment.score
+    if segment.end - segment.start > 1:
+        alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], model.adapter_dict[segment.name])
+        optimal_score = alignment.score
+    else:
+        optimal_score = 0
 
     # The max score is the match score * the length of the reference segment
-    max_score = (segment.end - segment.start) * ssw_aligner.matrix.get_match()
+    max_score = len(model.adapter_dict[segment.name]) * ssw_aligner.matrix.get_match()
 
     return optimal_score, max_score
 
