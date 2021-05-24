@@ -535,7 +535,7 @@ class LibraryModel:
     @staticmethod
     def build_and_return_slide_seq_model():
         """Create and return the model for the slide seq array."""
-        #                 |-----10x_Adapter---->        |---------------->               |------Poly_T---------------->                  |--------5p_Adapter----------|
+        #                 |-----10x_Adapter---->        |--splitter------>               |------Poly_T---------------->                  |--------5p_Adapter----------|
         # AGCTTACTTGTGAAGACTACACGACGCTCTTCCGATCTNNNNNNNNTCTTCAGCGTTCCCGAGANNNNNNNNNNNNNVVTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTVNNNNNNNNNNNNNNNNNCCCATGTACTCTGCGTTGATACCACTGCTTACTTGTAAGCTGTCTA...
         # |------A------->                      <------|                  <-----------|                                 <----cDNA-------|                              |-------B------>
         #                                          V                           V
