@@ -533,6 +533,98 @@ class LibraryModel:
         )
 
     @staticmethod
+    def build_and_return_slide_seq_model():
+        """Create and return the model for the slide seq array."""
+        #                 |-----10x_Adapter---->        |---------------->               |------Poly_T---------------->                  |--------5p_Adapter----------|
+        # AGCTTACTTGTGAAGACTACACGACGCTCTTCCGATCTNNNNNNNNTCTTCAGCGTTCCCGAGANNNNNNNNNNNNNVVTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTVNNNNNNNNNNNNNNNNNCCCATGTACTCTGCGTTGATACCACTGCTTACTTGTAAGCTGTCTA...
+        # |------A------->                      <------|                  <-----------|                                 <----cDNA-------|                              |-------B------>
+        #                                          V                           V
+        #                                    Spatial Barcode 2         Spatial Barcode 1
+        return LibraryModel(
+            name="slide-seq",
+            version="0.0.1",
+            array_element_structure=(
+                # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
+                ("A", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("B", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("C", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("D", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("E", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("F", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("G", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("H", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("I", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("J", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("K", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("L", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("M", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("N", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                # The last element doesn't currently have the "P" adapter in this version of the library:
+                ("O", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter", "P"),
+            ),
+            adapters={
+                "10x_Adapter": "CTACACGACGCTCTTCCGATCT",
+                "barcode_splitter": "TCTTCAGCGTTCCCGAGA",
+                "Poly_T": "T" * 30,
+                "5p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "A": "AGCTTACTTGTGAAGA",
+                "B": "ACTTGTAAGCTGTCTA",
+                "C": "ACTCTGTCAGGTCCGA",
+                "D": "ACCTCCTCCTCCAGAA",
+                "E": "AACCGGACACACTTAG",
+                "F": "AGAGTCCAATTCGCAG",
+                "G": "AATCAAGGCTTAACGG",
+                "H": "ATGTTGAATCCTAGCG",
+                "I": "AGTGCGTTGCGAATTG",
+                "J": "AATTGCGTAGTTGGCC",
+                "K": "ACACTTGGTCGCAATC",
+                "L": "AGTAAGCCTTCGTGTC",
+                "M": "ACCTAGATCAGAGCCT",
+                "N": "AGGTATGCCGGTTAAG",
+                "O": "AAGTCACCGGCACCTT",
+                "P": "ATGAAGTGGCTCGAGA",
+            },
+            direct_connections={
+                "5p_Adapter": {
+                    "A",
+                    "B",
+                    "C",
+                    "D",
+                    "E",
+                    "F",
+                    "G",
+                    "H",
+                    "I",
+                    "J",
+                    "K",
+                    "L",
+                    "M",
+                    "N",
+                    "O",
+                    "P",
+                },
+                "A": {"10x_Adapter"},
+                "B": {"10x_Adapter"},
+                "C": {"10x_Adapter"},
+                "D": {"10x_Adapter"},
+                "E": {"10x_Adapter"},
+                "F": {"10x_Adapter"},
+                "G": {"10x_Adapter"},
+                "H": {"10x_Adapter"},
+                "I": {"10x_Adapter"},
+                "J": {"10x_Adapter"},
+                "K": {"10x_Adapter"},
+                "L": {"10x_Adapter"},
+                "M": {"10x_Adapter"},
+                "N": {"10x_Adapter"},
+                "O": {"10x_Adapter"},
+                "P": {"10x_Adapter"},
+            },
+            start_element_names={"A", "10x_Adapter"},
+            end_element_names={"Poly_T", "P"},
+        )
+
+    @staticmethod
     def build_and_return_mas_seq_8_model():
         """Create and return the model for the prototype 8 element MAS-seq array.
 
