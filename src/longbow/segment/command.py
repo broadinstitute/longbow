@@ -182,7 +182,6 @@ def _sub_process_write_fn(
 ):
     """Thread / process fn to write out all our data."""
 
-    # get our model:
     if use_mas_seq_10_model:
         logger.info("Using MAS-seq 10 array element annotation model.")
         model = LibraryModel.build_and_return_mas_seq_10_model()

@@ -247,30 +247,39 @@ def annotate_read(read, m):
 
 def format_state_sequence(seq, path, line_length=150):
     # TODO: Must tie this into the model itself.  We shouldn't re-define our segments here.
+    adapter_state_color = "#DF5A49"
+    scaffold_state_color = "#334D5C"
+    poly_a_color = "#45B29D"
+    three_p_adapter_color = "#EFC94C"
+    random_color = "#aaaaaa"
+
+    # Color for states we haven't enumerated:
+    default_color = "#c2a8f0"
+
     color_hash = {
-        "10x_Adapter": "#334D5C",
-        "5p_TSO": "#334D5C",
-        "Poly_A": "#45B29D",
-        "3p_Adapter": "#EFC94C",
-        "A": "#DF5A49",
-        "B": "#DF5A49",
-        "C": "#DF5A49",
-        "D": "#DF5A49",
-        "E": "#DF5A49",
-        "F": "#DF5A49",
-        "G": "#DF5A49",
-        "H": "#DF5A49",
-        "I": "#DF5A49",
-        "J": "#DF5A49",
-        "K": "#DF5A49",
-        "L": "#DF5A49",
-        "M": "#DF5A49",
-        "N": "#DF5A49",
-        "O": "#DF5A49",
-        "P": "#DF5A49",
-        "Q": "#DF5A49",
-        "R": "#DF5A49",
-        "random": "#aaaaaa",
+        "10x_Adapter": scaffold_state_color,
+        "5p_TSO": scaffold_state_color,
+        "Poly_A": poly_a_color,
+        "3p_Adapter": three_p_adapter_color,
+        "A": adapter_state_color,
+        "B": adapter_state_color,
+        "C": adapter_state_color,
+        "D": adapter_state_color,
+        "E": adapter_state_color,
+        "F": adapter_state_color,
+        "G": adapter_state_color,
+        "H": adapter_state_color,
+        "I": adapter_state_color,
+        "J": adapter_state_color,
+        "K": adapter_state_color,
+        "L": adapter_state_color,
+        "M": adapter_state_color,
+        "N": adapter_state_color,
+        "O": adapter_state_color,
+        "P": adapter_state_color,
+        "Q": adapter_state_color,
+        "R": adapter_state_color,
+        "random": random_color,
     }
 
     labelled_bases = []
@@ -289,16 +298,25 @@ def format_state_sequence(seq, path, line_length=150):
             if label == b:
                 bases.append(a)
             elif label != b:
+                try:
+                    color = color_hash[label]
+                except KeyError:
+                    color = default_color
+
                 labelled_bases.append("".join(bases))
                 state_labels.append(label)
-                state_colors.append(color_hash[label])
+                state_colors.append(color)
 
                 bases = [a]
                 label = b
 
         labelled_bases.append("".join(bases))
         state_labels.append(label)
-        state_colors.append(color_hash[label])
+        try:
+            color = color_hash[label]
+        except KeyError:
+            color = default_color
+        state_colors.append(color)
 
     return labelled_bases, state_colors, state_labels
 
