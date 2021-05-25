@@ -52,14 +52,18 @@ click_log.basic_config(logger)
     help="annotated bam output  [default: stdout]",
 )
 @click.option(
-    '--m10',
-    is_flag=True,
-    default=False,
+    "-m",
+    "--model",
+    type=str,
+    default="mas15",
     show_default=True,
-    help="Use the 10 array element MAS-seq model."
+    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+         "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_bam, m10, input_bam):
+def main(pbi, threads, output_bam, model, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
@@ -69,12 +73,13 @@ def main(pbi, threads, output_bam, m10, input_bam):
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
-    if m10:
-        logger.info("Using MAS-seq 10 array element annotation model.")
-        m = LibraryModel.build_and_return_mas_seq_10_model()
+    # Get our model:
+    if LibraryModel.has_prebuilt_model(model):
+        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
+        m = LibraryModel.build_pre_configured_model(model)
     else:
-        logger.info("Using MAS-seq default annotation model.")
-        m = LibraryModel.build_and_return_mas_seq_model()
+        logger.info(f"Loading model from json file: %s", model)
+        m = LibraryModel.from_json_file(model)
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None

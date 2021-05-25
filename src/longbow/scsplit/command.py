@@ -83,14 +83,17 @@ __OUT_WHITELIST_FILE_SUFFIX = "_whitelist.txt"
     help="Force scsplit to run on the input bam without checking for compatibility."
 )
 @click.option(
-    '--m10',
-    is_flag=True,
-    default=False,
+    "-m",
+    "--model",
+    default="mas15",
     show_default=True,
-    help="Use the 10 array element MAS-seq model."
+    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+         "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_bam, input_bam):
+def main(threads, output_base_name, cell_barcode, umi_length, force, model, write_bam, input_bam):
     """Create files for use in `alevin` for single-cell analysis.
     This tool coerces a set of reads from a single source into a format that `alevin` can ingest.
     
@@ -117,13 +120,13 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, m10, write_
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
-    # get our model:
-    if m10:
-        logger.info("Using MAS-seq 10 array element annotation model.")
-        model = LibraryModel.build_and_return_mas_seq_10_model()
+    # Get our model:
+    if LibraryModel.has_prebuilt_model(model):
+        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
+        model = LibraryModel.build_pre_configured_model(model)
     else:
-        logger.info("Using MAS-seq default annotation model.")
-        model = LibraryModel.build_and_return_mas_seq_model()
+        logger.info(f"Loading model from json file: %s", model)
+        model = LibraryModel.from_json_file(model)
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.

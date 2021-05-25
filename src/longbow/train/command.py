@@ -54,15 +54,18 @@ click_log.basic_config(logger)
     help="trained model",
 )
 @click.option(
-    '--m10',
-    is_flag=True,
-    default=False,
+    "-m",
+    "--model",
+    default="mas15",
     show_default=True,
-    help="Use the 10 array element MAS-seq model."
+    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+         "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.argument("training-bam", type=click.Path(exists=True))
 def main(
-    num_training_samples, max_training_iterations, threads, output_yaml, m10, training_bam
+    num_training_samples, max_training_iterations, threads, output_yaml, model, training_bam
 ):
     """Train transition and emission probabilities on real data."""
 
@@ -73,12 +76,14 @@ def main(
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
-    if m10:
-        logger.info("Using MAS-seq 10 array element annotation model.")
-        m = LibraryModel.build_and_return_mas_seq_10_model()
+    # Get our model:
+    if LibraryModel.has_prebuilt_model(model):
+        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
+        m = LibraryModel.build_pre_configured_model(model)
     else:
-        logger.info("Using MAS-seq default annotation model.")
-        m = LibraryModel.build_and_return_mas_seq_model()
+        logger.info(f"Loading model from json file: %s", model)
+        m = LibraryModel.from_json_file(model)
+
     training_seqs = load_training_seqs(m, num_training_samples, threads, training_bam)
 
     logger.info("Loaded %d training sequences", len(training_seqs))

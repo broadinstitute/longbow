@@ -58,11 +58,14 @@ click_log.basic_config(logger)
     help="Output directory",
 )
 @click.option(
-    '--m10',
-    is_flag=True,
-    default=False,
+    "-m",
+    "--model",
+    default="mas15",
     show_default=True,
-    help="Use the 10 array element MAS-seq model."
+    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+         "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.option(
     '--seg-score',
@@ -72,7 +75,7 @@ click_log.basic_config(logger)
     help="Display alignment score for annotated segments."
 )
 @click.argument("input-bam", type=click.Path(exists=True))
-def main(read_names, pbi, file_format, outdir, m10, seg_score, input_bam):
+def main(read_names, pbi, file_format, outdir, model, seg_score, input_bam):
     """Inspect the classification results on specified reads."""
 
     t_start = time.time()
@@ -86,12 +89,13 @@ def main(read_names, pbi, file_format, outdir, m10, seg_score, input_bam):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    if m10:
-        logger.info("Using MAS-seq 10 array element annotation model.")
-        lb_model = LibraryModel.build_and_return_mas_seq_10_model()
+    # Get our model:
+    if LibraryModel.has_prebuilt_model(model):
+        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
+        lb_model = LibraryModel.build_pre_configured_model(model)
     else:
-        logger.info("Using MAS-seq default annotation model.")
-        lb_model = LibraryModel.build_and_return_mas_seq_model()
+        logger.info(f"Loading model from json file: %s", model)
+        lb_model = LibraryModel.from_json_file(model)
 
     # Create an aligner if we are scoring our segments:
     ssw_aligner = ssw.Aligner() if seg_score else None
