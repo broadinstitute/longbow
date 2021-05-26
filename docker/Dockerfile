@@ -17,8 +17,12 @@ RUN apt-get install -y gcc python3-dev python3-setuptools && \
 RUN apt-get install -y libtcmalloc-minimal4
 RUN echo 'export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"' >> ~/.bashrc
 
-RUN git clone https://github.com/broadinstitute/longbow.git && \
-    cd longbow && \
+# Create known hosts for github ssh info:
+RUN mkdir -p ~/.ssh && touch ~/.ssh/known_hosts
+RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+RUN --mount=type=ssh git clone git@github.com:broadinstitute/longbow.git 
+RUN cd longbow && \
     git checkout v0.3.0 && \
     python3 -mvenv venv && \
     . venv/bin/activate && \
