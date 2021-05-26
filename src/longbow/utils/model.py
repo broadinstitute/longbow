@@ -22,9 +22,9 @@ class LibraryModel:
     The model can annotate the known sections of a read from the library it describes."""
 
     # Define constants for all our default probabilities here:
-    RANDOM_BASE_PROB = 0.5
+    RANDOM_BASE_PROB = 0.25
     PER_BASE_MATCH_PROB = 0.94
-    PER_BASE_SNP_PROB = 0.02
+    PER_BASE_MISMATCH_PROB = 0.02
 
     MATCH_MATCH_PROB = 0.90
     MATCH_INDEL_PROB = 0.05
@@ -44,6 +44,7 @@ class LibraryModel:
 
     def __init__(self,
                  name,
+                 description,
                  version,
                  array_element_structure,
                  adapters,
@@ -53,6 +54,7 @@ class LibraryModel:
                  do_build=True):
 
         self.name = name
+        self.description = description
         self.version = version
 
         self.array_element_structure = array_element_structure
@@ -159,39 +161,68 @@ class LibraryModel:
             elif "random:RDB" in s.name:
                 rdb = s
 
-        # link array element start to hmm start nodes:
+        # link silent start state to all of our start nodes
+        # this is the start of the array.
         for sname in starts:
             if sname in self.start_element_names:
                 self.hmm.add_transition(self.hmm.start, starts[sname], 1.0/len(self.start_element_names))
 
-        # link array element ends to start nodes:
+        # link random element model silent state A to all of our starts
+        # This is the transition from `random` to one of our array elements.
         for sname in starts:
             if sname in self.end_element_names:
                 self.hmm.add_transition(rda, starts[sname], 1.0/len(self.end_element_names))
 
-        # link up ending states according to our direct connections dictionary
+        # link up adapter final states according to our direct connections dictionary
         for s in self.hmm.states:
             m = re.match(r"^(\w+):([MID])(\d+)", s.name)
+
+            # If we're in the last state of each adapter:
             if m is not None and int(m.group(3)) == len(self.adapter_dict[m.group(1)]):
                 sname = m.group(1)
 
+                # If we have direct connections from this state to some other states then we add
+                # them into the model:
                 if sname in self.direct_connections_dict:
                     for dcname in self.direct_connections_dict[sname]:
                         self.hmm.add_transition(
                             s, starts[dcname], 1.0 / len(self.direct_connections_dict[sname])
                         )
+                # If we have no direct connections from this state, we add in a transition from this
+                # state to the silent random B state:
                 else:
                     # Verify this probability is the notional equivalent:
-                    # self.hmm.add_transition(s, rdb, 0.5)
                     self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
 
         # link up all adapters to model end state
         for s in self.hmm.states:
             m = re.match(r"^(\w+):([MID])(\d+)", s.name)
+
+            # Get the last state in each adapter:
             if m is not None and int(m.group(3)) == len(self.adapter_dict[m.group(1)]):
                 self.hmm.add_transition(s, self.hmm.end, LibraryModel.SUDDEN_END_PROB)
 
         self.hmm.bake()
+
+    @staticmethod
+    def create_model(model_name):
+        """Create the model of the given name.
+        If the name is not in LibraryModel.has_prebuilt_model, will attempt to read the given model_name as a json
+        file to create a model.  This file is assumed to contain the information as per LibraryModel.to_json()."""
+        # Get our model:
+        if LibraryModel.has_prebuilt_model(model_name):
+            logger.info(f"Using %s", LibraryModel.pre_configured_models[model_name]["description"])
+            m = LibraryModel.build_pre_configured_model(model_name)
+        else:
+            logger.info(f"Loading model from json file: %s", model_name)
+            m = LibraryModel.from_json_file(model_name)
+
+        return m
+
+    @staticmethod
+    def has_prebuilt_model(model_name):
+        """Returns True iff LibraryModel.pre_configured_models has a model with the given name.  False otherwise."""
+        return model_name in LibraryModel.pre_configured_models
 
     def _create_key_adapter_order(self):
         """Setup an ordered list of key segments that characterize the correct array element order."""
@@ -233,10 +264,10 @@ class LibraryModel:
             mc = State(
                 DiscreteDistribution(
                     {
-                        "A": LibraryModel.PER_BASE_MATCH_PROB if target[c] == "A" else LibraryModel.PER_BASE_SNP_PROB,
-                        "C": LibraryModel.PER_BASE_MATCH_PROB if target[c] == "C" else LibraryModel.PER_BASE_SNP_PROB,
-                        "G": LibraryModel.PER_BASE_MATCH_PROB if target[c] == "G" else LibraryModel.PER_BASE_SNP_PROB,
-                        "T": LibraryModel.PER_BASE_MATCH_PROB if target[c] == "T" else LibraryModel.PER_BASE_SNP_PROB,
+                        "A": LibraryModel.PER_BASE_MATCH_PROB if target[c] == "A" else LibraryModel.PER_BASE_MISMATCH_PROB,
+                        "C": LibraryModel.PER_BASE_MATCH_PROB if target[c] == "C" else LibraryModel.PER_BASE_MISMATCH_PROB,
+                        "G": LibraryModel.PER_BASE_MATCH_PROB if target[c] == "G" else LibraryModel.PER_BASE_MISMATCH_PROB,
+                        "T": LibraryModel.PER_BASE_MATCH_PROB if target[c] == "T" else LibraryModel.PER_BASE_MISMATCH_PROB,
                     }
                 ),
                 name=f"{name}:M{c + 1}",
@@ -335,12 +366,44 @@ class LibraryModel:
 
         return model
 
+    # @staticmethod
+    # def _make_homopolymer_repeat_model(name="homopolymer_repeat", base="A"):
+    #     model = HiddenMarkovModel(name=name)
+    #
+    #     # add states
+    #     hpr = State(
+    #         DiscreteDistribution({
+    #             base: 1
+    #         }),
+    #         name=f"{name}:RI",
+    #     )
+    #     hpr_a = State(None, name=f"{name}:HPRA")
+    #     hpr_b = State(None, name=f"{name}:HPRB")
+    #
+    #     model.add_states([hpr, hpr_a, hpr_b])
+    #
+    #     # add transitions
+    #     model.add_transition(model.start, hpr_a, LibraryModel.START_AND_END_RANDOM_PROB)
+    #     model.add_transition(model.start, hpr, LibraryModel.START_AND_END_RANDOM_PROB)
+    #
+    #     model.add_transition(hpr, hpr, LibraryModel.RAND_INS_CONTINUATION_PROB)
+    #     model.add_transition(hpr, hpr_a, LibraryModel.RAND_INS_TO_DEL_PROB)
+    #     model.add_transition(hpr, model.end, LibraryModel.RAND_INS_END_PROB)
+    #
+    #     model.add_transition(hpr_b, hpr, LibraryModel.RAND_RAND_PROB)
+    #     model.add_transition(hpr_b, model.end, LibraryModel.START_AND_END_RANDOM_PROB)
+    #
+    #     model.bake(merge="None")
+    #
+    #     return model
+
     def to_json(self, outfile=None, indent=4):
         """Serialize this model to a json object and return that json object.
         If outfile is not none, will write the json object to the given file path."""
 
         model_data = {
             "name": self.name,
+            "description": self.description,
             "version": self.version,
             "array_element_structure": self.array_element_structure,
             "adapters": self.adapter_dict,
@@ -369,6 +432,7 @@ class LibraryModel:
 
         m = LibraryModel(
             name=json_data["name"],
+            description=json_data["description"],
             version=json_data["version"],
             array_element_structure=tuple(tuple(v) for v in json_data["array_element_structure"]),
             adapters=json_data["adapters"],
@@ -380,12 +444,30 @@ class LibraryModel:
         return m
 
     @staticmethod
-    def build_and_return_mas_seq_model():
-        """Create and return the model for the standard 15 element MAS-seq array."""
+    def build_pre_configured_model(model_name):
+        """Build a pre-configured model based on the given model name.
+        If the given name does not appear in self.pre_configured_models, then a KeyError will be thrown."""
+        if model_name not in LibraryModel.pre_configured_models:
+            raise KeyError(f"Model not found in pre-configured models: {model_name}")
+
         return LibraryModel(
-            name="mas15",
-            version="1.0.0",
-            array_element_structure=(
+            name=model_name,
+            description=LibraryModel.pre_configured_models[model_name]["description"],
+            version=LibraryModel.pre_configured_models[model_name]["version"],
+            array_element_structure=LibraryModel.pre_configured_models[model_name]["array_element_structure"],
+            adapters=LibraryModel.pre_configured_models[model_name]["adapters"],
+            direct_connections=LibraryModel.pre_configured_models[model_name]["direct_connections"],
+            start_element_names=LibraryModel.pre_configured_models[model_name]["start_element_names"],
+            end_element_names=LibraryModel.pre_configured_models[model_name]["end_element_names"],
+        )
+
+    # TODO: Make an enum for this...
+    pre_configured_models = {
+        # def build_and_return_mas_seq_model():
+        "mas15": {
+            "description": "The standard MAS-seq 15 array element model.",
+            "version": "1.0.0",
+            "array_element_structure": (
                 # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
                 ("A", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
                 ("B", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
@@ -404,7 +486,7 @@ class LibraryModel:
                 # The last element doesn't currently have the "P" adapter in this version of the library:
                 ("O", "10x_Adapter", "random", "Poly_A", "3p_Adapter", "P"),
             ),
-            adapters={
+            "adapters": {
                 "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
                 "Poly_A": "A" * 30,
                 "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
@@ -425,7 +507,7 @@ class LibraryModel:
                 "O": "AAGTCACCGGCACCTT",
                 "P": "ATGAAGTGGCTCGAGA",
             },
-            direct_connections={
+            "direct_connections": {
                 "Poly_A": {"3p_Adapter"},
                 "3p_Adapter": {
                     "A",
@@ -462,17 +544,13 @@ class LibraryModel:
                 "O": {"10x_Adapter"},
                 "P": {"10x_Adapter"},
             },
-            start_element_names={"A", "10x_Adapter"},
-            end_element_names={"Poly_A", "P"},
-        )
-
-    @staticmethod
-    def build_and_return_mas_seq_10_model():
-        """Create and return the model for the 10 element MAS-seq array."""
-        return LibraryModel(
-            name="mas10",
-            version="1.0.0",
-            array_element_structure=(
+            "start_element_names": {"A", "10x_Adapter"},
+            "end_element_names": {"Poly_A", "P"},
+        },
+        "mas10": {
+            "description": "The MAS-seq 10 array element model.",
+            "version": "1.0.0",
+            "array_element_structure": (
                 ("Q", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
                 ("C", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
                 ("M", "10x_Adapter", "random", "Poly_A", "3p_Adapter"),
@@ -485,7 +563,7 @@ class LibraryModel:
                 # The last element may not currently have the "R" adapter in this version of the library:
                 ("H", "10x_Adapter", "random", "Poly_A", "3p_Adapter", "R"),
             ),
-            adapters={
+            "adapters": {
                 "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
                 "Poly_A": "A" * 30,
                 "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
@@ -501,7 +579,7 @@ class LibraryModel:
                 "Q": "AAGCACCATAATGTGT",
                 "R": "AACCGGACACACTTAG",
             },
-            direct_connections={
+            "direct_connections": {
                 "Poly_A": {"3p_Adapter"},
                 "3p_Adapter": {
                     "Q",
@@ -528,20 +606,103 @@ class LibraryModel:
                 "Q": {"10x_Adapter"},
                 "R": {"10x_Adapter"},
             },
-            start_element_names={"Q", "10x_Adapter"},
-            end_element_names={"Poly_A", "R"},
-        )
-
-    @staticmethod
-    def build_and_return_mas_seq_8_model():
-        """Create and return the model for the prototype 8 element MAS-seq array.
-
-        Included for completeness, but for now this SHOULD NOT BE USED.
-        """
-        return LibraryModel(
-            name="mas8prototype",
-            version="1.0.0",
-            array_element_structure=(
+            "start_element_names": {"Q", "10x_Adapter"},
+            "end_element_names": {"Poly_A", "R"},
+        },
+        "slide-seq": {
+            # The slide-seq model is:
+            #
+            #                 |-----10x_Adapter---->        |--splitter------>               |------Poly_T---------------->                  |--------5p_Adapter----------|                         # noqa
+            # AGCTTACTTGTGAAGACTACACGACGCTCTTCCGATCTNNNNNNNNTCTTCAGCGTTCCCGAGANNNNNNNNNNNNNVVTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTVNNNNNNNNNNNNNNNNNCCCATGTACTCTGCGTTGATACCACTGCTTACTTGTAAGCTGTCTA...      # noqa
+            # |------A------->                      <------|                  <-----------|                                 <----cDNA-------|                              |-------B------>         # noqa
+            #                                          V                           V
+            #                                    Spatial Barcode 2         Spatial Barcode 1
+            "description": "The Slide-seq 15 array element model.",
+            "version": "0.0.1",
+            "array_element_structure": (
+                # Currently longbow can't handle multiple `random` segments, so we'll need to
+                # update this in the future to look more like this:
+                # ("A", "10x_Adapter", "random", "barcode_splitter", "random", "Poly_T", "random", "5p_Adapter"),
+                ("A", "10x_Adapter", "random", "5p_Adapter"),
+                ("B", "10x_Adapter", "random", "5p_Adapter"),
+                ("C", "10x_Adapter", "random", "5p_Adapter"),
+                ("D", "10x_Adapter", "random", "5p_Adapter"),
+                ("E", "10x_Adapter", "random", "5p_Adapter"),
+                ("F", "10x_Adapter", "random", "5p_Adapter"),
+                ("G", "10x_Adapter", "random", "5p_Adapter"),
+                ("H", "10x_Adapter", "random", "5p_Adapter"),
+                ("I", "10x_Adapter", "random", "5p_Adapter"),
+                ("J", "10x_Adapter", "random", "5p_Adapter"),
+                ("K", "10x_Adapter", "random", "5p_Adapter"),
+                ("L", "10x_Adapter", "random", "5p_Adapter"),
+                ("M", "10x_Adapter", "random", "5p_Adapter"),
+                ("N", "10x_Adapter", "random", "5p_Adapter"),
+                ("O", "10x_Adapter", "random", "5p_Adapter", "P"),
+            ),
+            "adapters": {
+                "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
+                "5p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "A": "AGCTTACTTGTGAAGA",
+                "B": "ACTTGTAAGCTGTCTA",
+                "C": "ACTCTGTCAGGTCCGA",
+                "D": "ACCTCCTCCTCCAGAA",
+                "E": "AACCGGACACACTTAG",
+                "F": "AGAGTCCAATTCGCAG",
+                "G": "AATCAAGGCTTAACGG",
+                "H": "ATGTTGAATCCTAGCG",
+                "I": "AGTGCGTTGCGAATTG",
+                "J": "AATTGCGTAGTTGGCC",
+                "K": "ACACTTGGTCGCAATC",
+                "L": "AGTAAGCCTTCGTGTC",
+                "M": "ACCTAGATCAGAGCCT",
+                "N": "AGGTATGCCGGTTAAG",
+                "O": "AAGTCACCGGCACCTT",
+                "P": "ATGAAGTGGCTCGAGA",
+            },
+            "direct_connections": {
+                "5p_Adapter": {
+                    "A",
+                    "B",
+                    "C",
+                    "D",
+                    "E",
+                    "F",
+                    "G",
+                    "H",
+                    "I",
+                    "J",
+                    "K",
+                    "L",
+                    "M",
+                    "N",
+                    "O",
+                    "P",
+                },
+                "A": {"10x_Adapter"},
+                "B": {"10x_Adapter"},
+                "C": {"10x_Adapter"},
+                "D": {"10x_Adapter"},
+                "E": {"10x_Adapter"},
+                "F": {"10x_Adapter"},
+                "G": {"10x_Adapter"},
+                "H": {"10x_Adapter"},
+                "I": {"10x_Adapter"},
+                "J": {"10x_Adapter"},
+                "K": {"10x_Adapter"},
+                "L": {"10x_Adapter"},
+                "M": {"10x_Adapter"},
+                "N": {"10x_Adapter"},
+                "O": {"10x_Adapter"}
+            },
+            # Right now it won't work properly without both A and 10xAdapter being starts and P and
+            # 5pAdapter being ends.
+            "start_element_names": {"A", "10x_Adapter"},
+            "end_element_names": {"P", "5p_Adapter"},
+        },
+        "mas8prototype": {
+            "description": "The prototype MAS-seq 8 array element model.",
+            "version": "1.0.0",
+            "array_element_structure": (
                 # NOTE: the first element may not have the "A" adapter in this version of the library.
                 ("A", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
                 ("B", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
@@ -552,7 +713,7 @@ class LibraryModel:
                 ("G", "10x_Adapter", "random", "Poly_T", "random", "TSO"),
                 ("H", "10x_Adapter", "random", "Poly_T", "random", "TSO", "A"),
             ),
-            adapters={
+            "adapters": {
                 "10x_Adapter": "CTACACGACGCTCTTCCGATCT",
                 "Poly_T": "T" * 30,
                 "TSO": "CCCATGTACTCTGCGTTGATACCACTGCTT",
@@ -565,7 +726,7 @@ class LibraryModel:
                 "G": "ACAGGTTA",
                 "H": "ATCTCACA",
             },
-            direct_connections={
+            "direct_connections": {
                 "TSO": {
                     "A",
                     "B",
@@ -585,9 +746,10 @@ class LibraryModel:
                 "G": {"10x_Adapter"},
                 "H": {"10x_Adapter"},
             },
-            start_element_names={"A", "10x_Adapter"},
-            end_element_names={"TSO", "A"},
-        )
+            "start_element_names": {"A", "10x_Adapter"},
+            "end_element_names": {"TSO", "A"},
+        }
+    }
 
 
 # IUPAC RC's from: http://arep.med.harvard.edu/labgc/adnan/projects/Utilities/revcomp.html

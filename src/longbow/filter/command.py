@@ -37,11 +37,14 @@ click_log.basic_config(logger)
     help="Output file prefix",
 )
 @click.option(
-    '--m10',
-    is_flag=True,
-    default=False,
+    "-m",
+    "--model",
+    default="mas15",
     show_default=True,
-    help="Use the 10 array element MAS-seq model."
+    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+         "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.option(
     '--force',
@@ -51,21 +54,20 @@ click_log.basic_config(logger)
     help="Force overwrite of the output files if they exist."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, out_prefix, m10, force, input_bam):
+def main(pbi, out_prefix, model, force, input_bam):
     """Filter reads by whether they conform to expected segment order."""
 
     t_start = time.time()
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
-    if m10:
-        logger.info("Using MAS-seq 10 array element annotation model.")
-        lb_model = LibraryModel.build_and_return_mas_seq_10_model()
-        model_name = "mas10"
+    # Get our model:
+    if LibraryModel.has_prebuilt_model(model):
+        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
+        lb_model = LibraryModel.build_pre_configured_model(model)
     else:
-        logger.info("Using MAS-seq default annotation model.")
-        lb_model = LibraryModel.build_and_return_mas_seq_model()
-        model_name = "mas15"
+        logger.info(f"Loading model from json file: %s", model)
+        lb_model = LibraryModel.from_json_file(model)
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
@@ -83,7 +85,8 @@ def main(pbi, out_prefix, m10, force, input_bam):
     logger.info(f"Writing reads that conform to the model to: {passing_out_name}")
     logger.info(f"Writing reads that do not conform to the model to: {failing_out_name}")
 
-    logger.info(f"Filtering according to {model_name} model ordered key adapters: {', '.join(lb_model.key_adapters)}")
+    logger.info(f"Filtering according to {lb_model.name} model ordered key adapters: "
+                f"{', '.join(lb_model.key_adapters)}")
 
     # Open our input bam file:
     pysam.set_verbosity(0)
@@ -120,7 +123,7 @@ def main(pbi, out_prefix, m10, force, input_bam):
                     sys.exit(1)
 
                 # Annotate the read with the model that was used in its validation:
-                read.set_tag(bam_utils.READ_MODEL_NAME_TAG, model_name)
+                read.set_tag(bam_utils.READ_MODEL_NAME_TAG, lb_model.name)
 
                 # Check to see if the read is valid by this model and write it out:
                 segment_names = [s.name for s in segments]
@@ -129,7 +132,7 @@ def main(pbi, out_prefix, m10, force, input_bam):
 
                 if is_valid:
                     logger.debug("Read is %s valid: %s: first key adapter: [%d, %s], # key adapters: %d",
-                                 model_name,
+                                 lb_model.name,
                                  read.query_name,
                                  first_valid_adapter_index,
                                  lb_model.key_adapters[first_valid_adapter_index],
@@ -145,7 +148,7 @@ def main(pbi, out_prefix, m10, force, input_bam):
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug("Read is not %s valid: %s: first key adapter: [%d, %s], # key adapters: %d, "
                                      "key adapters detected: %s",
-                                     model_name,
+                                     lb_model.name,
                                      read.query_name,
                                      first_valid_adapter_index,
                                      lb_model.key_adapters[first_valid_adapter_index],

@@ -11,7 +11,6 @@ import pysam
 from construct import *
 
 from ..utils import bam_utils
-from ..utils.model import LibraryModel
 from ..annotate.command import get_segments
 
 logging.basicConfig(stream=sys.stderr)

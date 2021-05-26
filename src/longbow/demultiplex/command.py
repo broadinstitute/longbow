@@ -75,10 +75,11 @@ def main(pbi, out_base_name, threads, input_bam):
     input_data_queue = manager.Queue(maxsize=queue_size)
     results = manager.Queue()
 
-    # Create a dictionary of models to use to annotate and score our reads:
+    # Create a dictionary of models to use to annotate and score our reads.
+    # For now we just worry about the 10 and 15 length arrays:
     model_list = [
-        LibraryModel.build_and_return_mas_seq_model(),
-        LibraryModel.build_and_return_mas_seq_10_model(),
+        LibraryModel.build_pre_configured_model("mas15"),
+        LibraryModel.build_pre_configured_model("mas10"),
     ]
 
     # Start worker sub-processes:

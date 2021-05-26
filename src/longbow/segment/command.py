@@ -50,14 +50,17 @@ click_log.basic_config(logger)
     "This splitting will cause delimiter sequences to be repeated in each read they bound.",
 )
 @click.option(
-    '--m10',
-    is_flag=True,
-    default=False,
+    "-m",
+    "--model",
+    default="mas15",
     show_default=True,
-    help="Use the 10 array element MAS-seq model."
+    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+         "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, do_simple_splitting, m10, input_bam):
+def main(threads, output_bam, do_simple_splitting, model, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
@@ -99,14 +102,15 @@ def main(threads, output_bam, do_simple_splitting, m10, input_bam):
         disable=not sys.stdin.isatty(),
     ) as pbar:
 
-        # Get our header from the input bam file:
-        if m10:
-            logger.info("Using MAS-seq 10 array element annotation model.")
-            model = LibraryModel.build_and_return_mas_seq_10_model()
+        # Get our model:
+        if LibraryModel.has_prebuilt_model(model):
+            logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
+            m = LibraryModel.build_pre_configured_model(model)
         else:
-            logger.info("Using MAS-seq default annotation model.")
-            model = LibraryModel.build_and_return_mas_seq_model()
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[model])
+            logger.info(f"Loading model from json file: %s", model)
+            m = LibraryModel.from_json_file(model)
+
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[m])
 
         # Start output worker:
         res = manager.dict({"num_reads_segmented": 0, "num_segments": 0})
@@ -118,7 +122,7 @@ def main(threads, output_bam, do_simple_splitting, m10, input_bam):
                 output_bam,
                 pbar,
                 do_simple_splitting,
-                m10,
+                model,
                 res,
             ),
         )
@@ -177,18 +181,18 @@ def _sub_process_write_fn(
     out_bam_file_name,
     pbar,
     do_simple_splitting,
-    use_mas_seq_10_model,
+    model_name_or_file,
     res,
 ):
     """Thread / process fn to write out all our data."""
 
-    # get our model:
-    if use_mas_seq_10_model:
-        logger.info("Using MAS-seq 10 array element annotation model.")
-        model = LibraryModel.build_and_return_mas_seq_10_model()
+    # Get our model:
+    if LibraryModel.has_prebuilt_model(model_name_or_file):
+        logger.info(f"Using %s", LibraryModel.pre_configured_models[model_name_or_file]["description"])
+        model = LibraryModel.build_pre_configured_model(model_name_or_file)
     else:
-        logger.info("Using MAS-seq default annotation model.")
-        model = LibraryModel.build_and_return_mas_seq_model()
+        logger.info(f"Loading model from json file: %s", model_name_or_file)
+        model = LibraryModel.from_json_file(model_name_or_file)
 
     # Create our delimiter sequences for simple splitting if we have to:
     delimiters = _create_simple_delimiters(model) if do_simple_splitting else None
