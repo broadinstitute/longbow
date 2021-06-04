@@ -237,6 +237,9 @@ def annotate_read(read, m):
             qLen = int(qEnd) - int(qStart) + 1
 
             fppath.extend([state] * qLen)
+
+        # Set our logp from the bam file:
+        flogp = read.get_tag(bam_utils.READ_MODEL_SCORE_TAG)
     else:
         for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
             logp, ppath = m.annotate(seq)
