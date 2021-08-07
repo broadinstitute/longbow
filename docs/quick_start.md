@@ -1,7 +1,9 @@
 ---
 layout: default
-title: Nomenclature
-nav_order: 2
+title: Quick start
+nav_order: 1
+description: "Quickstart guide to Longbow."
+permalink: /
 ---
 
 # Quick start
