@@ -1,8 +1,9 @@
 ---
 layout: default
 title: Commands
-nav_order: 4
 description: "Longbow commands."
+nav_order: 4
+has_children: true
 ---
 
 # Commands
