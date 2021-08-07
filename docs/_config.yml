@@ -1,4 +1,3 @@
-title: "Remote theme example"
+title: "Longbow"
 remote_theme: pmarsceill/just-the-docs
-color_scheme: "dark"
-search_enabled: false
+search_enabled: true
