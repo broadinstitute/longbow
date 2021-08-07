@@ -1,8 +1,7 @@
 ---
-title: Quick start
-parent: Test
-has_children: true
-nav_order: 1
+layout: default
+title: Nomenclature
+nav_order: 2
 ---
 
 # Quick start
