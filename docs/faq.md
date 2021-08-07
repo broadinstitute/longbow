@@ -1,7 +1,7 @@
 ---
 layout: default
 title: FAQ
-nav_order: 1
+nav_order: 3
 description: "Longbow frequently asked questions."
 ---
 
