@@ -6,4 +6,6 @@ description: "Annotation and segmentation of MAS-seq data."
 permalink: /
 ---
 
-Placeholder
+# Introduction
+
+Longbow is a processing toolkit for **M**ultiplexed **A**rray**S** **seq**uencing (MAS-seq) data.  In particular, 
