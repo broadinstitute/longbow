@@ -8,7 +8,8 @@ has_children: true
 
 # Commands
 
-$ longbow --help
+```
+> longbow --help
 Usage: longbow [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -24,3 +25,4 @@ Commands:
   segment      Segment pre-annotated reads from an input BAM file.
   train        Train transition and emission probabilities on real data.
   version      Print the version of longbow.
+```

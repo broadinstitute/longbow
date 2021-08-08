@@ -8,8 +8,8 @@ parent: Commands
 
 # Extract
 
-`
-$ longbow extract --help
+```
+> longbow extract --help
 Usage: longbow extract [OPTIONS] INPUT_BAM
 
   Extract coding segments from the reads in the given bam. The main coding
@@ -38,4 +38,4 @@ Options:
                               in the extracted sequences.  [default: 26]
 
   --help                      Show this message and exit.
-`
+```

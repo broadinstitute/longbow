@@ -8,8 +8,8 @@ parent: Commands
 
 # Inspect
 
-`
-$ longbow inspect --help
+```
+> longbow inspect --help
 Usage: longbow inspect [OPTIONS] INPUT_BAM
 
   Inspect the classification results on specified reads.
@@ -36,4 +36,4 @@ Options:
                                [default: False]
 
   --help                       Show this message and exit.
-`
+```

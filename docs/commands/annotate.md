@@ -8,8 +8,8 @@ parent: Commands
 
 # Annotate
 
-`
-$ longbow annotate --help
+```
+> longbow annotate --help
 Usage: longbow annotate [OPTIONS] INPUT_BAM
 
   Annotate reads in a BAM file with segments from the model.
@@ -29,4 +29,4 @@ Options:
                          [default: mas15]
 
   --help                 Show this message and exit.
-`
+```

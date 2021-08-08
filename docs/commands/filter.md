@@ -8,8 +8,8 @@ parent: Commands
 
 # Filter
 
-`
-$ longbow filter --help
+```
+> longbow filter --help
 Usage: longbow filter [OPTIONS] INPUT_BAM
 
   Filter reads by whether they conform to expected segment order.
@@ -31,4 +31,4 @@ Options:
                          [default: False]
 
   --help                 Show this message and exit.
-`
+```
