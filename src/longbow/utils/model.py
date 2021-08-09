@@ -22,7 +22,7 @@ class LibraryModel:
     The model can annotate the known sections of a read from the library it describes."""
 
     # Define constants for all our default probabilities here:
-    RANDOM_BASE_PROB = 0.25
+    RANDOM_BASE_PROB = 0.5
     PER_BASE_MATCH_PROB = 0.94
     PER_BASE_MISMATCH_PROB = 0.02
 
