@@ -8,6 +8,10 @@ parent: Commands
 
 # Filter
 
+## Description
+
+## Command help
+
 ```
 > longbow filter --help
 Usage: longbow filter [OPTIONS] INPUT_BAM
@@ -32,3 +36,5 @@ Options:
 
   --help                 Show this message and exit.
 ```
+
+## Example

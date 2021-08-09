@@ -8,6 +8,10 @@ parent: Commands
 
 # Version
 
+## Description
+
+## Command help
+
 ```
 > longbow version --help
 Usage: longbow version [OPTIONS]
@@ -18,3 +22,5 @@ Options:
   -v, --verbosity LVL  Either CRITICAL, ERROR, WARNING, INFO or DEBUG
   --help               Show this message and exit.
 ```
+
+## Example

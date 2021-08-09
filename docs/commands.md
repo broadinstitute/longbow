@@ -2,7 +2,7 @@
 layout: default
 title: Commands
 description: "Longbow commands."
-nav_order: 5
+nav_order: 6
 has_children: true
 ---
 
@@ -75,7 +75,7 @@ Progress: 108 read [00:00, 11176.81 read/s]
 
 ## Optional .pbi index file
 
-Longbow can make use of a .pbi index file. This facilitates accurate progress reporting and helps in certain commands to permit specific reads to be fetched and processed without processing the entire file (e.g. `longbow inspect`, useful for inspecting model annotations).  The .pbi file is optional; if not present at the path guessed or not explicitly supplied on the command-line, Longbow will simply process records linearly, and will not report the expected time to completion.  For example:
+Longbow can make use of a [.pbi index](https://pbbam.readthedocs.io/en/latest/tools/pbindex.html) file, which provides information as to the amount of data in a PacBio BAM file and enables random access over its contents. This facilitates accurate progress reporting and helps in certain commands to permit specific reads to be fetched and processed without processing the entire file (e.g. `longbow inspect`, useful for inspecting model annotations).  The .pbi file is optional; if not present at the path guessed or not explicitly supplied on the command-line, Longbow will simply process records linearly, and will not report the expected time to completion.  For example:
 
 ```
 # with .pbi file:
@@ -91,21 +91,3 @@ mas15_test_input.bam
 > longbow annotate -v WARN -o /dev/null mas15_test_input.bam
 Progress: 8 read [00:01,  4.70 read/s]
 ```
-
-## Inspecting model annotations
-
-It can occasionally be useful to inspect the annotation by Longbow's hidden Markov model. To simplify this process, Longbow provides an `inspect` command, which can take existing annotations (or redo the annotation from scratch) and display the full sequence of the read with the annotated adapters color-coded appropriately.
-
-If a .pbi file for the input .bam file is available, then specific reads can be fetched very quickly without iterating over the entire file. For example:
-
-```
-> longbow inspect -r m64020_201213_022403/25/ccs --seg-score -o images tests/test_data/mas15_test_input.bam
-[INFO 2021-08-09 00:13:37  inspect] Invoked via: longbow inspect -r m64020_201213_022403/25/ccs --seg-score -o images tests/test_data/mas15_test_input.bam
-[INFO 2021-08-09 00:13:37  inspect] Using The standard MAS-seq 15 array element model.
-[INFO 2021-08-09 00:13:40  inspect] Drawing read 'm64020_201213_022403/25/ccs' to 'images/m64020_201213_022403_25_ccs.png'
-[INFO 2021-08-09 00:13:44  inspect] Done. Elapsed time: 7.00s.
-```
-
-An example screenshot from the `longbow inspect` command can be found below.  Note that for visual clarity, `random` model sections are drawn as gray read sections.  Only adapter sequences and poly-A tails are labeled and color-coded.
-
-![](figures/m64020_201213_022403_25_ccs.png)

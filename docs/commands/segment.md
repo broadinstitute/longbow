@@ -8,6 +8,10 @@ parent: Commands
 
 # Segment
 
+## Description
+
+## Command help
+
 ```
 > longbow segment --help
 Usage: longbow segment [OPTIONS] INPUT_BAM
@@ -36,3 +40,5 @@ Options:
 
   --help                     Show this message and exit.
 ```
+
+## Example

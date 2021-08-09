@@ -8,6 +8,10 @@ parent: Commands
 
 # Scsplit
 
+## Description
+
+## Command help
+
 ```
 > longbow scsplit --help
 Usage: longbow scsplit [OPTIONS] INPUT_BAM
@@ -63,3 +67,5 @@ Options:
 
   --help                       Show this message and exit.
 ```
+
+## Example

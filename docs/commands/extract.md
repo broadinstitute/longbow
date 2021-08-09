@@ -8,6 +8,10 @@ parent: Commands
 
 # Extract
 
+## Description
+
+## Command help
+
 ```
 > longbow extract --help
 Usage: longbow extract [OPTIONS] INPUT_BAM
@@ -39,3 +43,5 @@ Options:
 
   --help                      Show this message and exit.
 ```
+
+## Example

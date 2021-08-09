@@ -8,6 +8,10 @@ parent: Commands
 
 # Demultiplex
 
+## Description
+
+## Command help
+
 ```
 > longbow demultiplex --help
 Usage: longbow demultiplex [OPTIONS] INPUT_BAM
@@ -28,3 +32,5 @@ Options:
 
   --help                    Show this message and exit.
 ```
+
+## Example

@@ -8,6 +8,10 @@ parent: Commands
 
 # Train
 
+## Description
+
+## Command help
+
 ```
 > longbow train --help
 Usage: longbow train [OPTIONS] TRAINING_BAM
@@ -42,3 +46,5 @@ Options:
 
   --help                          Show this message and exit.
 ```
+
+## Example

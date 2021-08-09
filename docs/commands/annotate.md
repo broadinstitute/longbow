@@ -8,6 +8,10 @@ parent: Commands
 
 # Annotate
 
+## Description
+
+## Command help
+
 ```
 > longbow annotate --help
 Usage: longbow annotate [OPTIONS] INPUT_BAM
@@ -30,3 +34,5 @@ Options:
 
   --help                 Show this message and exit.
 ```
+
+## Example
