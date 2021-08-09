@@ -21,3 +21,4 @@ progress
 construct
 pathos
 ssw==0.4.1
+pydoc-markdown
