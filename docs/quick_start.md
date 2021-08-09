@@ -41,6 +41,6 @@ Progress: 100%|█████████████████████�
 $ pbmm2 align --preset ISOSEQ --sample SIRVTest --sort tests/test_data/resources/SIRV_Library.fasta extracted.bam extracted.aligned.bam
 ```
 
-We can examine these results in IGV (example locus: KX147762.1:3478-15255):
+Below, we examine the data in IGV before (top track) and after Longbow processing (middle track) over two of the SIRV isoforms (bottom track; locus: KX147762.1:3478-15255).  Notice the soft-clipped bases (the myriad reference-mismatching bases at the 5' and 3' ends of the read) in the data before Longbow processing. These represent the other concatenated transcripts that have not been separated from each other yet.  After segmentation by Longbow, each read now appropriately represents an individual transcript isoform sequence and is ready for downstream analysis.
 
-![IGV screenshot for two SIRV isoforms](figures/quick_start_igv2.png)
+![IGV screenshot for two SIRV isoforms](figures/quick_start_igv3.png)
