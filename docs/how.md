@@ -1,8 +1,8 @@
 ---
 layout: default
-title: FAQ
+title: How does Longbow work?
 nav_order: 2
-description: "How does Longbow work?"
+description: "Detailed description of the inner workings of Longbow."
 ---
 
 # How does Longbow work?
