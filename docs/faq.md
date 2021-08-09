@@ -7,4 +7,4 @@ description: "Longbow frequently asked questions."
 
 # FAQ
 
-I am a child page.
+To be written.
