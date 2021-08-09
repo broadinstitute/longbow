@@ -13,7 +13,7 @@ parent: Commands
 ## Command help
 
 ```
-> longbow scsplit --help
+$ longbow scsplit --help
 Usage: longbow scsplit [OPTIONS] INPUT_BAM
 
   Create files for use in `alevin` for single-cell analysis. This tool

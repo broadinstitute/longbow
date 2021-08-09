@@ -13,7 +13,7 @@ parent: Commands
 ## Command help
 
 ```
-> longbow train --help
+$ longbow train --help
 Usage: longbow train [OPTIONS] TRAINING_BAM
 
   Train transition and emission probabilities on real data.

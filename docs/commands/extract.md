@@ -13,7 +13,7 @@ parent: Commands
 ## Command help
 
 ```
-> longbow extract --help
+$ longbow extract --help
 Usage: longbow extract [OPTIONS] INPUT_BAM
 
   Extract coding segments from the reads in the given bam. The main coding

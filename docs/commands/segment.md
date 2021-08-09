@@ -13,7 +13,7 @@ parent: Commands
 ## Command help
 
 ```
-> longbow segment --help
+$ longbow segment --help
 Usage: longbow segment [OPTIONS] INPUT_BAM
 
   Segment pre-annotated reads from an input BAM file.

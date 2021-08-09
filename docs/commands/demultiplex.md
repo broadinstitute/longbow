@@ -13,7 +13,7 @@ parent: Commands
 ## Command help
 
 ```
-> longbow demultiplex --help
+$ longbow demultiplex --help
 Usage: longbow demultiplex [OPTIONS] INPUT_BAM
 
   Separate reads into files based on which model they fit best.

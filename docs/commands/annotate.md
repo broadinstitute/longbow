@@ -12,8 +12,8 @@ parent: Commands
 
 ## Command help
 
-```
-> longbow annotate --help
+```shell
+$ longbow annotate --help
 Usage: longbow annotate [OPTIONS] INPUT_BAM
 
   Annotate reads in a BAM file with segments from the model.

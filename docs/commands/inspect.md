@@ -17,7 +17,7 @@ If a .pbi file for the input .bam file is available, then specific reads can be 
 ## Command help
 
 ```
-> longbow inspect --help
+$ longbow inspect --help
 Usage: longbow inspect [OPTIONS] INPUT_BAM
 
   Inspect the classification results on specified reads.

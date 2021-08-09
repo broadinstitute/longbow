@@ -13,7 +13,7 @@ parent: Commands
 ## Command help
 
 ```
-> longbow filter --help
+$ longbow filter --help
 Usage: longbow filter [OPTIONS] INPUT_BAM
 
   Filter reads by whether they conform to expected segment order.

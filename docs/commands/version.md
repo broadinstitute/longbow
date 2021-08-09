@@ -13,7 +13,7 @@ parent: Commands
 ## Command help
 
 ```
-> longbow version --help
+$ longbow version --help
 Usage: longbow version [OPTIONS]
 
   Print the version of longbow.
