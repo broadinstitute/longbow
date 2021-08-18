@@ -10,6 +10,24 @@ parent: Commands
 
 ## Description
 
+The `annotate` command is the first in the chain of commands for processing MAS-seq data. Given an array model (e.g. 'mas15'), `annotate` determines an optimal annotation (Viterbi path) for the adapters and unknown sequences in each read. The Viterbi path is automatically computed for both the forward and reverse-complement orientations of the read, and the path with the highest overall maximum likelihood is considered to be the correct one.  Longbow then appends this information to the read's auxillary BAM tags for use with downstream Longbow tools (e.g. `filter`, `segment`).
+
+Several models are available for use with the `--model` argument.  They are:
+
+| name          | description                                 | version        |
+|---------------|---------------------------------------------|----------------|
+| mas15         | The standard MAS-seq 15-element array model | 1.0.0          |
+| mas10         | The MAS-seq 10-element array model          | 1.0.0          |
+| mas8prototype | The prototype MAS-seq 8-element array       | 1.0.0          |
+| slide-seq     | The Slide-seq 15-element array model        | 0.0.1          |
+| bulk15        | The 15-element bulk RNA model               | (experimental) |
+
+By default, the `annotate` command streams its results to `stdout` for use with other Longbow commands or tools (e.g. `samtools`) via Unix pipes.
+
+This command is parallelizable on a per-read level.  On a system with N cores, it will attempt to use N-1 cores by default.
+
+Optionally, this command can make use of a PacBio index (.pbi) file, which specifies the total number of reads in the file and can therefore be useful for accurate progress reporting.  The .pbi file has no effect on speed or accuracy of results; it is solely for convenience in progress logging.
+
 ## Command help
 
 ```shell
@@ -36,3 +54,14 @@ Options:
 ```
 
 ## Example
+
+```shell
+$ longbow annotate -o annotated.bam tests/test_data/mas15_test_input.bam
+[INFO 2021-08-12 09:55:07 annotate] Invoked via: longbow annotate -o annotated.bam tests/test_data/mas15_test_input.bam
+[INFO 2021-08-12 09:55:07 annotate] Running with 11 worker subprocess(es)
+[INFO 2021-08-12 09:55:07 annotate] Using The standard MAS-seq 15 array element model.
+[INFO 2021-08-12 09:55:10 annotate] Annotating 8 reads
+Progress: 100%|████████████████████████████████████████████████████████████████████████████████| 8/8 [00:02<00:00,  3.26 read/s]
+[INFO 2021-08-12 09:55:12 annotate] Annotated 8 reads with 557 total sections.
+[INFO 2021-08-12 09:55:12 annotate] Done. Elapsed time: 5.35s. Overall processing rate: 1.50 reads/s.
+```

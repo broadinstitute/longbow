@@ -16,7 +16,7 @@ If a .pbi file for the input .bam file is available, then specific reads can be 
 
 ## Command help
 
-```
+```shell
 $ longbow inspect --help
 Usage: longbow inspect [OPTIONS] INPUT_BAM
 
@@ -48,12 +48,12 @@ Options:
 
 ## Example
 
-```
-> longbow inspect -r m64020_201213_022403/25/ccs --seg-score -o images tests/test_data/mas15_test_input.bam
-[INFO 2021-08-09 00:13:37  inspect] Invoked via: longbow inspect -r m64020_201213_022403/25/ccs --seg-score -o images tests/test_data/mas15_test_input.bam
-[INFO 2021-08-09 00:13:37  inspect] Using The standard MAS-seq 15 array element model.
-[INFO 2021-08-09 00:13:40  inspect] Drawing read 'm64020_201213_022403/25/ccs' to 'images/m64020_201213_022403_25_ccs.png'
-[INFO 2021-08-09 00:13:44  inspect] Done. Elapsed time: 7.00s.
+```shell
+$ longbow inspect -r m64020_201213_022403/25/ccs --seg-score -o images tests/test_data/mas15_test_input.bam
+[INFO 2021-08-09 11:13:37  inspect] Invoked via: longbow inspect -r m64020_201213_022403/25/ccs --seg-score -o images tests/test_data/mas15_test_input.bam
+[INFO 2021-08-09 11:13:37  inspect] Using The standard MAS-seq 15 array element model.
+[INFO 2021-08-09 11:13:40  inspect] Drawing read 'm64020_201213_022403/25/ccs' to 'images/m64020_201213_022403_25_ccs.png'
+[INFO 2021-08-09 11:13:44  inspect] Done. Elapsed time: 7.00s.
 ```
 
 An example screenshot from the `longbow inspect` command can be found below.  Note that for visual clarity, `random` model sections are drawn as gray read sections.  Only adapter sequences and poly-A tails are labeled and color-coded.

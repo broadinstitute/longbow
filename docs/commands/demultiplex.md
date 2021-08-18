@@ -10,9 +10,13 @@ parent: Commands
 
 ## Description
 
+If multiple MAS-seq libraries with different array designs are pooled into a single sequencing run, Longbow can demultiplex the reads into separate BAM files.  This is accomplished with the `demultiplex` command, which tests multiple MAS-seq models per read (see `annotate`) and chooses the one with the highest overall likelihood.
+
+Note that in Longbow parlance, the act of splitting a MAS-seq read array into its constituent elements is referred to as "segmentation", not "demultiplexing". If you're trying to split the reads into individual transcripts, see the `segment` command.
+
 ## Command help
 
-```
+```shell
 $ longbow demultiplex --help
 Usage: longbow demultiplex [OPTIONS] INPUT_BAM
 
