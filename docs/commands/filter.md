@@ -10,9 +10,15 @@ parent: Commands
 
 ## Description
 
+After running the `annotate` command on MAS-seq data, we expect that MAS-seq adapters will be found in sequential order throughout the length of the read. Reads that violate this expectation are potentially mis-segmented, and using them in downstream analysis can lead to biological misinterpretations (e.g. false fusion events, aberrant alternative splicing, erroneous transcript degradation, etc.).
+
+Such errors manifest as off-subdiagonal elements in our ligation heatmap (left panel in figure below), depicting MAS-seq adapter adjacencies found in each read.  The `filter` command removes the off-subdiagonal reads (right panel), ensuring that only high-quality data with confident and model-consistent segmentations are propagated to downstream analysis.
+
+![](../figures/before_after_filter.png)
+
 ## Command help
 
-```
+```shell
 $ longbow filter --help
 Usage: longbow filter [OPTIONS] INPUT_BAM
 

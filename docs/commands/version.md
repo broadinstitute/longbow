@@ -10,9 +10,13 @@ parent: Commands
 
 ## Description
 
+Print the version of Longbow.
+
+Longbow uses [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH).
+
 ## Command help
 
-```
+```shell
 $ longbow version --help
 Usage: longbow version [OPTIONS]
 
@@ -24,3 +28,8 @@ Options:
 ```
 
 ## Example
+
+```shell
+$ longbow version
+0.3.0
+```

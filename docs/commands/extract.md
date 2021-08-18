@@ -10,9 +10,14 @@ parent: Commands
 
 ## Description
 
+Extract coding segments from the reads in the given bam. The main coding
+segments are assumed to be labeled as `random` segments. Uses known
+segments flanking the region to be extracted as markers to indicate the
+start and end of what to extract.
+
 ## Command help
 
-```
+```shell
 $ longbow extract --help
 Usage: longbow extract [OPTIONS] INPUT_BAM
 

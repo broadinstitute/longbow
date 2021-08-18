@@ -10,9 +10,11 @@ parent: Commands
 
 ## Description
 
+Segment pre-annotated reads from an input BAM file.
+
 ## Command help
 
-```
+```shell
 $ longbow segment --help
 Usage: longbow segment [OPTIONS] INPUT_BAM
 
@@ -42,3 +44,13 @@ Options:
 ```
 
 ## Example
+
+```shell
+$ longbow segment -o segmented.bam annotated.bam
+[INFO 2021-08-12 09:57:45  segment] Invoked via: longbow segment -o segmented.bam annotated.bam
+[INFO 2021-08-12 09:57:45  segment] Running with 11 worker subprocess(es)
+[INFO 2021-08-12 09:57:45  segment] Using bounded region splitting mode.
+[INFO 2021-08-12 09:57:48  segment] Using The standard MAS-seq 15 array element model.
+[INFO 2021-08-12 09:57:50  segment] Segmented 8 reads with 113 total segments.
+[INFO 2021-08-12 09:57:50  segment] Done. Elapsed time: 4.84s.
+```

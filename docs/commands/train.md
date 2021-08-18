@@ -10,9 +10,13 @@ parent: Commands
 
 ## Description
 
+Train transition and emission probabilities using the Baum-Welch algorithm.
+
+(This command is currently being rewritten and is not recommended for use by anyone other than those who wish to develop the Longbow software package.)
+
 ## Command help
 
-```
+```shell
 $ longbow train --help
 Usage: longbow train [OPTIONS] TRAINING_BAM
 
