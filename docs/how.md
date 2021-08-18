@@ -70,4 +70,4 @@ Because our HMM is robust to sequencing error, we also process the ~3.9M reads t
 
 Our generative modelling approach to MAS-seq processing (probabilistic annotation -> segmentation -> filtering) makes use of all landmarks in the read simultaneously, rather than iteratively searching for adapters without regard for overall context. This approach enables an accurate segmentation of the reads even in the presence of substantial sequencing error (e.g. reads that are not corrected by the `ccs` software).
 
-Enjoy! And please feel free to send us questions, comments, concerns, or cake in our [Github issues](https://github.com/broadinstitute/longbow/issues) page!
+Enjoy! And please feel free to send us questions, comments, and requests in our [Github issues](https://github.com/broadinstitute/longbow/issues) page!
