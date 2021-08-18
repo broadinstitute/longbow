@@ -12,6 +12,8 @@ parent: Commands
 
 It can occasionally be useful to inspect the classifications made by Longbow's hidden Markov model. To simplify this process, Longbow provides the `inspect` command, which can take existing annotations (or redo the annotation from scratch) and display the full sequence of the read with the annotated adapters color-coded appropriately.
 
+Output in .png and .pdf formats are supported via the `--file-format` argument. Choose 'png' if you want a rasterized image for a quick look at data.  For a vector image that also has the added capability of highlighting and copying read subsequences, choose the 'pdf' output.
+
 If a .pbi file for the input .bam file is available, then specific reads can be fetched very quickly without iterating over the entire file.  If the .pbi file is not available, the BAM file will be scanned linearly until the requested reads are found. The .pbi file is therefore highly recommended and can be easily generated using the [pbindex](https://pbbam.readthedocs.io/en/latest/tools/pbindex.html) tool, installable via `conda install pbbam`.
 
 ## Command help
