@@ -44,3 +44,21 @@ Options:
 ```
 
 ## Example
+
+```shell
+$ longbow filter -o filtered annotated.bam
+[INFO 2021-08-12 10:04:26   filter] Invoked via: longbow filter -o filtered annotated.bam
+[INFO 2021-08-12 10:04:26   filter] Using The standard MAS-seq 15 array element model.
+[INFO 2021-08-12 10:04:28   filter] Writing reads that conform to the model to: filtered_longbow_filter_passed.bam
+[INFO 2021-08-12 10:04:28   filter] Writing reads that do not conform to the model to: filtered_longbow_filter_failed.bam
+[INFO 2021-08-12 10:04:28   filter] Filtering according to mas15 model ordered key adapters: A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P
+Progress: 8 read [00:00, 970.54 read/s]
+[INFO 2021-08-12 10:04:28   filter] Done. Elapsed time: 2.35s.
+[INFO 2021-08-12 10:04:28   filter] Total Reads Processed: 8
+[INFO 2021-08-12 10:04:28   filter] # Reads Passing Model Filter: 8 (100.00%)
+[INFO 2021-08-12 10:04:28   filter] # Reads Failing Model Filter: 0 (0.00%)
+[INFO 2021-08-12 10:04:28   filter] Total # correctly ordered key adapters in passing reads: 110
+[INFO 2021-08-12 10:04:28   filter] Total # correctly ordered key adapters in failing reads: 0
+[INFO 2021-08-12 10:04:28   filter] Avg # correctly ordered key adapters per passing read: 13.7500 [16]
+[INFO 2021-08-12 10:04:28   filter] Avg # correctly ordered key adapters per failing read: 0.0000 [16]
+```
