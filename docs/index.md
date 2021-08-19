@@ -14,7 +14,7 @@ Longbow is a processing toolkit for **M**ultiplexed **A**rray**S** **seq**uencin
 
 ## Features
 
- * Works with both low error-rate data (PacBio HiFi `rq >= 0.99` reads) and high error-rate reads reads (CLR/uncorrected `-1 <= rq < 0.99` reads).
+ * Works with both low error-rate reads (PacBio HiFi `rq >= 0.99` reads) and high error-rate reads (CLR/uncorrected `-1 <= rq < 0.99` reads).
  * Flexible model structure (currently supports different array orderings; bulk RNA and SlideSeq support in progress).
  * Open source (BSD-3-Clause License).
 
