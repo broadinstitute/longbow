@@ -10,13 +10,7 @@ parent: Commands
 
 ## Description
 
-Create files for use in `alevin` for single-cell analysis. This tool
-coerces a set of reads from a single source into a format that `alevin`
-can ingest.
-
-Segment names are assumed to be those in the default model (utils/model.py).
-
-INPUT_BAM should contain reads that have been processed by `longbow segment`.
+_*This is an experimental tool and should not be used in most applications.*_
 
 ## Command help
 
