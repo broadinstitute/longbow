@@ -38,3 +38,15 @@ Options:
 ```
 
 ## Example
+
+```shell
+$ longbow demultiplex -t4 -v INFO multiplexed_data.bam -o MAS-seq_demuxed
+[INFO 2021-08-20 17:59:16 demultiplex] Invoked via: longbow demultiplex -t4 -v INFO multiplexed_data.bam -o MAS-seq_demuxed
+[INFO 2021-08-20 17:59:16 demultiplex] Running with 4 worker subprocess(es)
+[INFO 2021-08-20 17:59:16 demultiplex] Annotating 996 reads
+Progress: 100%|████████████████████████████| 996/996 [10:24<00:00,  1.59 read/s]
+[INFO 2021-08-20 18:09:45 demultiplex] Annotated 996 reads with 46004 total sections.
+[INFO 2021-08-20 18:09:45 demultiplex] Model mas15 annotated 818 reads.
+[INFO 2021-08-20 18:09:45 demultiplex] Model mas10 annotated 178 reads.
+[INFO 2021-08-20 18:09:45 demultiplex] Done. Elapsed time: 629.44s. Overall processing rate: 1.58 reads/s.
+```
