@@ -77,3 +77,14 @@ Options:
 ```
 
 ## Example
+
+```shell
+$ longbow scsplit -o single_cell_split segmented.bam
+[INFO 2021-08-20 18:14:49  scsplit] Invoked via: longbow scsplit -o single_cell_split tmp.segment.bam
+[INFO 2021-08-20 18:14:49  scsplit] Running with 7 worker subprocess(es)
+[INFO 2021-08-20 18:14:49  scsplit] Using The standard MAS-seq 15 array element model.
+[INFO 2021-08-20 18:14:52  scsplit] Processed 108 reads.
+[INFO 2021-08-20 18:14:52  scsplit] CBC length: 16.
+[INFO 2021-08-20 18:14:52  scsplit] UMI length: 10.
+[INFO 2021-08-20 18:14:52  scsplit] Done. Elapsed time: 3.01s.
+```
