@@ -12,6 +12,36 @@ parent: Commands
 
 _*This is an experimental tool and should not be used in most applications.*_
 
+The Single Cell Split (`scsplit`) tool is designed to convert MAS-seq data into
+a format that is readily ingested by the `alevin` single-cell analysis tool.  
+
+`scsplit` assumes all data are from the same cell, and takes in a dummy cell
+barcode as one of its inputs.  The primary output is two [FASTQ](https://en.wikipedia.org/wiki/FASTQ_format) files.
+Both of these output files have information from each read and are in the 
+same order (read 1 of the input bam will be represented as the first entry
+in both output files).
+
+`OUTPUT_BASE_NAME_mates_1.fastq` contains barcode information for each 
+input read.  This barcode information consists of the given dummy cell
+barcode and the UMI for each read.
+
+`OUTPUT_BASE_NAME_mates_2.fastq` contains the transcript sequences for
+each read in the given input bam file.  These transcript sequences are
+calculated to be any bases that occur after the UMI and before the 
+Poly-A tail for each read.
+
+These two files should be considered "linked" and should not be reordered
+before processing with `alevin`.
+
+The third and final output is a text file containing the dummy cell 
+barcode given to `scsplit` so that `alevin` can know what the cell barcode
+is for the data.
+
+As mentioned above, this tool is experimental and not yet mature enough for
+use on real datasets. 
+
+More information on `alevin` can be found [here](https://combine-lab.github.io/alevin-tutorial/).
+
 ## Command help
 
 ```shell
