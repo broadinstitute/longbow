@@ -10,10 +10,27 @@ parent: Commands
 
 ## Description
 
-Extract coding segments from the reads in the given bam. The main coding
-segments are assumed to be labeled as `random` segments. Uses known
-segments flanking the region to be extracted as markers to indicate the
-start and end of what to extract.
+The `extract` command is a read post-processing tool.  `Extract` 
+removes leading and trailing adapter sequences, as well as poly-A 
+tails from the given reads so that they can be aligned to the 
+genome / transcriptome without library prep artifacts affecting 
+the alignment process.  This effectively extracts the cDNA 
+portion of each read.
+
+The cDNA portion of each read is expected to be in sections that
+Longbow has labeled as `random`.  The leading and trailing 
+sequences that `extract` uses as markers are configurable and 
+default to the regions that most commonly flank the cDNA regions
+in the current models (`10x_adapter` and `Poly_A`).
+
+`extract` can ignore a number of bases from the start of the 
+`random` / cDNA section to account for barcodes prepended to 
+reads (by default, 26).  In addition, a configurable number
+of bases that extend beyond the `random` segment are included in
+the output to mitigate potential off-by-one errors in the Longbow
+model (by default, 2).  
+
+Input reads are expected to be either `annotate`d or `segment`ed.
 
 ## Command help
 
