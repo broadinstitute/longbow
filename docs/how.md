@@ -10,7 +10,7 @@ description: "Detailed description of the inner workings of Longbow."
 ## Introduction to MAS-seq
 
 ![](figures/masseq_concept.png)
-#### Figure 1: comparison of read structure between Iso-Seq and MAS-seq for a 10x Genomics single-cell library. (A) Iso-Seq read structure with Iso-Seq 5' and 3' adapters, 10x 5' and 3' template-switching oligo (TSO) adapters, and cDNA sequence are color-coded. For a 2-5 kbp read, ~100 circular passes (np ~= 100) are expected. (B) MAS-seq read structure with similar color-coding to Iso-Seq reads, and MAS-seq adapters additionally highlighted. For 15-25 kbp reads, np ~= 10.
+### Figure 1: comparison of read structure between Iso-Seq and MAS-seq for a 10x Genomics single-cell library. (A) Iso-Seq read structure with Iso-Seq 5' and 3' adapters, 10x 5' and 3' template-switching oligo (TSO) adapters, and cDNA sequence are color-coded. For a 2-5 kbp read, ~100 circular passes (np ~= 100) are expected. (B) MAS-seq read structure with similar color-coding to Iso-Seq reads, and MAS-seq adapters additionally highlighted. For 15-25 kbp reads, np ~= 10.
 
 To overcome yield limitations of the standard Iso-Seq protocol (Figure 1A), MAS-seq multiplexes several cDNA sequences within each long read (Figure 1B). Each sequence is flanked by one of several custom MAS-seq multiplexing adapters used to construct the full multiplexed read, termed an "array". This design increases the number of full-length transcripts (along with any associated adapters/barcodes) sequenced by more than an order of magnitude. It also presents an interesting challenge: how to correctly segment the array into its constituent elements.
 
@@ -19,7 +19,7 @@ To overcome yield limitations of the standard Iso-Seq protocol (Figure 1A), MAS-
 An initial approach to this problem might be to conduct iterative BLAST/BLAST-like searches and split the read each time a MAS-seq adapter is found. In practice however, this solution is very sensitive to sequencing error (even in CCS-corrected data). Figure 2A illustrates a common failure mode: sequencing error may impair the discovery of one or more MAS-seq adapters (i.e. adapter false negatives), and adjacent array elements may be mistaken for a gene fusion. Similarly, adapter false positives would be the erroneous misclassification of read subsequences as adapters, resulting truncated transcripts and possibly misinterpreted as alternatively spliced or degraded transcripts.
 
 ![](figures/bad_demux2.png)
-#### Figure 2: an example of errorful demultiplexing. (A) MAS-seq read diagram showing discovered adapters (shown in color) and undiscovered adapters (greyed out). (B) Heatmap of MAS-seq adapter adjacencies (i.e. given that we observed adapter M<sub>i</sub>, which adapter appeared next in the read?). Subdiagonal cells indicate correct segmentations (i.e. M<sub>i</sub> -> M<sub>i+1</sub>), while off-subdiagonal cells indicate either segmentation errors or issues with the array construction itself.
+### Figure 2: an example of errorful demultiplexing. (A) MAS-seq read diagram showing discovered adapters (shown in color) and undiscovered adapters (greyed out). (B) Heatmap of MAS-seq adapter adjacencies (i.e. given that we observed adapter M<sub>i</sub>, which adapter appeared next in the read?). Subdiagonal cells indicate correct segmentations (i.e. M<sub>i</sub> -> M<sub>i+1</sub>), while off-subdiagonal cells indicate either segmentation errors or issues with the array construction itself.
 
 We can measure our segmentation performance by constructing a heatmap of MAS-seq adapter adjacencies in the reads. Perfect segmentation would result in only the subdiagonal of the heatmap being highlighted, indicating that adapters had been found in correct sequence along the read. In Figure 1B, off-subdiagonal activity from the BLAST approach indicates imperfect segmentation and compromised yield.
 
@@ -38,13 +38,13 @@ To build this probabilistic model, note three key observations regarding the str
 MAS-seq read structure thus provides us with useful constraints in designing a model for their optimal annotation. Point 1 specifies a quality control measure (discussed in the next section). Points 2 and 3 define the model components, as depicted in Figure 3.  The "global alignment" submodel enables the recognition of known sequences, allowing for mismatches and indels along the length of the sequence.  The "random, repeat" submodel enables the recognition of sequences that are not known in advance.  These models are connected to one another and repeated as necessary according to a given MAS-seq array design.
 
 ![](figures/model_components.png)
-#### Figure 3: Longbow submodels. (A) "Global alignment" model, enabling full matching of a known sequence and allowing for mismatch and indel sequencing errors. (B) "Random, repeat" model, enabling annotation of unknown sequences.  For further details, see Durbin et al. 1998, pg 115.
+### Figure 3: Longbow submodels. (A) "Global alignment" model, enabling full matching of a known sequence and allowing for mismatch and indel sequencing errors. (B) "Random, repeat" model, enabling annotation of unknown sequences.  For further details, see Durbin et al. 1998, pg 115.
 
 
 Figure 4 displays some example array designs. MAS-seq adapters labeled as 'A', 'B', 'C', ..., 'P'). The MAS10/MAS15 models can be used to annotate single-cell 10-element or 15-element arrays. In bulk RNA sequencing, no single cell adapters are present, hence these sections are omitted from the Bulk model. The SlideSeq model carries transcripts in a reverse-complement orientation to the previous designs, as well as containing spatial barcodes separated by a known spacer sequence. Any array design that can make use of the aforementioned submodels can be quickly implemented in Longbow.
 
 ![](figures/models.png)
-#### Figure 4: Longbow graphical models for various MAS-seq array designs. "Global alignment" submodels depicted as white boxes. "Random, repeat" models depicted as grey boxes. MAS-seq adapters labeled as 'A', 'B', 'C', ..., 'P'.  Edges denote permitted transitions, with solid lines representing a higher transition probability than dashed lines.  Left: MAS10/MAS15 models for 10-element and 15-element arrays, respectively (the salient difference being the number of permitted MAS-seq adapters; MAS10 would only contain adapters from A through L). Middle: Bulk RNA sequencing model, wherein single-cell adapters (3' TSO and 10x adapter) are not present. Right: SlideSeq model, where transcripts are found in reverse-complement orientation (hence a poly(T) submodel rather than a poly(A), and a spacer sequence found before spatial barcodes).
+### Figure 4: Longbow graphical models for various MAS-seq array designs. "Global alignment" submodels depicted as white boxes. "Random, repeat" models depicted as grey boxes. MAS-seq adapters labeled as 'A', 'B', 'C', ..., 'P'.  Edges denote permitted transitions, with solid lines representing a higher transition probability than dashed lines.  Left: MAS10/MAS15 models for 10-element and 15-element arrays, respectively (the salient difference being the number of permitted MAS-seq adapters; MAS10 would only contain adapters from A through L). Middle: Bulk RNA sequencing model, wherein single-cell adapters (3' TSO and 10x adapter) are not present. Right: SlideSeq model, where transcripts are found in reverse-complement orientation (hence a poly(T) submodel rather than a poly(A), and a spacer sequence found before spatial barcodes).
 
 ## Model transition and emission probabilities
 
@@ -79,7 +79,7 @@ To preserve some flexibility in annotation (which can be helpful when diagnosing
 The results of probabilistic segmentation and subsequent filtering are shown in Figure 5A and 5B, respectively.  After segmentation, nearly all reads exhibit the expected on-subdiagonal behavior.  The small amount of off-subdiagonal data is removed through the filtration step, and only transcripts from confident and design-consistent segmentations are propagated to downstream analysis.
 
 ![](figures/before_after_filter.png)
-#### Figure 5: MAS-seq adapter adjacency heatmaps from Longbow's HMM-based annotation. (A) Before filtration. (B) After filtration.
+### Figure 5: MAS-seq adapter adjacency heatmaps from Longbow's HMM-based annotation. (A) Before filtration. (B) After filtration.
 
 ## Results
 
@@ -88,7 +88,7 @@ We can now examine the results of applying Longbow to 15-element MAS-seq data fo
 Because our HMM is robust to sequencing error, we also process the ~3.9M reads that `ccs` does not correct (-1 < rq <= 0.99).  Here, substantially more reads fail Longbow's filtering (~55%).  However, 1.7M reads do segment properly and pass filtration, yielding another ~12.8M transcripts. These transcripts are not CCS-corrected, but still represent valid data that can be used for a variety of purposes (e.g. transcriptome annotation).
 
 ![](figures/sankey_and_ccs_passes.png)
-#### Figure 6: Overall yield and effect of MAS-seq multiplexing on CCS reads. (A) Sankey diagram of final processing status for reads from an exemplar 15-element MAS-seq library. (B) Circular pass count distribution for IsoSeq, MAS-seq, and whole-genome CCS sequencing data.
+### Figure 6: Overall yield and effect of MAS-seq multiplexing on CCS reads. (A) Sankey diagram of final processing status for reads from an exemplar 15-element MAS-seq library. (B) Circular pass count distribution for IsoSeq, MAS-seq, and whole-genome CCS sequencing data.
 
 ## Conclusions
 
