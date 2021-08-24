@@ -60,6 +60,8 @@ Default Longbow HMM transition probabilities (and descriptions to aid in their i
 | 1/\|M\| | probability of transitioning from 10x 3' global alignment submodel to MAS-seq adapter | 0.0625  |
 | τ       | probability of termination                                                            | 0.01    |
 
+Note that transitions between submodels are only permitted at termini. This constraint ensures that Longbow doesn't unwittingly transition away from one submodel (e.g. a 10x 5' adapter) to another (e.g. the "random, repeat" submodel) in the middle of the adapter sequence.
+
 The emission probability of a nucleotide emitted from an insertion or random state is e(x<sub>i</sub>) = 0.25. The match state nucleotide emission matrix e(x<sub>i</sub>,y<sub>j</sub>) (where x<sub>i</sub> is the nucleotide at site i in sequence x and y<sub>j</sub> is the nucleotide at site j in sequence y) is given by:
 
 ![e(x_i, x_j) =
