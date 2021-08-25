@@ -211,7 +211,7 @@ def _write_summary_stats_file(output_prefix,
     """Write summary statistics for the given input bam to a file."""
 
     logger.debug("Calculating ligation profiles...")
-    ligation_profile_data = _calculate_top_ligation_profiles(array_lengths,
+    ligation_profile_data = _calculate_top_ligation_profiles(len(array_lengths),
                                                              ligation_profile_count_dict,
                                                              num_ligation_profiles_to_show)
 
@@ -232,14 +232,29 @@ def _write_summary_stats_file(output_prefix,
             f.write(f"{hist_bins[i]:2d}:\t{h}\n")
 
         f.write("\n")
+        f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
+
+        f.write("\n")
         f.write(f"Top {len(ligation_profile_data)} Ligation Profiles:\n")
-        f.write(f"Profile\tLength\tCount\tPercent of Total Counts\n")
-        for p in ligation_profile_data:
-            ps = "\t".join([str(i) for i in p])
-            f.write(f"{ps}\n")
+
+        field_widths = []
+        columns = ["Profile", "Length", "Count", "Percent of Total Counts"]
+        for i in range(len(ligation_profile_data[0])):
+            field_widths.append(max([len(str(p[i])) for p in ligation_profile_data]))
+            if field_widths[-1] < len(columns[i]):
+                field_widths[-1] = len(columns[i])
+
+        for i, c in enumerate(columns):
+            f.write(f"{c:{field_widths[i]}s}\t")
+        f.write("\n")
+
+        for profile in ligation_profile_data:
+            for i, c in enumerate(profile):
+                f.write(f"{c:{field_widths[i]}}\t")
+            f.write(f"\n")
 
 
-def _calculate_top_ligation_profiles(array_lengths, ligation_profile_count_dict, num_ligation_profiles_to_show):
+def _calculate_top_ligation_profiles(num_reads, ligation_profile_count_dict, num_ligation_profiles_to_show):
 
     ligation_profiles, profile_counts = zip(*ligation_profile_count_dict.items())
     ligation_profiles = np.array(ligation_profiles)
@@ -267,11 +282,11 @@ def _calculate_top_ligation_profiles(array_lengths, ligation_profile_count_dict,
         if clean_ligation_count == 0:
             array_lengths.append(1)
         else:
-            array_lengths.append(clean_ligation_count)
+            array_lengths.append(clean_ligation_count + 1)
 
     # Display the data:
     data = [
-        [top_ligations[i], array_lengths[i], top_counts[i], f"{(top_counts[i] / len(array_lengths)) * 100:2.02f}%"]
+        [top_ligations[i], array_lengths[i], top_counts[i], f"{(top_counts[i] / num_reads) * 100:2.02f}%"]
         for i in range(len(top_counts) - 1, -1, -1)
     ]
     return data
