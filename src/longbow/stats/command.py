@@ -88,6 +88,9 @@ def main(output_prefix, model, input_bam):
         array_start_adapter_counts = {a: 0 for a in adapter_names}
         array_end_adapter_counts = {a: 0 for a in adapter_names}
         array_lengths = []
+        ligation_profile_count_dict = dict()
+
+        rc_decorator = "'"
 
         for read in bam_file:
             # Get our read segments:
@@ -119,7 +122,7 @@ def main(output_prefix, model, input_bam):
 
             # Adjust names for segmented direction:
             if read.get_tag(bam_utils.SEGMENTS_RC_TAG) == 1:
-                mas_seq_adapters = [a + "'" for a in mas_seq_adapters]
+                mas_seq_adapters = [a + rc_decorator for a in mas_seq_adapters]
 
             # Add our tally for our heatmap:
             if len(mas_seq_adapters) > 1:
@@ -128,6 +131,17 @@ def main(output_prefix, model, input_bam):
                     ligation_heat_matrix[index_map[cur_adapter]][index_map[next_adapter]] += 1
                     cur_adapter = next_adapter
 
+            # Track our ligation profile:
+            if len(mas_seq_adapters) == 0:
+                # Create a string that is descriptive for the non-marker bases:
+                ligation_profile_string = "EMPTY (" + " ".join([s.name + rc_decorator for s in adapter_names]) + ")"
+            else:
+                ligation_profile_string = " ".join(mas_seq_adapters)
+            try:
+                ligation_profile_count_dict[ligation_profile_string] += 1
+            except KeyError:
+                ligation_profile_count_dict[ligation_profile_string] = 1
+
             # Update progress:
             pbar.update(1)
 
@@ -135,8 +149,7 @@ def main(output_prefix, model, input_bam):
     array_lengths = np.array(array_lengths)
 
     # Write our stats out to the appropriate files:
-    logger.info("Writing summary stats file...")
-    _write_summary_stats_file(array_lengths, output_prefix)
+    _write_stats(array_lengths, ligation_profile_count_dict, model, output_prefix)
 
     logger.info("Writing complete ligation matrix...")
     create_ligation_heatmap(ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
@@ -147,16 +160,181 @@ def main(output_prefix, model, input_bam):
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def _write_summary_stats_file(array_lengths, output_prefix):
+def _write_stats(array_lengths, ligation_profile_count_dict, model, output_prefix):
+    """Write out all basic statistics for the data in the input file."""
+
+    # Calculate histogram of array lengths.  Bins are created around integer values.
+    hist_bins = np.arange(int(np.max(array_lengths))+2)
+    count_hist, _ = np.histogram(array_lengths, bins=hist_bins-.5)
+    hist_bins = hist_bins[:-1]
+
+    # Calculate summary stats:
+    array_length_min = np.min(array_lengths)
+    array_length_max = np.max(array_lengths)
+    array_length_mean = np.mean(array_lengths)
+    array_length_median = np.median(array_lengths)
+    array_length_std = np.std(array_lengths)
+
+    logger.info("Writing summary stats file...")
+    _write_summary_stats_file(output_prefix,
+                              array_lengths,
+                              array_length_min,
+                              array_length_max,
+                              array_length_mean,
+                              array_length_median,
+                              array_length_std,
+                              count_hist,
+                              hist_bins,
+                              ligation_profile_count_dict)
+
+    logger.info("Writing read stat histograms...")
+    _create_array_length_histogram(len(array_lengths),
+                                   count_hist,
+                                   hist_bins,
+                                   array_length_mean,
+                                   array_length_median,
+                                   model)
+
+
+def _write_summary_stats_file(output_prefix,
+                              array_lengths,
+                              array_length_min,
+                              array_length_max,
+                              array_length_mean,
+                              array_length_median,
+                              array_length_std,
+                              count_hist,
+                              hist_bins,
+                              ligation_profile_count_dict,
+                              num_ligation_profiles_to_show=20):
+
     """Write summary statistics for the given input bam to a file."""
 
-    num_zero_arrays = np.count_nonzero(array_lengths == 0)
-    num_singleton_arrays = np.count_nonzero(array_lengths == 1)
+    logger.debug("Calculating ligation profiles...")
+    ligation_profile_data = _calculate_top_ligation_profiles(array_lengths,
+                                                             ligation_profile_count_dict,
+                                                             num_ligation_profiles_to_show)
 
     with open(output_prefix + "_summary_stats.txt", 'w') as f:
-        f.write(f"num reads (arrays):\t{len(array_lengths)}\n")
-        f.write(f"num zero length arrays:\t{num_zero_arrays}\n")
-        f.write(f"num singleton length arrays:\t{num_singleton_arrays}\n")
+        f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
+        f.write("\n")
+
+        f.write(f"Array Length Stats:\n")
+        f.write(f"min:\t{array_length_min}\n")
+        f.write(f"max:\t{array_length_max}\n")
+        f.write(f"mean:\t{array_length_mean}\n")
+        f.write(f"median:\t{array_length_median}\n")
+        f.write(f"std:\t{array_length_std}\n")
+
+        f.write("\n")
+        f.write(f"Array Length Hist:\n")
+        for i, h in enumerate(count_hist):
+            f.write(f"{hist_bins[i]:2d}:\t{h}\n")
+
+        f.write("\n")
+        f.write(f"Top {len(ligation_profile_data)} Ligation Profiles:\n")
+        f.write(f"Profile\tLength\tCount\tPercent of Total Counts\n")
+        for p in ligation_profile_data:
+            ps = "\t".join([str(i) for i in p])
+            f.write(f"{ps}\n")
+
+
+def _calculate_top_ligation_profiles(array_lengths, ligation_profile_count_dict, num_ligation_profiles_to_show):
+
+    ligation_profiles, profile_counts = zip(*ligation_profile_count_dict.items())
+    ligation_profiles = np.array(ligation_profiles)
+    profile_counts = np.array(profile_counts)
+
+    # Show the top molecular arrangements:
+    if num_ligation_profiles_to_show > len(profile_counts):
+        num_ligation_profiles_to_show = len(profile_counts)
+    indices = np.argpartition(profile_counts, -num_ligation_profiles_to_show)[-num_ligation_profiles_to_show:]
+
+    # Sort the indices:
+    top_counts = profile_counts[indices]
+    top_ligations = ligation_profiles[indices]
+    idx = np.argsort(top_counts)
+    top_counts = top_counts[idx]
+    top_ligations = top_ligations[idx]
+
+    array_lengths = []
+    for ligation in top_ligations:
+        if ligation.startswith("EMPTY"):
+            array_lengths.append(0)
+            continue
+
+        clean_ligation_count = ligation.strip().count(" ")
+        if clean_ligation_count == 0:
+            array_lengths.append(1)
+        else:
+            array_lengths.append(clean_ligation_count)
+
+    # Display the data:
+    data = [
+        [top_ligations[i], array_lengths[i], top_counts[i], f"{(top_counts[i] / len(array_lengths)) * 100:2.02f}%"]
+        for i in range(len(top_counts) - 1, -1, -1)
+    ]
+    return data
+
+
+def _create_array_length_histogram(num_reads,
+                                   count_hist,
+                                   hist_bins,
+                                   array_length_mean,
+                                   array_length_median,
+                                   model_name):
+    """Create a histogram displaying the length distribution of all arrays."""
+
+    handles = []
+    fig = plt.figure(figsize=plot_utils.gFIG_SIZE_in)
+    ax = fig.add_subplot()
+
+    # Plot the bar graph:
+    h = ax.bar(hist_bins, count_hist, label="Array Lengths")
+    handles.append(h)
+
+    # Plot the mean line:
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    yrange = ymax - ymin
+
+    h, = ax.plot(
+        [array_length_mean, array_length_mean],
+        [ymin - (yrange * .1), ymax + (yrange * .2)],
+        "--",
+        color=[.4] * 3,
+        label=f"Mean Array Length = {array_length_mean:.02f}"
+    )
+    handles.append(h)
+
+    h, = ax.plot(
+        [array_length_median, array_length_median],
+        [ymin - (yrange * .1), ymax + (yrange * .2)],
+        "--",
+        color=[0] * 3,
+        label=f"Median Array Length = {array_length_median}"
+    )
+    handles.append(h)
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax + (yrange * .1))
+
+    # Add the labels for the bars:
+    yoff = (ymax - ymin) * .025
+    for c, l in zip(count_hist, hist_bins):
+        h = ax.text(l, c + yoff, f"{c}\n{c / num_reads * 100:.02f}%", horizontalalignment='center')
+
+    t = f"MAS-seq Array Length Counts\n({model_name})"
+    ax.set_title(t)
+    ax.set_xlabel("Array Length")
+    ax.set_ylabel("Number of Reads")
+
+    ax.set_xticks([x for x in range(int(max(hist_bins)))])
+
+    fig.legend(handles=handles, loc="upper right")
+    plot_utils.fix_plot_visuals(fig)
+
+    plot_utils.save_figure(fig, name=t)
 
 
 def create_ligation_heatmap(heat_matrix, index_map, title):
