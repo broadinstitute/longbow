@@ -217,6 +217,8 @@ def _write_summary_stats_file(output_prefix,
 
     with open(output_prefix + "_summary_stats.txt", 'w') as f:
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
+        f.write(f"Total Num Array Elements (Segmented Arrays):\tTBD\n")
+        f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
         f.write("\n")
 
         f.write(f"Array Length Stats:\n")
@@ -230,9 +232,6 @@ def _write_summary_stats_file(output_prefix,
         f.write(f"Array Length Hist:\n")
         for i, h in enumerate(count_hist):
             f.write(f"{hist_bins[i]:2d}:\t{h}\n")
-
-        f.write("\n")
-        f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
 
         f.write("\n")
         f.write(f"Top {len(ligation_profile_data)} Ligation Profiles:\n")
