@@ -82,7 +82,7 @@ def save_figure(fig=None, name=None, prefix=None, suffix=None, fig_dir=None):
         name = [ax.get_title() for ax in fig.axes if ax.get_title() and len(ax.get_title()) > 0][0]
 
     # Sanitize our name for writing to disk:
-    name = name.replace(" ", "_").replace("\n", "_").replace("\t", "_").replace("=", "-").replace("(", "-").replace(")", "-")
+    name = name.replace(" ", "_").replace("\n", "_").replace("\t", "_").replace("=", "-").replace("(", "").replace(")", "")
 
     # Add prefix and suffix to the name if we have them defined:
     if prefix:
