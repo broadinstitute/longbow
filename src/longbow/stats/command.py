@@ -1,5 +1,6 @@
 import logging
 import sys
+import os
 
 import time
 
@@ -35,6 +36,13 @@ click_log.basic_config(logger)
     help="prefix to give to output files",
 )
 @click.option(
+    "-p",
+    "--pbi",
+    required=False,
+    type=click.Path(),
+    help="BAM .pbi index file",
+)
+@click.option(
     "-m",
     "--model",
     default="mas15",
@@ -45,12 +53,18 @@ click_log.basic_config(logger)
          "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(output_prefix, model, input_bam):
+def main(pbi, output_prefix, model, input_bam):
     """Calculate and produce stats on the given input bam file."""
 
     t_start = time.time()
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
+
+    pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
+    read_count = None
+    if os.path.exists(pbi):
+        read_count = bam_utils.load_read_count(pbi)
+        logger.info("Annotating %d reads", read_count)
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
@@ -59,6 +73,7 @@ def main(output_prefix, model, input_bam):
         desc="Progress",
         unit=" read",
         colour="green",
+        total=read_count,
         file=sys.stderr,
         leave=False,
         disable=not sys.stdin.isatty(),
