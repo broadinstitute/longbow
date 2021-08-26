@@ -90,7 +90,7 @@ def save_figure(fig=None, name=None, prefix=None, suffix=None, fig_dir=None):
     if suffix:
         name = f"{name}_{suffix}"
     if not prefix:
-        name = f"{gFIG_NUM:02d}_{name}}"
+        name = f"{gFIG_NUM:02d}_{name}"
     gFIG_NUM += 1
 
     # Save the figure:
