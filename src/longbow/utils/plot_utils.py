@@ -82,18 +82,20 @@ def save_figure(fig=None, name=None, prefix=None, suffix=None, fig_dir=None):
         name = [ax.get_title() for ax in fig.axes if ax.get_title() and len(ax.get_title()) > 0][0]
 
     # Sanitize our name for writing to disk:
-    name = name.replace(" ", "_").replace("\n", "_").replace("\t", "_").replace("=", "-")
+    name = name.replace(" ", "_").replace("\n", "_").replace("\t", "_").replace("=", "-").replace("(", "-").replace(")", "-")
 
     # Add prefix and suffix to the name if we have them defined:
     if prefix:
-        name = f"{prefix}_{name}"
+        name = f"{prefix}_{gFIG_NUM:02d}_{name}"
     if suffix:
         name = f"{name}_{suffix}"
+    if not prefix:
+        name = f"{gFIG_NUM:02d}_{name}}"
+    gFIG_NUM += 1
 
     # Save the figure:
-    plt.savefig(f"{fig_dir}{gFIG_NUM:02d}_{name}.svg")
-    plt.savefig(f"{fig_dir}{gFIG_NUM:02d}_{name}.png")
-    gFIG_NUM += 1
+    plt.savefig(f"{fig_dir}{name}.svg")
+    plt.savefig(f"{fig_dir}{name}.png")
 
 
 def signif(x, p=4):

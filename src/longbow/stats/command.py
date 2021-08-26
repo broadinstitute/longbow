@@ -176,10 +176,10 @@ def main(pbi, output_prefix, model, input_bam):
     _write_stats(array_lengths, ligation_profile_count_dict, model, output_prefix)
 
     logger.info("Writing complete ligation matrix...")
-    create_ligation_heatmap(ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
+    create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
 
     logger.info("Writing reduced ligation matrix...")
-    create_ligation_heatmap_reduced(ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
+    create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
@@ -375,7 +375,7 @@ def _create_array_length_histogram(num_reads,
     plot_utils.save_figure(fig, name=t)
 
 
-def create_ligation_heatmap(heat_matrix, index_map, title):
+def create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
     """Plot the given heatmap which represents the ligations between different MAS-seq adapters.
     The resulting plot will represent the forward and reverse complemented ligations separately."""
 
@@ -409,14 +409,14 @@ def create_ligation_heatmap(heat_matrix, index_map, title):
     ax.xaxis.tick_top()
     plt.setp(ax.get_xticklabels(), rotation=45)
 
-    ax.set_title(title, pad=20)
+    ax.set_title(f"{output_prefix} {title}", pad=20)
     ax.set_xlabel("Adapter 1")
     ax.set_ylabel("Adapter 2")
 
     plot_utils.fix_plot_visuals(fig)
 
     # Save the figure without numbers first.
-    plot_utils.save_figure(fig, name=title, suffix="no_numbers")
+    plot_utils.save_figure(fig, name=title, prefix=output_prefix, suffix="no_numbers")
 
     # Get the color matrix so we can use it to display the counts
     # in an appropriately readable color:
@@ -437,11 +437,11 @@ def create_ligation_heatmap(heat_matrix, index_map, title):
     plot_utils.fix_plot_visuals(fig)
 
     # Save the figure with numbers as well:
-    plot_utils.save_figure(fig, name=title)
+    plot_utils.save_figure(fig, name=title, prefix=output_prefix)
 
 
 # Plot the heatmap we created above:
-def create_ligation_heatmap_reduced(heat_matrix, index_map, title, count_divisor=None, significant_digits=3):
+def create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, title, count_divisor=None, significant_digits=3):
     """Plot the given heatmap which represents the ligations between different MAS-seq adapters.
     The resulting plot will represent both the forward and reverse complemented ligations together
     in the same size-reduced heatmap and does not distinguish between read directions."""
@@ -503,16 +503,17 @@ def create_ligation_heatmap_reduced(heat_matrix, index_map, title, count_divisor
     plt.setp(ax.get_xticklabels(), rotation=45)
 
     if count_divisor:
-        ax.set_title(title + f" (count x {count_divisor})", pad=20)
+        ax.set_title(f"{output_prefix} {title} (count x {count_divisor})", pad=20)
     else:
-        ax.set_title(title, pad=20)
+        ax.set_title(f"{output_prefix} {title}", pad=20)
+
     ax.set_xlabel("Adapter 1")
     ax.set_ylabel("Adapter 2")
 
     plot_utils.fix_plot_visuals(fig)
 
     # Save the figure without numbers first.
-    plot_utils.save_figure(fig, name=title + "_reduced", suffix="no_numbers")
+    plot_utils.save_figure(fig, name=title, prefix=output_prefix, suffix="reduced_no_numbers")
 
     # Get the color matrix so we can use it to display the counts
     # in an appropriately readable color:
@@ -533,4 +534,4 @@ def create_ligation_heatmap_reduced(heat_matrix, index_map, title, count_divisor
     plot_utils.fix_plot_visuals(fig)
 
     # Save the figure with numbers as well:
-    plot_utils.save_figure(fig, name=title + "_reduced")
+    plot_utils.save_figure(fig, name=title, prefix=output_prefix, suffix="reduced")
