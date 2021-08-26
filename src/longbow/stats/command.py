@@ -105,6 +105,7 @@ def main(output_prefix, model, input_bam):
             mas_seq_adapters = [s.name for s in segments if s.name in adapter_name_set]
             if segments[0].name not in adapter_name_set and \
                     segments[0].name == "10x_Adapter" and \
+                    len(mas_seq_adapters) > 1 and \
                     mas_seq_adapters[0] == m.array_element_structure[1][0]:
                 mas_seq_adapters.insert(0, m.array_element_structure[0][0])
 
