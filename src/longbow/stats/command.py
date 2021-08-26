@@ -176,10 +176,10 @@ def main(pbi, output_prefix, model, input_bam):
     _write_stats(array_lengths, ligation_profile_count_dict, model, output_prefix)
 
     logger.info("Writing complete ligation matrix...")
-    create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
+    _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
 
     logger.info("Writing reduced ligation matrix...")
-    create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
+    _create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
@@ -377,7 +377,7 @@ def _create_array_length_histogram(output_prefix,
     plot_utils.save_figure(fig, name=t, prefix=output_prefix)
 
 
-def create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
+def _create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
     """Plot the given heatmap which represents the ligations between different MAS-seq adapters.
     The resulting plot will represent the forward and reverse complemented ligations separately."""
 
@@ -443,7 +443,7 @@ def create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
 
 
 # Plot the heatmap we created above:
-def create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, title, count_divisor=None, significant_digits=3):
+def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, title, count_divisor=None, significant_digits=3):
     """Plot the given heatmap which represents the ligations between different MAS-seq adapters.
     The resulting plot will represent both the forward and reverse complemented ligations together
     in the same size-reduced heatmap and does not distinguish between read directions."""
