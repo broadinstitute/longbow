@@ -136,7 +136,7 @@ def main(output_prefix, model, input_bam):
             # Track our ligation profile:
             if array_len == 0:
                 # Create a string that is descriptive for the non-marker bases:
-                ligation_profile_string = "EMPTY (" + " ".join([s.name + rc_decorator for s in adapter_names]) + ")"
+                ligation_profile_string = "EMPTY (" + " ".join([s.name + rc_decorator for s in segments]) + ")"
             else:
                 ligation_profile_string = " ".join(mas_seq_adapters)
             try:
