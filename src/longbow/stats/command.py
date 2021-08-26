@@ -212,7 +212,8 @@ def _write_stats(array_lengths, ligation_profile_count_dict, model, output_prefi
                               ligation_profile_count_dict)
 
     logger.info("Writing read stat histograms...")
-    _create_array_length_histogram(len(array_lengths),
+    _create_array_length_histogram(output_prefix,
+                                   len(array_lengths),
                                    count_hist,
                                    hist_bins,
                                    array_length_mean,
@@ -315,7 +316,8 @@ def _calculate_top_ligation_profiles(num_reads, ligation_profile_count_dict, num
     return data
 
 
-def _create_array_length_histogram(num_reads,
+def _create_array_length_histogram(output_prefix,
+                                   num_reads,
                                    count_hist,
                                    hist_bins,
                                    array_length_mean,
@@ -372,7 +374,7 @@ def _create_array_length_histogram(num_reads,
     fig.legend(handles=handles, loc="upper right")
     plot_utils.fix_plot_visuals(fig)
 
-    plot_utils.save_figure(fig, name=t)
+    plot_utils.save_figure(fig, name=t, prefix=output_prefix)
 
 
 def create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
