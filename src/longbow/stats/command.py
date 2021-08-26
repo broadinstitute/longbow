@@ -365,7 +365,7 @@ def _create_array_length_histogram(output_prefix,
         h = ax.text(l, c + yoff, f"{c}\n{c / num_reads * 100:.02f}%", horizontalalignment='center')
 
     t = f"MAS-seq Array Length Counts\n({model_name})"
-    ax.set_title(t)
+    ax.set_title(f"{output_prefix} {t}")
     ax.set_xlabel("Array Length")
     ax.set_ylabel("Number of Reads")
 
