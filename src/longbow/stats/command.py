@@ -60,11 +60,25 @@ def main(pbi, output_prefix, model, input_bam):
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
+    # Try to read in a pac bio index file so we can have a good progress bar:
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
         logger.info("Annotating %d reads", read_count)
+
+    # Get our model:
+    if LibraryModel.has_prebuilt_model(model):
+        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
+        m = LibraryModel.build_pre_configured_model(model)
+    else:
+        logger.info(f"Loading model from json file: %s", model)
+        m = LibraryModel.from_json_file(model)
+
+    # Flush the loggers before the pbar is created.
+    # NOTE: this is considered bad form (to access the logger handlers directly)
+    for h in logger.handlers:
+        h.flush()
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
@@ -78,13 +92,6 @@ def main(pbi, output_prefix, model, input_bam):
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
-        # Get our model:
-        if LibraryModel.has_prebuilt_model(model):
-            logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
-            m = LibraryModel.build_pre_configured_model(model)
-        else:
-            logger.info(f"Loading model from json file: %s", model)
-            m = LibraryModel.from_json_file(model)
 
         # Create storage point for heatmap data:
         adapter_names = [array_element_adapters[0] for array_element_adapters in m.array_element_structure]
