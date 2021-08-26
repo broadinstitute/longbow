@@ -115,8 +115,9 @@ def main(output_prefix, model, input_bam):
                 array_len -= 1
 
             # Increment our start and end adapter counts:
-            array_start_adapter_counts[mas_seq_adapters[0]] += 1
-            array_end_adapter_counts[mas_seq_adapters[-1]] += 1
+            if array_len > 0:
+                array_start_adapter_counts[mas_seq_adapters[0]] += 1
+                array_end_adapter_counts[mas_seq_adapters[-1]] += 1
 
             # Add our length to our list of lengths:
             array_lengths.append(array_len)
@@ -126,14 +127,14 @@ def main(output_prefix, model, input_bam):
                 mas_seq_adapters = [a + rc_decorator for a in mas_seq_adapters]
 
             # Add our tally for our heatmap:
-            if len(mas_seq_adapters) > 1:
+            if array_len > 1:
                 cur_adapter = mas_seq_adapters[0]
                 for next_adapter in mas_seq_adapters[1:]:
                     ligation_heat_matrix[index_map[cur_adapter]][index_map[next_adapter]] += 1
                     cur_adapter = next_adapter
 
             # Track our ligation profile:
-            if len(mas_seq_adapters) == 0:
+            if array_len == 0:
                 # Create a string that is descriptive for the non-marker bases:
                 ligation_profile_string = "EMPTY (" + " ".join([s.name + rc_decorator for s in adapter_names]) + ")"
             else:
