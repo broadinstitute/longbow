@@ -17,7 +17,8 @@ from ..utils import bam_utils
 from ..utils import plot_utils
 from ..utils.model import LibraryModel
 
-from ..annotate.command import SegmentInfo
+from ..segment import command as segment
+
 from ..annotate.command import get_segments
 
 
@@ -52,8 +53,17 @@ click_log.basic_config(logger)
          "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
          "of a LibraryModel as per LibraryModel.to_json()."
 )
+@click.option(
+    "-s",
+    "--do-simple-splitting",
+    required=False,
+    is_flag=True,
+    default=False,
+    help="Do splitting of reads based on splitter delimiters, rather than whole array structure. "
+    "This splitting will cause delimiter sequences to be repeated in each read they bound.",
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, output_prefix, model, input_bam):
+def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     """Calculate and produce stats on the given input bam file."""
 
     t_start = time.time()
@@ -70,15 +80,25 @@ def main(pbi, output_prefix, model, input_bam):
     # Get our model:
     if LibraryModel.has_prebuilt_model(model):
         logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
-        m = LibraryModel.build_pre_configured_model(model)
+        model = LibraryModel.build_pre_configured_model(model)
     else:
         logger.info(f"Loading model from json file: %s", model)
-        m = LibraryModel.from_json_file(model)
+        model = LibraryModel.from_json_file(model)
+
+    if do_simple_splitting:
+        logger.info("Splitting algorithm: Simple Splitting")
+    else:
+        logger.info("Splitting algorithm: Bounded Region")
+
+    # Prepare our delimiters for segmentation below:
+    delimiters = segment.create_simple_delimiters(model)
 
     # Flush the loggers before the pbar is created.
     # NOTE: this is considered bad form (to access the logger handlers directly)
     for h in logger.handlers:
         h.flush()
+
+    print(delimiters)
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
@@ -93,22 +113,23 @@ def main(pbi, output_prefix, model, input_bam):
         disable=not sys.stdin.isatty(),
     ) as pbar:
 
-        # Create storage point for heatmap data:
-        adapter_names = [array_element_adapters[0] for array_element_adapters in m.array_element_structure]
+        # Get our adapter names:
+        mas_adapter_names = [array_element_adapters[0] for array_element_adapters in model.array_element_structure]
         # Manually add in the last adapter which is the array end marker:
-        adapter_names.append(m.array_element_structure[-1][-1])
-        adapter_name_set = set(adapter_names)
+        mas_adapter_names.append(model.array_element_structure[-1][-1])
+        mas_adapter_name_set = set(mas_adapter_names)
 
-        ligation_heat_matrix = np.zeros(((len(adapter_names)-1) * 2, (len(adapter_names)-1) * 2), dtype=int)
+        # Create storage point for heatmap data:
+        ligation_heat_matrix = np.zeros((len(mas_adapter_names) * 2, len(mas_adapter_names) * 2), dtype=int)
         index_map = dict()
-        for i, name in enumerate(adapter_names[:-1]):
+        for i, name in enumerate(mas_adapter_names):
             index_map[name] = i
-        for i, name in enumerate(adapter_names[:-1]):
-            index_map[name + "'"] = i + len(adapter_names)-1
+        for i, name in enumerate(mas_adapter_names):
+            index_map[name + "'"] = i + len(mas_adapter_names)
 
         # Keep track of how many arrays start and end with each element:
-        array_start_adapter_counts = {a: 0 for a in adapter_names}
-        array_end_adapter_counts = {a: 0 for a in adapter_names}
+        array_start_adapter_counts = {a: 0 for a in mas_adapter_names}
+        array_end_adapter_counts = {a: 0 for a in mas_adapter_names}
         array_lengths = []
         ligation_profile_count_dict = dict()
 
@@ -124,34 +145,39 @@ def main(pbi, output_prefix, model, input_bam):
                 sys.exit(1)
 
             # Get the list of MAS-seq adapters in the segments and adjust for missing first adapters:
-            mas_seq_adapters = [s.name for s in segments if s.name in adapter_name_set]
-            if segments[0].name not in adapter_name_set and \
+            read_mas_seq_adapters = [s.name for s in segments if s.name in mas_adapter_name_set]
+            if segments[0].name not in mas_adapter_name_set and \
                     segments[0].name == "10x_Adapter" and \
-                    len(mas_seq_adapters) > 1 and \
-                    mas_seq_adapters[0] == m.array_element_structure[1][0]:
-                mas_seq_adapters.insert(0, m.array_element_structure[0][0])
+                    len(read_mas_seq_adapters) > 1 and \
+                    read_mas_seq_adapters[0] == model.array_element_structure[1][0]:
+                read_mas_seq_adapters.insert(0, model.array_element_structure[0][0])
+            # TODO: Change the "10x_Adapter" above to be dependent on the model itself.
 
-            # Get our array length, adjusting for a final trailing mas seq adapter:
-            array_len = len(mas_seq_adapters)
-            if segments[-1].name == m.array_element_structure[-1][-1]:
-                array_len -= 1
+            # Segment the array into segments using our actual segmentation algorithm so we have accurate counts:
+            if do_simple_splitting:
+                segment_tuples = segment.segment_read_with_simple_splitting(read, delimiters, segments)
+                array_len = len(segment_tuples)
+                print(f"{read.query_name}\t{array_len}", end="")
+            else:
+                found_tuple, _ = segment.segment_read_with_bounded_region_algorithm(read, model, segments)
+                array_len = sum(found_tuple)
 
             # Increment our start and end adapter counts:
             if array_len > 0:
-                array_start_adapter_counts[mas_seq_adapters[0]] += 1
-                array_end_adapter_counts[mas_seq_adapters[-1]] += 1
+                array_start_adapter_counts[read_mas_seq_adapters[0]] += 1
+                array_end_adapter_counts[read_mas_seq_adapters[-1]] += 1
 
             # Add our length to our list of lengths:
             array_lengths.append(array_len)
 
             # Adjust names for segmented direction:
             if read.get_tag(bam_utils.SEGMENTS_RC_TAG) == 1:
-                mas_seq_adapters = [a + rc_decorator for a in mas_seq_adapters]
+                read_mas_seq_adapters = [a + rc_decorator for a in read_mas_seq_adapters]
 
             # Add our tally for our heatmap:
             if array_len > 1:
-                cur_adapter = mas_seq_adapters[0]
-                for next_adapter in mas_seq_adapters[1:]:
+                cur_adapter = read_mas_seq_adapters[0]
+                for next_adapter in read_mas_seq_adapters[1:]:
                     ligation_heat_matrix[index_map[cur_adapter]][index_map[next_adapter]] += 1
                     cur_adapter = next_adapter
 
@@ -160,11 +186,14 @@ def main(pbi, output_prefix, model, input_bam):
                 # Create a string that is descriptive for the non-marker bases:
                 ligation_profile_string = "EMPTY (" + " ".join([s.name + rc_decorator for s in segments]) + ")"
             else:
-                ligation_profile_string = " ".join(mas_seq_adapters)
+                ligation_profile_string = " ".join(read_mas_seq_adapters)
             try:
                 ligation_profile_count_dict[ligation_profile_string] += 1
             except KeyError:
                 ligation_profile_count_dict[ligation_profile_string] = 1
+
+            print(f"\t{ligation_profile_string}")
+            print(f"\t{segment_tuples}")
 
             # Update progress:
             pbar.update(1)
@@ -173,18 +202,18 @@ def main(pbi, output_prefix, model, input_bam):
     array_lengths = np.array(array_lengths)
 
     # Write our stats out to the appropriate files:
-    _write_stats(array_lengths, ligation_profile_count_dict, model, output_prefix)
+    _write_stats(array_lengths, ligation_profile_count_dict, model.name, output_prefix)
 
     logger.info("Writing complete ligation matrix...")
-    _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
+    _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model.name})")
 
     logger.info("Writing reduced ligation matrix...")
-    _create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model})")
+    _create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model.name})")
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def _write_stats(array_lengths, ligation_profile_count_dict, model, output_prefix):
+def _write_stats(array_lengths, ligation_profile_count_dict, model_name, output_prefix):
     """Write out all basic statistics for the data in the input file."""
 
     # Calculate histogram of array lengths.  Bins are created around integer values.
@@ -218,7 +247,7 @@ def _write_stats(array_lengths, ligation_profile_count_dict, model, output_prefi
                                    hist_bins,
                                    array_length_mean,
                                    array_length_median,
-                                   model)
+                                   model_name)
 
 
 def _write_summary_stats_file(output_prefix,
@@ -262,7 +291,7 @@ def _write_summary_stats_file(output_prefix,
         f.write(f"Top {len(ligation_profile_data)} Ligation Profiles:\n")
 
         field_widths = []
-        columns = ["Profile", "Length", "Count", "Percent of Total Counts"]
+        columns = ["Profile", "Count", "Percent of All Ligations"]
         for i in range(len(ligation_profile_data[0])):
             field_widths.append(max([len(str(p[i])) for p in ligation_profile_data]))
             if field_widths[-1] < len(columns[i]):
@@ -296,21 +325,9 @@ def _calculate_top_ligation_profiles(num_reads, ligation_profile_count_dict, num
     top_counts = top_counts[idx]
     top_ligations = top_ligations[idx]
 
-    array_lengths = []
-    for ligation in top_ligations:
-        if ligation.startswith("EMPTY"):
-            array_lengths.append(0)
-            continue
-
-        clean_ligation_count = ligation.strip().count(" ")
-        if clean_ligation_count == 0:
-            array_lengths.append(1)
-        else:
-            array_lengths.append(clean_ligation_count + 1)
-
-    # Display the data:
+    # Package up the data:
     data = [
-        [top_ligations[i], array_lengths[i], top_counts[i], f"{(top_counts[i] / num_reads) * 100:2.02f}%"]
+        [top_ligations[i], top_counts[i], f"{(top_counts[i] / num_reads) * 100:2.02f}%"]
         for i in range(len(top_counts) - 1, -1, -1)
     ]
     return data
