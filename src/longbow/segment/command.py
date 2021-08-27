@@ -149,6 +149,9 @@ def main(threads, output_bam, do_simple_splitting, model, input_bam):
     logger.info(
         f"Segmented {res['num_reads_segmented']} reads with {res['num_segments']} total segments."
     )
+    num_reads = res['num_reads_segmented']
+    num_segmented = res['num_segments']
+    logger.info(f"MAS-seq gain factor: {num_segmented/num_reads:.02f}x")
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
