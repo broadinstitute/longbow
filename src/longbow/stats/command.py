@@ -98,7 +98,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     for h in logger.handlers:
         h.flush()
 
-    print(delimiters)
+    logger.debug(f"Splitting delimiters: %s", str(delimiters))
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
@@ -157,7 +157,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             if do_simple_splitting:
                 segment_tuples = segment.segment_read_with_simple_splitting(read, delimiters, segments)
                 array_len = len(segment_tuples)
-                print(f"{read.query_name}\t{array_len}", end="")
+                logger.debug(f"Split for {read.query_name}: {array_len} segments:")
             else:
                 found_tuple, _ = segment.segment_read_with_bounded_region_algorithm(read, model, segments)
                 array_len = sum(found_tuple)
@@ -192,8 +192,8 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             except KeyError:
                 ligation_profile_count_dict[ligation_profile_string] = 1
 
-            print(f"\t{ligation_profile_string}")
-            print(f"\t{segment_tuples}")
+            logger.debug(f"\tProfile: {ligation_profile_string}")
+            logger.debug(f"\tSegments: {segment_tuples}")
 
             # Update progress:
             pbar.update(1)
