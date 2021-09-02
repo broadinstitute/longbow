@@ -163,7 +163,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
                 array_len = sum(found_tuple)
 
             # Increment our start and end adapter counts:
-            if array_len > 0:
+            if len(read_mas_seq_adapters) > 0:
                 array_start_adapter_counts[read_mas_seq_adapters[0]] += 1
                 array_end_adapter_counts[read_mas_seq_adapters[-1]] += 1
 
@@ -175,18 +175,19 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
                 read_mas_seq_adapters = [a + rc_decorator for a in read_mas_seq_adapters]
 
             # Add our tally for our heatmap:
-            if array_len > 1:
+            if len(read_mas_seq_adapters) > 1:
                 cur_adapter = read_mas_seq_adapters[0]
                 for next_adapter in read_mas_seq_adapters[1:]:
                     ligation_heat_matrix[index_map[cur_adapter]][index_map[next_adapter]] += 1
                     cur_adapter = next_adapter
 
             # Track our ligation profile:
-            if array_len == 0:
+            if len(read_mas_seq_adapters) == 0:
                 # Create a string that is descriptive for the non-marker bases:
                 ligation_profile_string = "EMPTY (" + " ".join([s.name + rc_decorator for s in segments]) + ")"
             else:
                 ligation_profile_string = " ".join(read_mas_seq_adapters)
+                
             try:
                 ligation_profile_count_dict[ligation_profile_string] += 1
             except KeyError:
