@@ -147,11 +147,12 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             # Get the list of MAS-seq adapters in the segments and adjust for missing first adapters:
             read_mas_seq_adapters = [s.name for s in segments if s.name in mas_adapter_name_set]
             if segments[0].name not in mas_adapter_name_set and \
-                    segments[0].name == "10x_Adapter" and \
+                    segments[0].name == model.array_element_structure[0][1] and \
                     len(read_mas_seq_adapters) > 1 and \
                     read_mas_seq_adapters[0] == model.array_element_structure[1][0]:
                 read_mas_seq_adapters.insert(0, model.array_element_structure[0][0])
-            # TODO: Change the "10x_Adapter" above to be dependent on the model itself.
+            # NOTE: here model.array_element_structure[0][1] corresponds to the "10x_Adapter"
+            #       that we use as our second segment in each array element.
 
             # Segment the array into segments using our actual segmentation algorithm so we have accurate counts:
             if do_simple_splitting:
@@ -161,6 +162,12 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             else:
                 found_tuple, _ = segment.segment_read_with_bounded_region_algorithm(read, model, segments)
                 array_len = sum(found_tuple)
+
+            # Here we need to adjust for our segmentation array count.
+            # without this step, we will allow array elements consisting of only `random` sections
+            # to count as length 1 arrays:
+            if len(read_mas_seq_adapters) == 0:
+                array_len = 0
 
             # Increment our start and end adapter counts:
             if len(read_mas_seq_adapters) > 0:
@@ -182,7 +189,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
                     cur_adapter = next_adapter
 
             # Track our ligation profile:
-            if len(read_mas_seq_adapters) == 0:
+            if array_len == 0:
                 # Create a string that is descriptive for the non-marker bases:
                 ligation_profile_string = "EMPTY (" + " ".join([s.name + rc_decorator for s in segments]) + ")"
             else:
@@ -261,7 +268,7 @@ def _write_summary_stats_file(output_prefix,
                               count_hist,
                               hist_bins,
                               ligation_profile_count_dict,
-                              num_ligation_profiles_to_show=20):
+                              num_ligation_profiles_to_show=40):
 
     """Write summary statistics for the given input bam to a file."""
 
@@ -387,7 +394,7 @@ def _create_array_length_histogram(output_prefix,
     ax.set_xlabel("Array Length")
     ax.set_ylabel("Number of Reads")
 
-    ax.set_xticks([x for x in range(int(max(hist_bins)))])
+    ax.set_xticks([x for x in range(1+int(max(hist_bins)))])
 
     fig.legend(handles=handles, loc="upper right")
     plot_utils.fix_plot_visuals(fig)
