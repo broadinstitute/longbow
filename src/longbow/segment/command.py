@@ -149,6 +149,9 @@ def main(threads, output_bam, do_simple_splitting, model, input_bam):
     logger.info(
         f"Segmented {res['num_reads_segmented']} reads with {res['num_segments']} total segments."
     )
+    num_reads = res['num_reads_segmented']
+    num_segmented = res['num_segments']
+    logger.info(f"MAS-seq gain factor: {num_segmented/num_reads:.02f}x")
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
@@ -195,7 +198,7 @@ def _sub_process_write_fn(
         model = LibraryModel.from_json_file(model_name_or_file)
 
     # Create our delimiter sequences for simple splitting if we have to:
-    delimiters = _create_simple_delimiters(model) if do_simple_splitting else None
+    delimiters = create_simple_delimiters(model) if do_simple_splitting else None
 
     if do_simple_splitting:
         logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
@@ -238,7 +241,7 @@ def _sub_process_write_fn(
             pbar.update(1)
 
 
-def _create_simple_delimiters(model, num_seqs_from_each_array_element=1):
+def create_simple_delimiters(model, num_seqs_from_each_array_element=1):
     """Create delimiters for simple splitting.
 
     :param model: Model to use for array structure.
@@ -265,6 +268,202 @@ def _create_simple_delimiters(model, num_seqs_from_each_array_element=1):
     return delimiters
 
 
+def segment_read_with_simple_splitting(read, delimiters, segments=None):
+    """Segments the given read using the simple splitting algorithm.
+
+    NOTE: Assumes that all given data are in the forward direction.
+
+    :param read: A pysam.AlignedSegment object containing a read that has been segmented.
+    :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
+    :param segments: None or A list of SegmentInfo objects representing the segments of the given reads.
+                     If None, will be populated by getting segments from the given read.
+    :return: a list of tuples containing the split segments in the given read
+    """
+
+    if not segments:
+        segments = get_segments(read)
+
+    # Now we have our delimiter list.
+    # We need to go through our segments and split them up.
+    # Note: we assume each delimiter can occur only once.
+    delimiter_match_matrix = [0 for _ in delimiters]
+    delimiter_start_segments = [None for _ in delimiters]
+
+    # We have to store the end segments as tuples in case we want to use more than one
+    # segment as a delimiter:
+    delimiter_end_segment_tuples = [None for _ in delimiters]
+
+    # We do it this way so we iterate over the segments once and the delimiters many times
+    # under the assumption the segment list is much longer than the delimiters.
+    for seg in segments:
+        # at each position go through our delimiters and track whether we're a match:
+        for i, dmi in enumerate(delimiter_match_matrix):
+            try:
+                if seg.name == delimiters[i][dmi]:
+                    if delimiter_match_matrix[i] == 0:
+                        delimiter_start_segments[i] = seg
+                    delimiter_match_matrix[i] += 1
+                    if delimiter_match_matrix[i] == len(delimiters[i]):
+                        # We've got a full and complete match!
+                        # We store the end segment we found.
+                        delimiter_end_segment_tuples[i] = (
+                            delimiter_start_segments[i],
+                            seg,
+                        )
+                else:
+                    # No match at the position we expected!
+                    # We need to reset our count and start segment:
+                    delimiter_match_matrix[i] = 0
+                    delimiter_start_segments[i] = None
+                    delimiter_end_segment_tuples[i] = None
+            except IndexError:
+                # We're out of range of the delimiter.
+                # This means we've hit the end and actually have a match, so we can ignore this error.
+                pass
+
+    # OK, we've got a handle on our delimiters, so now we just need to split the sequence.
+    # We do so by looking at which end delimiters are filled in, and grabbing their complementary start delimiter:
+
+    # Sort and filter our delimiters:
+    seg_delimiters = [
+        (delim_index, start, end_tuple)
+        for delim_index, (start, end_tuple) in enumerate(
+            zip(delimiter_start_segments, delimiter_end_segment_tuples)
+        )
+        if end_tuple is not None
+    ]
+    seg_delimiters.sort(key=lambda dtuple: dtuple[1].start)
+
+    # Now we can go through our split sequences and write them out.
+    # However we need to account for the "extra" sequences leading and trailing each array element.
+    # These are caused by the delimiter sequences taking the first and second halves from different array elements
+    # to increase splitting sensitivity.
+
+    cur_read_base_index = 0
+    prev_delim_name = "START"
+
+    segment_tuples = []
+
+    for i, (di, start_seg, end_seg_tuple) in enumerate(seg_delimiters):
+        start_coord = cur_read_base_index
+        end_coord = end_seg_tuple[0].end
+        delim_name = end_seg_tuple[0].name
+
+        segment_tuples.append(
+            tuple([prev_delim_name, delim_name, start_coord, end_coord])
+        )
+
+        cur_read_base_index = end_seg_tuple[1].start
+        prev_delim_name = end_seg_tuple[1].name
+
+    # Now we have to write out the last segment:
+    seg_start_coord = cur_read_base_index
+    # Subtract 1 for 0-based inclusive coords:
+    seg_end_coord = len(read.query_sequence) - 1
+
+    start_coord = seg_start_coord
+    end_coord = seg_end_coord
+
+    delim_name = "END"
+
+    segment_tuples.append(
+        tuple([prev_delim_name, delim_name, start_coord, end_coord])
+    )
+
+    return segment_tuples
+
+
+def segment_read_with_bounded_region_algorithm(read, model, segments=None):
+    """Segments the given read using the simple splitting algorithm.
+
+    NOTE: Assumes that all given data are in the forward direction.
+
+    :param read: A pysam.AlignedSegment object containing a read that has been segmented.
+    :param model: The model to use for the array segment information.
+    :param segments: None or A list of SegmentInfo objects representing the segments of the given reads.
+                     If None, will be populated by getting segments from the given read.
+    :return: Two tuples:
+             delimiter_found: a tuple of booleans indicating if a delimiter in `delimiter_segments` is the start of a
+                              segment.
+             delimiter_segments: a tuple of lists of SegmentInfo representing the delimiters for each segment in the
+                                 read.
+    """
+
+    # Get our segments if we have to:
+    if not segments:
+        segments = get_segments(read)
+
+    # Create our delimiter list:
+    delimiters = model.array_element_structure
+
+    # Modify the delimiter sequences for this library.
+    # NOTE: this is an artifact of some library preparation steps and should be removed in the next
+    #       iteration of the library.
+    # We must change to a list here so we cna modify it:
+    delimiters = list(delimiters)
+    # The first sequence doesn't actually have an 'A' element:
+    delimiters[0] = delimiters[0][1:]
+    # The last sequence doesn't actually have a 'P' element:
+    delimiters[-1] = delimiters[-1][:-1]
+
+    # We need to go through our segments and split them up.
+    # Note: we assume each full array element can occur only once and they do not overlap.
+    delimiter_match_matrix = [0 for _ in delimiters]
+    delimiter_segments = [list() for _ in delimiters]
+    delimiter_found = [False for _ in delimiters]
+    delimiter_score = [0 for _ in delimiters]
+
+    # We define some scoring increments here:
+    match_val = 2
+    indel_val = 1
+
+    # We do it this way so we iterate over the segments once and the delimiters many times
+    # under the assumption the segment list is much longer than the delimiters.
+    for seg in segments:
+        # at each position go through our delimiters and track whether we're a match:
+        for i, dmi in enumerate(delimiter_match_matrix):
+            if not delimiter_found[i]:
+                try:
+                    if seg.name == delimiters[i][dmi]:
+                        delimiter_match_matrix[i] += 1
+                        delimiter_segments[i].append(seg)
+                        delimiter_score[i] += match_val
+                    else:
+                        found = False
+                        # Only look ahead if we already have a partial match:
+                        if delimiter_match_matrix[i] != 0:
+                            # Here we "peek ahead" so we an look at other delimiters after the current one just in
+                            # case we're missing a delimiter / segment.  This will impact the "score" but allow for
+                            # fuzzy matching.
+                            for peek_ahead in range(
+                                    1, len(delimiters[i]) - delimiter_match_matrix[i]
+                            ):
+                                if seg.name == delimiters[i][dmi + peek_ahead]:
+                                    delimiter_match_matrix[i] += 1 + peek_ahead
+                                    delimiter_segments[i].append(seg)
+                                    delimiter_score[i] += indel_val
+                                    found = True
+                                    break
+
+                        if not found:
+                            # No match at the position we expected!
+                            # We need to reset our count and start segment:
+                            delimiter_match_matrix[i] = 0
+                            delimiter_segments[i] = list()
+                            delimiter_score[i] = 0
+
+                    # Make sure we mark ourselves as done if we're out of info:
+                    if delimiter_match_matrix[i] == len(delimiters[i]):
+                        delimiter_found[i] = True
+
+                except IndexError:
+                    # We're out of range of the delimiter.
+                    # This means we've hit the end and actually have a match.
+                    delimiter_found[i] = True
+
+    return tuple(delimiter_found), tuple(delimiter_segments)
+
+
 def _write_segmented_read(
     model, read, segments, do_simple_splitting, delimiters, bam_out
 ):
@@ -285,71 +484,9 @@ def _write_segmented_read(
 
     if do_simple_splitting:
 
-        # Now we have our delimiter list.
-        # We need to go through our segments and split them up.
-        # Note: we assume each delimiter can occur only once.
-        delimiter_match_matrix = [0 for _ in delimiters]
-        delimiter_start_segments = [None for _ in delimiters]
+        segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segments)
 
-        # We have to store the end segments as tuples in case we want to use more than one
-        # segment as a delimiter:
-        delimiter_end_segment_tuples = [None for _ in delimiters]
-
-        # We do it this way so we iterate over the segments once and the delimiters many times
-        # under the assumption the segment list is much longer than the delimiters.
-        for seg in segments:
-            # at each position go through our delimiters and track whether we're a match:
-            for i, dmi in enumerate(delimiter_match_matrix):
-                try:
-                    if seg.name == delimiters[i][dmi]:
-                        if delimiter_match_matrix[i] == 0:
-                            delimiter_start_segments[i] = seg
-                        delimiter_match_matrix[i] += 1
-                        if delimiter_match_matrix[i] == len(delimiters[i]):
-                            # We've got a full and complete match!
-                            # We store the end segment we found.
-                            delimiter_end_segment_tuples[i] = (
-                                delimiter_start_segments[i],
-                                seg,
-                            )
-                    else:
-                        # No match at the position we expected!
-                        # We need to reset our count and start segment:
-                        delimiter_match_matrix[i] = 0
-                        delimiter_start_segments[i] = None
-                        delimiter_end_segment_tuples[i] = None
-                except IndexError:
-                    # We're out of range of the delimiter.
-                    # This means we've hit the end and actually have a match, so we can ignore this error.
-                    pass
-
-        # OK, we've got a handle on our delimiters, so now we just need to split the sequence.
-        # We do so by looking at which end delimiters are filled in, and grabbing their complementary start delimiter:
-
-        # Sort and filter our delimiters:
-        seg_delimiters = [
-            (delim_index, start, end_tuple)
-            for delim_index, (start, end_tuple) in enumerate(
-                zip(delimiter_start_segments, delimiter_end_segment_tuples)
-            )
-            if end_tuple is not None
-        ]
-        seg_delimiters.sort(key=lambda dtuple: dtuple[1].start)
-
-        # Now we can go through our split sequences and write them out.
-        # However we need to account for the "extra" sequences leading and trailing each array element.
-        # These are caused by the delimiter sequences taking the first and second halves from different array elements
-        # to increase splitting sensitivity.
-
-        cur_read_base_index = 0
-        prev_delim_name = "START"
-
-        for i, (di, start_seg, end_seg_tuple) in enumerate(seg_delimiters):
-
-            start_coord = cur_read_base_index
-            end_coord = end_seg_tuple[0].end
-            delim_name = end_seg_tuple[0].name
-
+        for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
             # Write our segment here:
             _write_split_array_element(
                 bam_out,
@@ -361,102 +498,14 @@ def _write_segmented_read(
                 prev_delim_name,
             )
 
-            cur_read_base_index = end_seg_tuple[1].start
-            prev_delim_name = end_seg_tuple[1].name
+        return len(segment_bounds_tuples)
 
-        # Now we have to write out the last segment:
-        seg_start_coord = cur_read_base_index
-        # Subtract 1 for 0-based inclusive coords:
-        seg_end_coord = len(read.query_sequence) - 1
-
-        start_coord = seg_start_coord
-        end_coord = seg_end_coord
-
-        delim_name = "END"
-
-        _write_split_array_element(
-            bam_out,
-            start_coord,
-            end_coord,
-            read,
-            segments,
-            delim_name,
-            prev_delim_name,
-        )
-
-        return len(seg_delimiters)
     else:
         # Here we're doing bounded region splitting.
         # This requires each read to conform to the expected read structure as defined in the model.
         # The process is similar to what is done above for simple splitting.
 
-        # Create our delimiter list:
-        delimiters = model.array_element_structure
-
-        # Modify the delimiter sequences for this library.
-        # NOTE: this is an artifact of some library preparation steps and should be removed in the next
-        #       iteration of the library.
-        # We must change to a list here so we cna modify it:
-        delimiters = list(delimiters)
-        # The first sequence doesn't actually have an 'A' element:
-        delimiters[0] = delimiters[0][1:]
-        # The last sequence doesn't actually have a 'P' element:
-        delimiters[-1] = delimiters[-1][:-1]
-
-        # We need to go through our segments and split them up.
-        # Note: we assume each full array element can occur only once and they do not overlap.
-        delimiter_match_matrix = [0 for _ in delimiters]
-        delimiter_segments = [list() for _ in delimiters]
-        delimiter_found = [False for _ in delimiters]
-        delimiter_score = [0 for _ in delimiters]
-
-        # We define some scoring increments here:
-        match_val = 2
-        indel_val = 1
-
-        # We do it this way so we iterate over the segments once and the delimiters many times
-        # under the assumption the segment list is much longer than the delimiters.
-        for seg in segments:
-            # at each position go through our delimiters and track whether we're a match:
-            for i, dmi in enumerate(delimiter_match_matrix):
-                if not delimiter_found[i]:
-                    try:
-                        if seg.name == delimiters[i][dmi]:
-                            delimiter_match_matrix[i] += 1
-                            delimiter_segments[i].append(seg)
-                            delimiter_score[i] += match_val
-                        else:
-                            found = False
-                            # Only look ahead if we already have a partial match:
-                            if delimiter_match_matrix[i] != 0:
-                                # Here we "peek ahead" so we an look at other delimiters after the current one just in
-                                # case we're missing a delimiter / segment.  This will impact the "score" but allow for
-                                # fuzzy matching.
-                                for peek_ahead in range(
-                                    1, len(delimiters[i]) - delimiter_match_matrix[i]
-                                ):
-                                    if seg.name == delimiters[i][dmi + peek_ahead]:
-                                        delimiter_match_matrix[i] += 1 + peek_ahead
-                                        delimiter_segments[i].append(seg)
-                                        delimiter_score[i] += indel_val
-                                        found = True
-                                        break
-
-                            if not found:
-                                # No match at the position we expected!
-                                # We need to reset our count and start segment:
-                                delimiter_match_matrix[i] = 0
-                                delimiter_segments[i] = list()
-                                delimiter_score[i] = 0
-
-                        # Make sure we mark ourselves as done if we're out of info:
-                        if delimiter_match_matrix[i] == len(delimiters[i]):
-                            delimiter_found[i] = True
-
-                    except IndexError:
-                        # We're out of range of the delimiter.
-                        # This means we've hit the end and actually have a match.
-                        delimiter_found[i] = True
+        delimiter_found, delimiter_segments = segment_read_with_bounded_region_algorithm(read, model, segments)
 
         # Now we have our segments as described by our model.
         # We assume they don't overlap and we write them out:

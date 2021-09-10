@@ -463,7 +463,6 @@ class LibraryModel:
 
     # TODO: Make an enum for this...
     pre_configured_models = {
-        # def build_and_return_mas_seq_model():
         "mas15": {
             "description": "The standard MAS-seq 15 array element model.",
             "version": "1.0.0",
