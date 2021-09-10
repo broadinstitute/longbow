@@ -211,7 +211,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     array_lengths = np.array(array_lengths)
 
     # Write our stats out to the appropriate files:
-    _write_stats(input_bam.name, array_lengths, ligation_profile_count_dict, model.name, output_prefix)
+    _write_stats(input_bam.name, array_lengths, ligation_profile_count_dict, ligation_heat_matrix, model.name, output_prefix)
 
     logger.info("Writing complete ligation matrix...")
     _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model.name})")
@@ -222,7 +222,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def _write_stats(input_bam, array_lengths, ligation_profile_count_dict, model_name, output_prefix):
+def _write_stats(input_bam, array_lengths, ligation_profile_count_dict, ligation_heat_matrix, model_name, output_prefix):
     """Write out all basic statistics for the data in the input file."""
 
     # Calculate histogram of array lengths.  Bins are created around integer values.
@@ -251,7 +251,8 @@ def _write_stats(input_bam, array_lengths, ligation_profile_count_dict, model_na
                               num_array_elements,
                               count_hist,
                               hist_bins,
-                              ligation_profile_count_dict)
+                              ligation_profile_count_dict,
+                              ligation_heat_matrix)
 
     logger.info("Writing read stat histograms...")
     _create_array_length_histogram(output_prefix,
@@ -275,6 +276,7 @@ def _write_summary_stats_file(input_bam,
                               count_hist,
                               hist_bins,
                               ligation_profile_count_dict,
+                              ligation_heat_matrix,
                               num_ligation_profiles_to_show=40):
 
     """Write summary statistics for the given input bam to a file."""
@@ -283,6 +285,9 @@ def _write_summary_stats_file(input_bam,
     ligation_profile_data = _calculate_top_ligation_profiles(len(array_lengths),
                                                              ligation_profile_count_dict,
                                                              num_ligation_profiles_to_show)
+
+    # We need to rotate and flip our count matrix:
+    ligation_heat_matrix = np.rot90(np.fliplr(ligation_heat_matrix))
 
     current_timestamp = time.time()
     timezone = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
@@ -318,6 +323,38 @@ def _write_summary_stats_file(input_bam,
             f.write(f"{hist_bins[i]:2d}:\t{h}\n")
 
         f.write("\n")
+        f.write("Ligation Matrix Statistics:\n")
+
+        total_count = np.sum(ligation_heat_matrix)
+
+        sub_diagonal_count = 0
+        for i in range(1, ligation_heat_matrix.shape[0]):
+            sub_diagonal_count += ligation_heat_matrix[i, i-1]
+        off_sub_diagonal_count = total_count - sub_diagonal_count
+
+        sub_sub_diagonal_count = 0
+        for i in range(2, ligation_heat_matrix.shape[0]):
+            sub_sub_diagonal_count += ligation_heat_matrix[i, i-2]
+
+        f.write(f"Subdiagonal Count Total (correct segments): {sub_diagonal_count}\n")
+        f.write(f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count}\n")
+        f.write(f"Sub-Subdiagonal Count Total (missed MAS-seq adapters): {sub_sub_diagonal_count}\n")
+        f.write(f"Correctly placed segments percentage: {100*sub_diagonal_count/total_count:.2f}%\n")
+
+        f.write("\n")
+        f.write("Raw Ligation Matrix:\n")
+        _write_heat_matrix(f, ligation_heat_matrix)
+
+        f.write("\n")
+        f.write("Reduced Ligation Matrix:\n")
+
+        reduced_heat_matrix, _ = reduce_heatmap(
+            ligation_heat_matrix,
+            {i: i for i in range(int(ligation_heat_matrix.shape[0]/2))}
+        )
+        _write_heat_matrix(f, reduced_heat_matrix)
+
+        f.write("\n")
         f.write(f"Top {len(ligation_profile_data)} Ligation Profiles:\n")
 
         field_widths = []
@@ -335,6 +372,16 @@ def _write_summary_stats_file(input_bam,
             for i, c in enumerate(profile):
                 f.write(f"{c:{field_widths[i]}}\t")
             f.write(f"\n")
+
+
+def _write_heat_matrix(f, reduced_heat_matrix):
+    """Write the given heat matrix to the given file"""
+    max_length = int(np.log10(np.max(reduced_heat_matrix)) + 1)
+    for i in range(0, reduced_heat_matrix.shape[0]):
+        for j in range(0, reduced_heat_matrix.shape[1]):
+            f.write(f"{reduced_heat_matrix[i, j]:{max_length}d} ")
+        f.write("\n")
+    f.write("\n")
 
 
 def _calculate_top_ligation_profiles(num_reads, ligation_profile_count_dict, num_ligation_profiles_to_show):
@@ -513,23 +560,7 @@ def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, titl
 
     logger.debug(f"Reduced Heatmap Scale: Digits: {num_digits} | Scale: {fig_scale}")
 
-    # Check upper right and lower left quadrants to see if there are any non-zero
-    # entries and warn the user if there are:
-    half_point = int(heat_matrix.shape[0] / 2)
-    ur_sum = heat_matrix[0:half_point, half_point:].sum()
-    ll_sum = heat_matrix[half_point:, 0:half_point].sum()
-    if ur_sum != 0:
-        logger.warning("WARNING: "
-                       "Upper right quadrant of heat matrix has nonzero values that are ignored by this method!")
-    if ll_sum != 0:
-        logger.warning("WARNING: "
-                       "Lower left quadrant of heat matrix has nonzero values that are ignored by this method!")
-
-    # Convert given heat matrix into the reduced form for the forward direction only:
-    reduced_heat_mat = np.copy(heat_matrix[0:half_point, 0:half_point])
-    reduced_heat_mat += np.copy(heat_matrix[half_point:, half_point:])
-
-    reduced_index_map = {k: v for k, v in list(index_map.items())[0:half_point]}
+    reduced_heat_mat, reduced_index_map = reduce_heatmap(heat_matrix, index_map)
 
     if count_divisor:
         reduced_heat_mat = plot_utils.signif(reduced_heat_mat / count_divisor, significant_digits)
@@ -584,3 +615,25 @@ def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, titl
 
     # Save the figure with numbers as well:
     plot_utils.save_figure(fig, name=title, prefix=output_prefix, suffix="reduced")
+
+
+def reduce_heatmap(heat_matrix, index_map):
+    """Reduce the given count heat matrix to be 1/4 the size by summing the upper left and lower right quadrants."""
+
+    # Check upper right and lower left quadrants to see if there are any non-zero
+    # entries and warn the user if there are:
+    half_point = int(heat_matrix.shape[0] / 2)
+    ur_sum = heat_matrix[0:half_point, half_point:].sum()
+    ll_sum = heat_matrix[half_point:, 0:half_point].sum()
+    if ur_sum != 0:
+        logger.warning("WARNING: "
+                       "Upper right quadrant of heat matrix has nonzero values that are ignored by this method!")
+    if ll_sum != 0:
+        logger.warning("WARNING: "
+                       "Lower left quadrant of heat matrix has nonzero values that are ignored by this method!")
+    # Convert given heat matrix into the reduced form for the forward direction only:
+    reduced_heat_mat = np.copy(heat_matrix[0:half_point, 0:half_point])
+    reduced_heat_mat += np.copy(heat_matrix[half_point:, half_point:])
+    reduced_index_map = {k: v for k, v in list(index_map.items())[0:half_point]}
+
+    return reduced_heat_mat, reduced_index_map
