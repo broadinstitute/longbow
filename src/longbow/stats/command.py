@@ -3,6 +3,7 @@ import sys
 import os
 
 import time
+import datetime
 
 import click
 import click_log
@@ -210,7 +211,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     array_lengths = np.array(array_lengths)
 
     # Write our stats out to the appropriate files:
-    _write_stats(array_lengths, ligation_profile_count_dict, model.name, output_prefix)
+    _write_stats(input_bam.name, array_lengths, ligation_profile_count_dict, model.name, output_prefix)
 
     logger.info("Writing complete ligation matrix...")
     _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model.name})")
@@ -221,7 +222,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def _write_stats(array_lengths, ligation_profile_count_dict, model_name, output_prefix):
+def _write_stats(input_bam, array_lengths, ligation_profile_count_dict, model_name, output_prefix):
     """Write out all basic statistics for the data in the input file."""
 
     # Calculate histogram of array lengths.  Bins are created around integer values.
@@ -236,14 +237,18 @@ def _write_stats(array_lengths, ligation_profile_count_dict, model_name, output_
     array_length_median = np.median(array_lengths)
     array_length_std = np.std(array_lengths)
 
+    num_array_elements = np.sum(array_lengths)
+
     logger.info("Writing summary stats file...")
-    _write_summary_stats_file(output_prefix,
+    _write_summary_stats_file(input_bam,
+                              output_prefix,
                               array_lengths,
                               array_length_min,
                               array_length_max,
                               array_length_mean,
                               array_length_median,
                               array_length_std,
+                              num_array_elements,
                               count_hist,
                               hist_bins,
                               ligation_profile_count_dict)
@@ -258,13 +263,15 @@ def _write_stats(array_lengths, ligation_profile_count_dict, model_name, output_
                                    model_name)
 
 
-def _write_summary_stats_file(output_prefix,
+def _write_summary_stats_file(input_bam,
+                              output_prefix,
                               array_lengths,
                               array_length_min,
                               array_length_max,
                               array_length_mean,
                               array_length_median,
                               array_length_std,
+                              num_array_elements,
                               count_hist,
                               hist_bins,
                               ligation_profile_count_dict,
@@ -277,9 +284,23 @@ def _write_summary_stats_file(output_prefix,
                                                              ligation_profile_count_dict,
                                                              num_ligation_profiles_to_show)
 
+    current_timestamp = time.time()
+    timezone = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
     with open(output_prefix + "_summary_stats.txt", 'w') as f:
+        f.write("#")
+        f.write("=" * 80)
+        f.write("\n")
+        f.write(f"#Time: {datetime.datetime.fromtimestamp(current_timestamp)} {timezone} ")
+        f.write(f"({current_timestamp})\n")
+        f.write(f"#Input file: {input_bam}\n")
+        f.write("#")
+        f.write("=" * 80)
+        f.write("\n")
+        f.write("\n")
+
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
-        f.write(f"Total Num Array Elements (Segmented Arrays):\tTBD\n")
+        f.write(f"Total Num Array Elements (Segmented Arrays):\t{num_array_elements}\n")
+        f.write(f"Output yield gain:\t{num_array_elements/len(array_lengths):.2f}x\n")
         f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
         f.write("\n")
 
@@ -292,6 +313,7 @@ def _write_summary_stats_file(output_prefix,
 
         f.write("\n")
         f.write(f"Array Length Hist:\n")
+        f.write(f"Length   Count\n")
         for i, h in enumerate(count_hist):
             f.write(f"{hist_bins[i]:2d}:\t{h}\n")
 
