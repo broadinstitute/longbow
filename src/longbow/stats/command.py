@@ -303,26 +303,30 @@ def _write_summary_stats_file(input_bam,
         f.write("\n")
         f.write("\n")
 
+        f.write("#" + ("-" * 80) + "\n")
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
         f.write(f"Total Num Array Elements (Segmented Arrays):\t{num_array_elements}\n")
         f.write(f"Output yield gain:\t{num_array_elements/len(array_lengths):.2f}x\n")
         f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
         f.write("\n")
 
+        f.write("#" + ("-" * 80) + "\n")
         f.write(f"Array Length Stats:\n")
         f.write(f"min:\t{array_length_min}\n")
         f.write(f"max:\t{array_length_max}\n")
         f.write(f"mean:\t{array_length_mean}\n")
         f.write(f"median:\t{array_length_median}\n")
         f.write(f"std:\t{array_length_std}\n")
-
         f.write("\n")
+
+        f.write("#" + ("-" * 80) + "\n")
         f.write(f"Array Length Hist:\n")
         f.write(f"Length   Count\n")
         for i, h in enumerate(count_hist):
             f.write(f"{hist_bins[i]:2d}:\t{h}\n")
-
         f.write("\n")
+
+        f.write("#" + ("-" * 80) + "\n")
         f.write("Ligation Matrix Statistics:\n")
 
         total_count = np.sum(ligation_heat_matrix)
@@ -340,12 +344,14 @@ def _write_summary_stats_file(input_bam,
         f.write(f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count}\n")
         f.write(f"Sub-Subdiagonal Count Total (missed MAS-seq adapters): {sub_sub_diagonal_count}\n")
         f.write(f"Correctly placed segments percentage: {100*sub_diagonal_count/total_count:.2f}%\n")
-
         f.write("\n")
+
+        f.write("#" + ("-" * 80) + "\n")
         f.write("Raw Ligation Matrix:\n")
         _write_heat_matrix(f, ligation_heat_matrix)
-
         f.write("\n")
+
+        f.write("#" + ("-" * 80) + "\n")
         f.write("Reduced Ligation Matrix:\n")
 
         reduced_heat_matrix, _ = reduce_heatmap(
@@ -353,8 +359,9 @@ def _write_summary_stats_file(input_bam,
             {i: i for i in range(int(ligation_heat_matrix.shape[0]/2))}
         )
         _write_heat_matrix(f, reduced_heat_matrix)
-
         f.write("\n")
+
+        f.write("#" + ("-" * 80) + "\n")
         f.write(f"Top {len(ligation_profile_data)} Ligation Profiles:\n")
 
         field_widths = []
