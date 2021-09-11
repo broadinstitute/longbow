@@ -340,10 +340,9 @@ def _write_summary_stats_file(input_bam,
         for i in range(2, ligation_heat_matrix.shape[0]):
             sub_sub_diagonal_count += ligation_heat_matrix[i, i-2]
 
-        f.write(f"Subdiagonal Count Total (correct segments): {sub_diagonal_count}\n")
-        f.write(f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count}\n")
-        f.write(f"Sub-Subdiagonal Count Total (missed MAS-seq adapters): {sub_sub_diagonal_count}\n")
-        f.write(f"Correctly placed segments percentage: {100*sub_diagonal_count/total_count:.2f}%\n")
+        f.write(f"Subdiagonal Count Total (correct segments): {sub_diagonal_count} ({100*sub_diagonal_count/total_count:.2f}%)\n")
+        f.write(f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count} ({100*off_sub_diagonal_count/total_count:.2f}%)\n")
+        f.write(f"Sub-Subdiagonal Count Total (missed MAS-seq adapters): {sub_sub_diagonal_count}  ({100*sub_sub_diagonal_count/total_count:.2f}%)\n")
         f.write("\n")
 
         f.write("#" + ("-" * 80) + "\n")
