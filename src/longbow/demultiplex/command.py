@@ -88,23 +88,35 @@ def main(pbi, out_base_name, threads, model, input_bam):
     results = manager.Queue()
 
     # Use defaults if model is not specified:
-    model_name_tuple = default_models
+    model_names = default_models
+
     if len(model) == 0:
-        logger.info(f"No models specified.  Demultiplexing with defaults: {', '.join(default_models)}")
+        logger.info(f"No models specified.  Using defaults.")
     elif len(model) == 1:
         logger.fatal(f"Only one model specified.  Demultiplex requires at least two models.")
         sys.exit(1)
     else:
-        logger.info(f"Demultiplexing with models: {', '.join(model)}")
-        # Validate the models we've been given:
+        # Ensure the user didn't specify the same model more than once:
+        for m in set(model):
+            count = 0
+            for other in model:
+                if m == other:
+                    count += 1
+            if count > 1:
+                logger.warning(f"Model specified more than once: {m} ({count}x).  "
+                               f"Ignoring all occurrences after the first.")
+        model_names = set(model)
+
+        # Validate that the models we've been given exist:
         for m in model:
             if not LibraryModel.has_prebuilt_model(m):
                 logger.fatal(f"Unknown model specified: {m}")
                 sys.exit(1)
-        model_name_tuple = model
+
+    logger.info(f"Demultiplexing with models: {', '.join(model_names)}")
 
     # Create a dictionary of models to use to annotate and score our reads:
-    model_list = [LibraryModel.build_pre_configured_model(m) for m in model_name_tuple]
+    model_list = [LibraryModel.build_pre_configured_model(m) for m in model_names]
 
     # Start worker sub-processes:
     worker_pool = []
