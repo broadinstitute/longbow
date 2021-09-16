@@ -23,6 +23,8 @@ logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("demultiplex")
 click_log.basic_config(logger)
 
+default_models = ("mas10", "mas15")
+
 
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
@@ -50,8 +52,19 @@ click_log.basic_config(logger)
     type=str,
     help="base name for output files",
 )
+@click.option(
+    "-m",
+    "--model",
+    required=False,
+    type=str,
+    multiple=True,
+    show_default=True,
+    default=default_models,
+    help="Models to use to demultiplex the input bam file.  Given model must either be a Longbow built-in model, "
+         "or a valid Longbow model json file.  If specified, this option must be specified at least twice."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, out_base_name, threads, input_bam):
+def main(pbi, out_base_name, threads, model, input_bam):
     """Separate reads into files based on which model they fit best.
 
     Resulting reads will be annotated with the model they best fit as well as the score and segments for that model."""
@@ -75,12 +88,48 @@ def main(pbi, out_base_name, threads, input_bam):
     input_data_queue = manager.Queue(maxsize=queue_size)
     results = manager.Queue()
 
-    # Create a dictionary of models to use to annotate and score our reads.
-    # For now we just worry about the 10 and 15 length arrays:
-    model_list = [
-        LibraryModel.build_pre_configured_model("mas15"),
-        LibraryModel.build_pre_configured_model("mas10"),
-    ]
+    # Use defaults if model is not specified:
+    model_names = default_models
+
+    if len(model) == 0:
+        logger.info(f"No models specified.  Using defaults.")
+    elif len(model) == 1:
+        logger.fatal(f"Only one model specified.  Demultiplex requires at least two models.")
+        sys.exit(1)
+    else:
+        # Ensure the user didn't specify the same model more than once:
+        for m in set(model):
+            count = 0
+            for other in model:
+                if m == other:
+                    count += 1
+            if count > 1:
+                logger.warning(f"Model specified more than once: {m} ({count}x).  "
+                               f"Ignoring all occurrences after the first.")
+
+        model_names = set(model)
+        
+        if len(model_names) == 1:
+            logger.fatal(f"Only one model specified.  Demultiplex requires at least two models.")
+            sys.exit(1)
+
+        # Validate that the models we've been given exist:
+        for m in model:
+            if not LibraryModel.has_prebuilt_model(m) and not os.path.exists(m):
+                logger.fatal(f"Unknown model specified: {m}")
+                sys.exit(1)
+
+    logger.info(f"Demultiplexing with models: {', '.join(model_names)}")
+
+    # Create a dictionary of models to use to annotate and score our reads:
+    model_list = []
+    for m in model_names:
+        # Get our model:
+        if LibraryModel.has_prebuilt_model(m):
+            model_list.append(LibraryModel.build_pre_configured_model(m))
+        else:
+            logger.info(f"Loading model from json file: %s", m)
+            model_list.append(LibraryModel.from_json_file(m))
 
     # Start worker sub-processes:
     worker_pool = []
