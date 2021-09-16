@@ -82,10 +82,6 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, input_bam):
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
-    pbi = f"{input_bam}.pbi" if pbi is None else pbi
-    if not os.path.exists(pbi):
-        raise FileNotFoundError(f"Missing .pbi file for {input_bam}")
-
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
@@ -105,6 +101,11 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, input_bam):
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bf:
         # If we have read names, we should use them to inspect the file:
         if len(read_names) > 0:
+
+            pbi = f"{input_bam}.pbi" if pbi is None else pbi
+            if not os.path.exists(pbi):
+                raise FileNotFoundError(f"Missing .pbi file for {input_bam}")
+
             file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
             for i, z in enumerate(file_offsets):
