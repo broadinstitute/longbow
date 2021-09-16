@@ -106,7 +106,12 @@ def main(pbi, out_base_name, threads, model, input_bam):
             if count > 1:
                 logger.warning(f"Model specified more than once: {m} ({count}x).  "
                                f"Ignoring all occurrences after the first.")
+
         model_names = set(model)
+        
+        if len(model_names) == 1:
+            logger.fatal(f"Only one model specified.  Demultiplex requires at least two models.")
+            sys.exit(1)
 
         # Validate that the models we've been given exist:
         for m in model:
