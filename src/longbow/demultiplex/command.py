@@ -60,7 +60,8 @@ default_models = ("mas10", "mas15")
     multiple=True,
     show_default=True,
     default=default_models,
-    help="Models to use to demultiplex the input bam file.  If specified, must be specified at least twice."
+    help="Models to use to demultiplex the input bam file.  Given model must either be a Longbow built-in model, "
+         "or a valid Longbow model json file.  If specified, this option must be specified at least twice."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(pbi, out_base_name, threads, model, input_bam):
@@ -109,14 +110,21 @@ def main(pbi, out_base_name, threads, model, input_bam):
 
         # Validate that the models we've been given exist:
         for m in model:
-            if not LibraryModel.has_prebuilt_model(m):
+            if not LibraryModel.has_prebuilt_model(m) and not os.path.exists(m):
                 logger.fatal(f"Unknown model specified: {m}")
                 sys.exit(1)
 
     logger.info(f"Demultiplexing with models: {', '.join(model_names)}")
 
     # Create a dictionary of models to use to annotate and score our reads:
-    model_list = [LibraryModel.build_pre_configured_model(m) for m in model_names]
+    model_list = []
+    for m in model_names:
+        # Get our model:
+        if LibraryModel.has_prebuilt_model(m):
+            model_list.append(LibraryModel.build_pre_configured_model(m))
+        else:
+            logger.info(f"Loading model from json file: %s", m)
+            model_list.append(LibraryModel.from_json_file(m))
 
     # Start worker sub-processes:
     worker_pool = []

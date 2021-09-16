@@ -32,8 +32,10 @@ Options:
   -o, --out-base-name TEXT  base name for output files  [default:
                             longbow_demultiplexed]
   -m, --model TEXT          Models to use to demultiplex the input bam file.
-                            If specified, must be specified at least twice.
-                            [default: mas10, mas15]
+                            Given model must either be a Longbow built-in
+                            model, or a valid Longbow model json file.  If
+                            specified, this option must be specified at least
+                            twice.  [default: mas10, mas15]
   --help                    Show this message and exit.
 ```
 
