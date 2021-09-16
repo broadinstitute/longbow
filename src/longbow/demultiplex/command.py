@@ -23,6 +23,8 @@ logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("demultiplex")
 click_log.basic_config(logger)
 
+default_models = ("mas10", "mas15")
+
 
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
@@ -50,8 +52,18 @@ click_log.basic_config(logger)
     type=str,
     help="base name for output files",
 )
+@click.option(
+    "-m",
+    "--model",
+    required=False,
+    type=str,
+    multiple=True,
+    show_default=True,
+    default=default_models,
+    help="Models to use to demultiplex the input bam file.  If specified, must be specified at least twice."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, out_base_name, threads, input_bam):
+def main(pbi, out_base_name, threads, model, input_bam):
     """Separate reads into files based on which model they fit best.
 
     Resulting reads will be annotated with the model they best fit as well as the score and segments for that model."""
@@ -75,12 +87,24 @@ def main(pbi, out_base_name, threads, input_bam):
     input_data_queue = manager.Queue(maxsize=queue_size)
     results = manager.Queue()
 
-    # Create a dictionary of models to use to annotate and score our reads.
-    # For now we just worry about the 10 and 15 length arrays:
-    model_list = [
-        LibraryModel.build_pre_configured_model("mas15"),
-        LibraryModel.build_pre_configured_model("mas10"),
-    ]
+    # Use defaults if model is not specified:
+    model_name_tuple = default_models
+    if len(model) == 0:
+        logger.info(f"No models specified.  Demultiplexing with defaults: {', '.join(default_models)}")
+    elif len(model) == 1:
+        logger.fatal(f"Only one model specified.  Demultiplex requires at least two models.")
+        sys.exit(1)
+    else:
+        logger.info(f"Demultiplexing with models: {', '.join(model)}")
+        # Validate the models we've been given:
+        for m in model:
+            if not LibraryModel.has_prebuilt_model(m):
+                logger.fatal(f"Unknown model specified: {m}")
+                sys.exit(1)
+        model_name_tuple = model
+
+    # Create a dictionary of models to use to annotate and score our reads:
+    model_list = [LibraryModel.build_pre_configured_model(m) for m in model_name_tuple]
 
     # Start worker sub-processes:
     worker_pool = []
