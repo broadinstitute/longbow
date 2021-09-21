@@ -340,9 +340,15 @@ def _write_summary_stats_file(input_bam,
         for i in range(2, ligation_heat_matrix.shape[0]):
             sub_sub_diagonal_count += ligation_heat_matrix[i, i-2]
 
-        f.write(f"Subdiagonal Count Total (correct segments): {sub_diagonal_count} ({100*sub_diagonal_count/total_count:.2f}%)\n")
-        f.write(f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count} ({100*off_sub_diagonal_count/total_count:.2f}%)\n")
-        f.write(f"Sub-Subdiagonal Count Total (missed MAS-seq adapters): {sub_sub_diagonal_count}  ({100*sub_sub_diagonal_count/total_count:.2f}%)\n")
+        logger.debug("Heat Matrix Counts:")
+        logger.debug("Total Count: %d", total_count)
+        logger.debug("Sub Diagonal Count: %d", sub_diagonal_count)
+        logger.debug("Off Diagonal Count: %d", off_sub_diagonal_count)
+        logger.debug("Sub Sub Diagonal Count: %d", sub_sub_diagonal_count)
+
+        f.write(_get_stat_and_percent_string_if_not_zero("Subdiagonal Count Total (correct segments)", sub_diagonal_count, total_count))
+        f.write(_get_stat_and_percent_string_if_not_zero("Off-Subdiagonal Count Total (segmentation / ligation errors)", off_sub_diagonal_count, total_count))
+        f.write(_get_stat_and_percent_string_if_not_zero("Sub-Subdiagonal Count Total (missed MAS-seq adapters)", sub_sub_diagonal_count, total_count))
         f.write("\n")
 
         f.write("#" + ("-" * 80) + "\n")
@@ -380,12 +386,25 @@ def _write_summary_stats_file(input_bam,
             f.write(f"\n")
 
 
-def _write_heat_matrix(f, reduced_heat_matrix):
+def _get_stat_and_percent_string_if_not_zero(description, stat, total):
+    if total == 0:
+        logger.warning(f"WARNING: total is zero for {description}: stat: {stat}, total: {total}")
+        return f"{description}: {stat} (0.0%)\n"
+    elif stat == 0:
+        logger.warning(f"WARNING: stat is zero for {description}: stat: {stat}, total: {total}")
+        return f"{description}: {stat} (0.0%)\n"
+    else:
+        return f"{description}: {stat} ({100 * stat / total:.2f}%)\n"
+
+
+def _write_heat_matrix(f, heat_matrix):
     """Write the given heat matrix to the given file"""
-    max_length = int(np.log10(np.max(reduced_heat_matrix)) + 1)
-    for i in range(0, reduced_heat_matrix.shape[0]):
-        for j in range(0, reduced_heat_matrix.shape[1]):
-            f.write(f"{reduced_heat_matrix[i, j]:{max_length}d} ")
+
+    max_length = _get_num_digits_for_heat_matrix(heat_matrix)
+
+    for i in range(0, heat_matrix.shape[0]):
+        for j in range(0, heat_matrix.shape[1]):
+            f.write(f"{heat_matrix[i, j]:{max_length}d} ")
         f.write("\n")
     f.write("\n")
 
@@ -485,7 +504,7 @@ def _create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
     heat_cmap = plot_utils.get_zero_white_cmap(base_cmap=plot_utils.get_heat_cmap("jet", False))
 
     # Make the figure huge so we can have our numbers fit:
-    num_digits = int(np.ceil(np.log10(np.max(heat_matrix))))
+    num_digits = _get_num_digits_for_heat_matrix(heat_matrix, 0)
 
     # Heuristic here.  We know that 5 digits fit well in a 3x scaled matrix.
     fig_scale = num_digits - 3
@@ -555,8 +574,7 @@ def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, titl
     # We should produce a warning if there are any non-zero counts in the forward->RC indicating
     # squares.
 
-    # Make the figure huge so we can have our numbers fit:
-    num_digits = int(np.ceil(np.log10(np.max(heat_matrix))))
+    num_digits = _get_num_digits_for_heat_matrix(heat_matrix, 0)
 
     # Heuristic here.  We know that 8 digits fit well in a 2x scaled matrix.
     fig_scale = num_digits - 6
@@ -621,6 +639,17 @@ def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, titl
 
     # Save the figure with numbers as well:
     plot_utils.save_figure(fig, name=title, prefix=output_prefix, suffix="reduced")
+
+
+def _get_num_digits_for_heat_matrix(heat_matrix, offset=1):
+    # Make the figure huge so we can have our numbers fit:
+    max_heat_val = np.max(heat_matrix)
+    if max_heat_val == 0:
+        logger.error("ERROR: Heat matrix is basically all zeros.  This is a problem!")
+        num_digits = 2
+    else:
+        num_digits = int(np.ceil(np.log10(max_heat_val))) + offset
+    return num_digits
 
 
 def reduce_heatmap(heat_matrix, index_map):
