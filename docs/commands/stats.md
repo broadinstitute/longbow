@@ -1,6 +1,6 @@
 ---
 layout: default
-title: version
+title: stats 
 description: "Calculate stats on input file."
 nav_order: 9
 parent: Commands
