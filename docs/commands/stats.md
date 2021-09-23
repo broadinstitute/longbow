@@ -81,6 +81,7 @@ $ cat longbow_stats_summary_stats.txt
 #================================================================================
 
 #--------------------------------------------------------------------------------
+MAS-seq / Longbow Model:	mas15
 Total Num Reads (Arrays):	109
 Total Num Array Elements (Segmented Arrays):	1635
 Output yield gain:	15.00x

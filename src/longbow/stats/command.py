@@ -241,6 +241,7 @@ def _write_stats(input_bam, array_lengths, ligation_profile_count_dict, ligation
 
     logger.info("Writing summary stats file...")
     _write_summary_stats_file(input_bam,
+                              model_name,
                               output_prefix,
                               array_lengths,
                               array_length_min,
@@ -265,6 +266,7 @@ def _write_stats(input_bam, array_lengths, ligation_profile_count_dict, ligation
 
 
 def _write_summary_stats_file(input_bam,
+                              model_name,
                               output_prefix,
                               array_lengths,
                               array_length_min,
@@ -304,6 +306,7 @@ def _write_summary_stats_file(input_bam,
         f.write("\n")
 
         f.write("#" + ("-" * 80) + "\n")
+        f.write(f"MAS-seq / Longbow Model:\t{model_name}\n")
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
         f.write(f"Total Num Array Elements (Segmented Arrays):\t{num_array_elements}\n")
         f.write(f"Output yield gain:\t{num_array_elements/len(array_lengths):.2f}x\n")
