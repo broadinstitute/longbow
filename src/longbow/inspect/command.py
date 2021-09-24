@@ -1,7 +1,7 @@
 import logging
-import time
 import sys
 import os
+import time
 import re
 import math
 import ssw
@@ -17,6 +17,7 @@ from construct import *
 import matplotlib.pyplot as plt
 from matplotlib import transforms
 
+from ..utils import model
 from ..utils.model import LibraryModel
 from ..utils.model import reverse_complement
 from ..utils import bam_utils
@@ -314,7 +315,7 @@ def format_state_sequence(seq, path, line_length=150):
         "P": adapter_state_color,
         "Q": adapter_state_color,
         "R": adapter_state_color,
-        "random": random_color,
+        model.RANDOM_SEGMENT_NAME: random_color,
     }
 
     labelled_bases = []
@@ -356,7 +357,7 @@ def format_state_sequence(seq, path, line_length=150):
     return labelled_bases, state_colors, state_labels
 
 
-def draw_state_sequence(seq, path, logp, read, out, show_seg_score, model, ssw_aligner, **kwargs):
+def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, ssw_aligner, **kwargs):
 
     line_length = 150
 
@@ -416,11 +417,11 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, model, ssw_a
         )
 
         # Write state label
-        if lbl != "random":
+        if lbl != model.RANDOM_SEGMENT_NAME:
 
             # If we want to show the segment scores, we calculate them here:
             if show_seg_score:
-                known_segment_seq = model.adapter_dict[lbl]
+                known_segment_seq = library_model.adapter_dict[lbl]
                 alignment = ssw_aligner.align(base_string.upper(), known_segment_seq)
                 optimal_score = alignment.score
                 # The max score is the match score * the length of the reference segment
