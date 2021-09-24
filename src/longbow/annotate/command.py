@@ -317,6 +317,10 @@ def _segment_read(read, model):
     logp, ppath = model.annotate(read.query_sequence)
 
     rc_logp, rc_ppath = model.annotate(bam_utils.reverse_complement(read.query_sequence))
+
+    # print(f"Forward Path: {logp}: {ppath}")
+    # print(f"Reverse Path: {rc_logp}: {rc_ppath}")
+
     if rc_logp > logp:
         logp = rc_logp
         ppath = rc_ppath

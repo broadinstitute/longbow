@@ -15,6 +15,7 @@ from inspect import getframeinfo, currentframe, getdoc
 import pysam
 
 from ..meta import VERSION
+from ..utils import model
 from ..utils.model import reverse_complement
 
 logging.basicConfig(stream=sys.stderr)
@@ -200,11 +201,13 @@ def check_for_preexisting_files(file_list, exist_ok=False):
         sys.exit(1)
 
 
-def get_segment_score(read_sequence, segment, model, ssw_aligner=None):
+def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     """Get the alignment score of the given segment against the read sequence."""
 
+    return 0, 0
+
     # We don't score random segments:
-    if segment.name == "random":
+    if segment.name == model.RANDOM_SEGMENT_NAME:
         return 0, 0
 
     # Create a default aligner if we weren't given one:
@@ -213,13 +216,13 @@ def get_segment_score(read_sequence, segment, model, ssw_aligner=None):
 
     # Get our alignment and our score:
     if segment.end - segment.start > 1:
-        alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], model.adapter_dict[segment.name])
+        alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], library_model.adapter_dict[segment.name])
         optimal_score = alignment.score
     else:
         optimal_score = 0
 
     # The max score is the match score * the length of the reference segment
-    max_score = len(model.adapter_dict[segment.name]) * ssw_aligner.matrix.get_match()
+    max_score = len(library_model.adapter_dict[segment.name]) * ssw_aligner.matrix.get_match()
 
     return optimal_score, max_score
 
