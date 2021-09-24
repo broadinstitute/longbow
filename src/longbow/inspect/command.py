@@ -345,7 +345,7 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, model, ssw_a
     np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
 
     f.suptitle(
-        f"{read.query_name}\n{qual_string}{np_string}[{len(read.query_sequence)} bp]    [model score: {logp:.2f}]",
+        f"{read.query_name}\n{qual_string}{np_string}[{len(read.query_sequence)} bp]    [model score: {model.name} : {logp:.2f}]",
         fontsize=16
     )
 
