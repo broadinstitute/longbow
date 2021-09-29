@@ -6,17 +6,18 @@ import logging
 import click_log
 import collections
 import re
+import pysam
+
 from collections import OrderedDict
 from math import ceil, floor
 
 from construct import *
 from inspect import getframeinfo, currentframe, getdoc
 
-import pysam
-
 from ..meta import VERSION
-from ..utils import model
-from ..utils.model import reverse_complement
+
+# TODO: FIX THIS TO BE AN IMPORT - needs to be refactored so include order isn't circular.
+RANDOM_SEGMENT_NAME = "random"
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("bam_utils")
@@ -29,6 +30,9 @@ SEGMENTS_TAG = "SG"
 SEGMENTS_QUAL_TAG = "XQ"
 SEGMENTS_RC_TAG = "RC"
 SEGMENT_TAG_DELIMITER = ","
+
+READ_IS_SEGMENTED_TAG = "ZS"
+
 READ_MODEL_NAME_TAG = "YN"
 READ_MODEL_SCORE_TAG = "YS"
 READ_IS_VALID_FOR_MODEL_TAG = "YV"
@@ -36,7 +40,23 @@ READ_FIRST_KEY_SEG_TAG = "YK"
 READ_NUM_KEY_SEGMENTS_TAG = "YG"
 READ_APPROX_QUAL_TAG = "YQ"
 
-READ_UMI_TAG = ""
+READ_ADAPTER_TAG = 'ZA'
+READ_ADAPTER_POS_TAG = "XA"
+
+READ_UMI_TAG = 'ZU'
+READ_UMI_POS_TAG = "XU"
+
+READ_BARCODE_TAG = 'CB'
+READ_RAW_BARCODE_TAG = 'CR'
+READ_BARCODE_POS_TAG = "XB"
+READ_BARCODE_QUAL_TAG = "CY"
+READ_BARCODE_CORRECTED_TAG = "XC"
+
+READ_SPATIAL_BARCODE1_TAG = "X1"
+READ_SPATIAL_BARCODE1_POS_TAG = "XP"
+
+READ_SPATIAL_BARCODE2_TAG = "X2"
+READ_SPATIAL_BARCODE2_POS_TAG = "XQ"
 
 
 # Named tuple to store alignment information:
@@ -204,10 +224,11 @@ def check_for_preexisting_files(file_list, exist_ok=False):
 def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     """Get the alignment score of the given segment against the read sequence."""
 
+    # TODO: FIX THIS METHOD WITH NEW SCORING MODEL!
     return 0, 0
 
     # We don't score random segments:
-    if segment.name == model.RANDOM_SEGMENT_NAME:
+    if segment.name == RANDOM_SEGMENT_NAME:
         return 0, 0
 
     # Create a default aligner if we weren't given one:
@@ -290,3 +311,50 @@ def write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_ba
         read.set_tag(READ_APPROX_QUAL_TAG, f"0.0")
 
     out_bam_file.write(read)
+
+
+# IUPAC RC's from: http://arep.med.harvard.edu/labgc/adnan/projects/Utilities/revcomp.html
+# and https://www.dnabaser.com/articles/IUPAC%20ambiguity%20codes.html
+RC_BASE_MAP = {
+    "N": "N",
+    "A": "T",
+    "T": "A",
+    "G": "C",
+    "C": "G",
+    "Y": "R",
+    "R": "Y",
+    "S": "S",
+    "W": "W",
+    "K": "M",
+    "M": "K",
+    "B": "V",
+    "V": "B",
+    "D": "H",
+    "H": "D",
+    "n": "n",
+    "a": "t",
+    "t": "a",
+    "g": "c",
+    "c": "g",
+    "y": "r",
+    "r": "y",
+    "s": "s",
+    "w": "w",
+    "k": "m",
+    "m": "k",
+    "b": "v",
+    "v": "b",
+    "d": "h",
+    "h": "d",
+}
+
+
+def reverse_complement(base_string):
+    """
+    Reverse complements the given base_string.
+    :param base_string: String of bases to be reverse-complemented.
+    :return: The reverse complement of the given base string.
+    """
+
+    return "".join(map(lambda b: RC_BASE_MAP[b], base_string[::-1]))
+

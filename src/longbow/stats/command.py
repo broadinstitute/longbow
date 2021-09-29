@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 
 from ..utils import bam_utils
 from ..utils import plot_utils
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
 from ..segment import command as segment
@@ -51,7 +52,7 @@ click_log.basic_config(logger)
 @click.option(
     "-m",
     "--model",
-    default="mas15",
+    default=LongbowModel.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -65,7 +66,8 @@ click_log.basic_config(logger)
     is_flag=True,
     default=False,
     help="Do splitting of reads based on splitter delimiters, rather than whole array structure. "
-    "This splitting will cause delimiter sequences to be repeated in each read they bound.",
+    "This splitting will cause delimiter sequences to be repeated in each read they bound.  "
+    "This is now the default setting, and this flag has been DEPRECATED.",
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
@@ -84,16 +86,17 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
 
     # Get our model:
     if LibraryModel.has_prebuilt_model(model):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
-        model = LibraryModel.build_pre_configured_model(model)
+        lb_model = LibraryModel.build_pre_configured_model(model)
     else:
         logger.info(f"Loading model from json file: %s", model)
-        model = LibraryModel.from_json_file(model)
+        lb_model = LibraryModel.from_json_file(model)
+    logger.info(f"Using %s: %s", model, lb_model.description)
+    model = lb_model
 
     if do_simple_splitting:
-        logger.info("Splitting algorithm: Simple Splitting")
-    else:
-        logger.info("Splitting algorithm: Bounded Region")
+        logger.warning("Simple splitting is now the default.  \"-s\" / \"--do-simple-splitting\" is now DEPRECATED.")
+    do_simple_splitting = True
+    logger.info("Using simple splitting mode.")
 
     # Prepare our delimiters for segmentation below:
     delimiters = segment.create_simple_delimiters(model)
@@ -159,7 +162,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
                     len(read_mas_seq_adapters) > 1 and \
                     read_mas_seq_adapters[0] == model.array_element_structure[1][0]:
                 read_mas_seq_adapters.insert(0, model.array_element_structure[0][0])
-            # NOTE: here model.array_element_structure[0][1] corresponds to the "10x_Adapter"
+            # NOTE: here model.array_element_structure[0][1] corresponds to "VENUS"
             #       that we use as our second segment in each array element.
 
             # Segment the array into segments using our actual segmentation algorithm so we have accurate counts:

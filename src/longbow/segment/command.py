@@ -12,6 +12,7 @@ import pysam
 import multiprocessing as mp
 
 from ..utils import bam_utils
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
 from ..annotate.command import SegmentInfo
@@ -47,12 +48,13 @@ click_log.basic_config(logger)
     is_flag=True,
     default=False,
     help="Do splitting of reads based on splitter delimiters, rather than whole array structure. "
-    "This splitting will cause delimiter sequences to be repeated in each read they bound.",
+    "This splitting will cause delimiter sequences to be repeated in each read they bound.  "
+    "This is now the default setting, and this flag has been DEPRECATED.",
 )
 @click.option(
     "-m",
     "--model",
-    default="mas15",
+    default=LongbowModel.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -71,9 +73,9 @@ def main(threads, output_bam, do_simple_splitting, model, input_bam):
     logger.info(f"Running with {threads} worker subprocess(es)")
 
     if do_simple_splitting:
-        logger.info("Using simple splitting mode.")
-    else:
-        logger.info("Using bounded region splitting mode.")
+        logger.warning("Simple splitting is now the default.  \"-s\" / \"--do-simple-splitting\" is now DEPRECATED.")
+    do_simple_splitting = True
+    logger.info("Using simple splitting mode.")
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
@@ -104,11 +106,11 @@ def main(threads, output_bam, do_simple_splitting, model, input_bam):
 
         # Get our model:
         if LibraryModel.has_prebuilt_model(model):
-            logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
-            m = LibraryModel.build_pre_configured_model(model)
+            lb_model = LibraryModel.build_pre_configured_model(model)
         else:
             logger.info(f"Loading model from json file: %s", model)
-            m = LibraryModel.from_json_file(model)
+            lb_model = LibraryModel.from_json_file(model)
+        logger.info(f"Using %s: %s", model, lb_model.description)
 
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[m])
 
@@ -489,6 +491,7 @@ def _write_segmented_read(
         for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
             # Write our segment here:
             _write_split_array_element(
+                model,
                 bam_out,
                 start_coord,
                 end_coord,
@@ -522,6 +525,7 @@ def _write_segmented_read(
 
                 # Write our segment here:
                 _write_split_array_element(
+                    model,
                     bam_out,
                     start_coord,
                     end_coord,
@@ -542,6 +546,7 @@ def _transform_to_rc_coords(start, end, read_length):
 
 
 def _write_split_array_element(
+    model,
     bam_out,
     start_coord,
     end_coord,
@@ -551,30 +556,49 @@ def _write_split_array_element(
     prev_delim_name,
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
+    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord)
+    bam_out.write(a)
+
+
+def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord):
+    """Package an array element into an AlignedSegment from the results of simple splitting rules."""
     a = pysam.AlignedSegment()
     a.query_name = (
         f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}"
     )
     # Add one to end_coord because coordinates are inclusive:
-    a.query_sequence = f"{read.query_sequence[start_coord:end_coord+1]}"
+    a.query_sequence = f"{read.query_sequence[start_coord:end_coord + 1]}"
     a.query_qualities = read.query_alignment_qualities[start_coord: end_coord + 1]
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
-
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
     out_segments = []
+    segments_to_annotate = []
     for s in segments:
         if start_coord <= s.start <= end_coord:
-            out_segments.append(
-                SegmentInfo(s.name, s.start - start_coord, s.end - start_coord)
-            )
+            seg_info = SegmentInfo(s.name, s.start - start_coord, s.end - start_coord)
+            out_segments.append(seg_info)
 
+            # If we have to annotate this segment, store it here for annotation later:
+            if (model.annotation_segments is not None) and (s.name in model.annotation_segments.keys()):
+                segments_to_annotate.append(seg_info)
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         bam_utils.SEGMENTS_TAG,
         bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
     )
+    # Annotate any segments in this array element that we have to:
+    for s in segments_to_annotate:
+        # First annotate the segment itself:
+        tag_name = model.annotation_segments[s.name][0]
+        seq = read.query_sequence[s.start:s.end + 1]
+        a.set_tag(tag_name, seq)
 
-    bam_out.write(a)
+        # Next annotate the starting position:
+        tag_name = model.annotation_segments[s.name][1]
+        a.set_tag(tag_name, s.start)
+    # Set our tag indicating that this read is now segmented:
+    a.set_tag(bam_utils.READ_IS_SEGMENTED_TAG, True)
+    return a

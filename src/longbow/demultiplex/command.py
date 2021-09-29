@@ -15,7 +15,6 @@ import pysam
 import multiprocessing as mp
 
 from ..utils import bam_utils
-from ..utils.model import reverse_complement
 from ..utils.model import LibraryModel
 
 
@@ -359,7 +358,7 @@ def _annotate_read(read, model):
     is_rc = False
     logp, ppath = model.annotate(read.query_sequence)
 
-    rc_logp, rc_ppath = model.annotate(reverse_complement(read.query_sequence))
+    rc_logp, rc_ppath = model.annotate(bam_utils.reverse_complement(read.query_sequence))
     if rc_logp > logp:
         logp = rc_logp
         ppath = rc_ppath
