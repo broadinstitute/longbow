@@ -12,8 +12,10 @@ import concurrent.futures
 
 import pysam
 
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
-from ..utils.model import reverse_complement
+
+from ..utils import bam_utils
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("train")
@@ -56,7 +58,7 @@ click_log.basic_config(logger)
 @click.option(
     "-m",
     "--model",
-    default="mas15",
+    default=LongbowModel.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -78,11 +80,11 @@ def main(
 
     # Get our model:
     if LibraryModel.has_prebuilt_model(model):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
         m = LibraryModel.build_pre_configured_model(model)
     else:
         logger.info(f"Loading model from json file: %s", model)
         m = LibraryModel.from_json_file(model)
+    logger.info(f"Using %s: %s", model, m.description)
 
     training_seqs = load_training_seqs(m, num_training_samples, threads, training_bam)
 
@@ -144,7 +146,7 @@ def select_read(read, model):
 
     # Use the untrained model to determine if we should add this training
     # example in the forward or reverse-complement orientation.
-    for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
+    for seq in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
         logp, ppath = model.annotate(seq, smooth_islands=True)
 
         if logp > flogp:

@@ -20,6 +20,7 @@ from construct import *
 
 from ..utils import bam_utils
 from ..utils.bam_utils import SegmentInfo
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
 
@@ -56,7 +57,7 @@ click_log.basic_config(logger)
     "-m",
     "--model",
     type=str,
-    default="mas15",
+    default=LongbowModel.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -101,11 +102,11 @@ def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
 
     # Get our model:
     if LibraryModel.has_prebuilt_model(model):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
         m = LibraryModel.build_pre_configured_model(model)
     else:
         logger.info(f"Loading model from json file: %s", model)
         m = LibraryModel.from_json_file(model)
+    logger.info(f"Using %s: %s", model, m.description)
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None

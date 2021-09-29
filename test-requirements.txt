@@ -11,3 +11,4 @@ numpy
 pandas
 pomegranate
 matplotlib
+editdistance

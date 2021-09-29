@@ -4,13 +4,18 @@ import os
 import time
 import re
 import math
-import ssw
+from functools import reduce
 
 import click
 import click_log
 
 import gzip
+
+import numpy as np
 import pysam
+
+import editdistance
+
 from collections import OrderedDict
 from construct import *
 
@@ -19,12 +24,13 @@ from matplotlib import transforms
 
 from ..utils import model
 from ..utils.model import LibraryModel
-from ..utils.model import reverse_complement
 from ..utils import bam_utils
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("inspect")
 click_log.basic_config(logger)
+
+DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
 
 
 @click.command(name=logger.name)
@@ -61,7 +67,7 @@ click_log.basic_config(logger)
 @click.option(
     "-m",
     "--model",
-    default="mas15",
+    default=model.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -104,14 +110,11 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
     # Get our model:
     if LibraryModel.has_prebuilt_model(model):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
         lb_model = LibraryModel.build_pre_configured_model(model)
     else:
         logger.info(f"Loading model from json file: %s", model)
         lb_model = LibraryModel.from_json_file(model)
-
-    # Create an aligner if we are scoring our segments:
-    ssw_aligner = ssw.Aligner() if seg_score else None
+    logger.info(f"Using %s: %s", model, lb_model.description)
 
     # Open our bam file:
     pysam.set_verbosity(0)
@@ -133,17 +136,17 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
                 bf.seek(file_offsets[z]["offset"])
                 read = bf.__next__()
-                __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner, max_length, min_rq)
+                __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
         else:
             # Without read names we just inspect every read in the file:
             logger.info("No read names given.  Inspecting every read in the input bam file.")
             for read in bf:
-                __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner, max_length, min_rq)
+                __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner, max_length, min_rq):
+def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq):
     """Create a figure for the given read."""
 
     out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
@@ -152,8 +155,7 @@ def __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_ali
 
     if seq is not None:
         logger.info("Drawing read '%s' to '%s'", read.query_name, out)
-        draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
-
+        draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, size=13, family="monospace")
 
 def load_read_names(read_name_args):
     read_names = []
@@ -270,7 +272,7 @@ def annotate_read(read, m, max_length, min_rq):
             logger.warning(f"Read quality is below the minimum.  "
                            f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
             return [None] * 3
-        for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
+        for seq in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
             logp, ppath = m.annotate(seq)
 
             if logp > flogp:
@@ -281,42 +283,98 @@ def annotate_read(read, m, max_length, min_rq):
     return fseq, fppath, flogp
 
 
-def format_state_sequence(seq, path, line_length=150):
-    # TODO: Must tie this into the model itself.  We shouldn't re-define our segments here.
+def create_colormap_for_model(m):
     adapter_state_color = "#DF5A49"
     scaffold_state_color = "#334D5C"
     poly_a_color = "#45B29D"
+    coding_region_color = "#4455FF"
     three_p_adapter_color = "#EFC94C"
     random_color = "#aaaaaa"
+
+    cbc_color = "#11FF66"
+    umi_color = "#1166FF"
 
     # Color for states we haven't enumerated:
     default_color = "#c2a8f0"
 
-    color_hash = {
-        "10x_Adapter": scaffold_state_color,
-        "5p_TSO": scaffold_state_color,
-        "Poly_A": poly_a_color,
-        "3p_Adapter": three_p_adapter_color,
-        "A": adapter_state_color,
-        "B": adapter_state_color,
-        "C": adapter_state_color,
-        "D": adapter_state_color,
-        "E": adapter_state_color,
-        "F": adapter_state_color,
-        "G": adapter_state_color,
-        "H": adapter_state_color,
-        "I": adapter_state_color,
-        "J": adapter_state_color,
-        "K": adapter_state_color,
-        "L": adapter_state_color,
-        "M": adapter_state_color,
-        "N": adapter_state_color,
-        "O": adapter_state_color,
-        "P": adapter_state_color,
-        "Q": adapter_state_color,
-        "R": adapter_state_color,
+    color_map = {
         model.RANDOM_SEGMENT_NAME: random_color,
+        DEFAULT_COLOR_MAP_ENTRY: default_color
     }
+
+    # Generate the rest of the colors:
+    for name in m.get_all_node_names():
+        if name in color_map:
+            continue
+        if len(name) == 1:
+            c = adapter_state_color
+        elif name == m.coding_region:
+            c = coding_region_color
+        elif name in model.MAS_SCAFFOLD_NAMES:
+            c = scaffold_state_color
+        elif name in m.named_random_segments:
+            # We'll do these next:
+            continue
+        elif name.upper().startswith("POLY"):
+            c = poly_a_color
+        else:
+            c = default_color
+
+        color_map[name] = c
+
+    # Now generate random segment colors:
+    # Start from the color of the coding region:
+    rc = [
+        int(cbc_color[1:3], 16),
+        int(cbc_color[3:5], 16),
+        int(cbc_color[5:7], 16),
+    ]
+    step = int(256 / len(m.named_random_segments))
+    for name in m.named_random_segments:
+        if name == m.coding_region:
+            continue
+        c = [(c + step) % 256 for c in rc]
+        c = adjust_color_for_existing_colors(c, color_map.values(), step)
+
+        color_map[name] = f"#{c[0]:02X}{c[1]:02X}{c[2]:02X}"
+        rc = c
+
+    return color_map
+
+
+def adjust_color_for_existing_colors(color, existing_color_strings, color_step, min_dist=50):
+    max_num_loops = 10
+    loop_num = 0
+
+    while loop_num < max_num_loops:
+        color_dist_ok = True
+        for color_string in existing_color_strings:
+            other_color = [
+                int(color_string[1:3], 16),
+                int(color_string[3:5], 16),
+                int(color_string[5:7], 16),
+            ]
+
+            # Simple Euclidian distance in color space:
+            color_dist = np.sqrt(reduce(lambda x, y: x+y, list(map(lambda x: (x[1]-x[0])**2, zip(color, other_color)))))
+
+            if color_dist < min_dist:
+                color_dist_ok = False
+                color = [(c + color_step) % 256 for c in color]
+
+        if color_dist_ok:
+            break
+
+        loop_num += 1
+
+    if loop_num >= max_num_loops:
+        logger.warning(f"Could not get distinct enough color.  Using color: {color}")
+
+    return color
+
+
+def format_state_sequence(seq, path, library_model, line_length=150):
+    color_map = create_colormap_for_model(library_model)
 
     labelled_bases = []
     state_labels = []
@@ -335,9 +393,9 @@ def format_state_sequence(seq, path, line_length=150):
                 bases.append(a)
             elif label != b:
                 try:
-                    color = color_hash[label]
+                    color = color_map[label]
                 except KeyError:
-                    color = default_color
+                    color = color_map[DEFAULT_COLOR_MAP_ENTRY]
 
                 labelled_bases.append("".join(bases))
                 state_labels.append(label)
@@ -349,19 +407,22 @@ def format_state_sequence(seq, path, line_length=150):
         labelled_bases.append("".join(bases))
         state_labels.append(label)
         try:
-            color = color_hash[label]
+            color = color_map[label]
         except KeyError:
-            color = default_color
+            color = color_map[DEFAULT_COLOR_MAP_ENTRY]
         state_colors.append(color)
 
     return labelled_bases, state_colors, state_labels
 
 
-def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, ssw_aligner, **kwargs):
+def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, **kwargs):
 
     line_length = 150
 
-    base_strings, colors, labels = format_state_sequence(seq, path, line_length=line_length)
+    base_strings, colors, labels = format_state_sequence(seq, path, library_model, line_length=line_length)
+
+    # Collapse the path here so we can later annotate our reads with the correct scores:
+    segments = bam_utils.collapse_annotations(path) if show_seg_score else None
 
     f = plt.figure(figsize=(24, 24))
 
@@ -371,9 +432,23 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
 
     qual_string = f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    " if read.has_tag("rq") else ""
     np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
+    is_rc_string = "[Direction: RC]" if read.get_tag("RC") == 1 else "[Direction: Forward]"
+
+    # Calculate whether the read has the correct array structure:
+    collapsed_annotations = bam_utils.collapse_annotations(path)
+    read_mas_adapters = [s.name for s in collapsed_annotations if len(s.name) == 1]
+    segment_order_valid, key_adapters_found, first_key_adapter_indx = \
+        library_model.validate_segment_order([s.name for s in collapsed_annotations])
+
+    valid_library_order_string = f"[{library_model.name} adapters: {' '.join(library_model.key_adapters)}]"
+    is_valid_order_string = "[Segment order: Valid]" if segment_order_valid else "[Segment order: INVALID]"
+    read_mas_adapter_string = f"[MAS adapters: {' '.join(read_mas_adapters)}]"
 
     f.suptitle(
-        f"{read.query_name}\n{qual_string}{np_string}[{len(read.query_sequence)} bp]    [{model.name} model score: {logp:.2f}]",
+        r"$\bf{" + read.query_name.replace("_", "\\_") + "}$" + f"\n{qual_string}{np_string}"
+        f"[{len(read.query_sequence)} bp]    {is_rc_string}    "
+        r"[$\bf{" + library_model.name.replace("_", "\\_") + "}$" + f" model score: {logp:.2f}]\n"
+        f"{is_valid_order_string}    {read_mas_adapter_string}    {valid_library_order_string}",
         fontsize=16
     )
 
@@ -386,15 +461,18 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
     plt.xlim([0, columns])
     plt.ylim([0, rows])
 
-    letters_seen = 0
     row = 0
     column = 0
-    n = 0
+    row_letters_seen = 0
+    total_bases_seen = 0
+
+    last_label = None
 
     for base_string, color, lbl in zip(base_strings, colors, labels):
         if column == 0:
-            ytic = ax.text(0, rows - row, f"{n}  ", transform=t, ha="right")
+            ytic = ax.text(0, rows - row, f"{total_bases_seen}  ", transform=t, ha="right")
 
+        # Write classified sequence
         text = ax.text(
             0,
             rows - row,
@@ -404,8 +482,6 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
             bbox=dict(facecolor=f"{color}22", edgecolor=f"{color}22", pad=0),
             **kwargs,
         )
-
-        # Write classified sequence
         text.draw(canvas.get_renderer())
         ex = text.get_window_extent()
 
@@ -416,19 +492,45 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
             text.get_transform(), x=scaling_factor * ex.width, units="dots"
         )
 
-        # Write state label
-        if lbl != model.RANDOM_SEGMENT_NAME:
+        # Write state label if we haven't already written it:
+        if lbl != last_label:
+            seg_score_string = ""
+            if lbl == model.RANDOM_SEGMENT_NAME:
+                # We want to label the random sections now, but we don't need to do anything fancy about it.
+                pass
+            # Always display the length of known random segments of fixed length:
+            elif lbl in library_model.named_random_segments and type(library_model.adapter_dict[lbl]) is dict:
+
+                special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
+
+                if special_seg_type == model.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                    # Mark the length that this known random segment should be:
+                    length = list(library_model.adapter_dict[lbl].values())[0]
+                    seg_score_string = f" [{length}]"
+                else:
+                    logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
 
             # If we want to show the segment scores, we calculate them here:
-            if show_seg_score:
-                known_segment_seq = library_model.adapter_dict[lbl]
-                alignment = ssw_aligner.align(base_string.upper(), known_segment_seq)
-                optimal_score = alignment.score
-                # The max score is the match score * the length of the reference segment
-                max_score = len(known_segment_seq) * ssw_aligner.matrix.get_match()
-                seg_score_string = f" ({optimal_score}/{max_score})"
-            else:
-                seg_score_string = ""
+            elif show_seg_score and lbl not in library_model.named_random_segments:
+
+                if type(library_model.adapter_dict[lbl]) is dict:
+                    special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
+
+                    if special_seg_type == model.HPR_SEGMENT_TYPE_NAME:
+                        base, count = library_model.adapter_dict[lbl][special_seg_type]
+                        known_segment_seq = base * count
+                        segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
+
+                        seg_score_string = f" ({len(known_segment_seq) - editdistance.eval(segment_bases, known_segment_seq)}" \
+                                           f"/{len(known_segment_seq)})"
+                    else:
+                        logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
+                else:
+                    known_segment_seq = library_model.adapter_dict[lbl]
+                    segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
+
+                    seg_score_string = f" ({len(known_segment_seq) - editdistance.eval(segment_bases, known_segment_seq)}" \
+                                       f"/{len(known_segment_seq)})"
 
             ax.text(
                 0 - (len(base_string) / 2),
@@ -441,18 +543,20 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
                 bbox=dict(facecolor="white", edgecolor="black"),
             )
 
-        if lbl == "10x_Adapter":
+        # TODO: Replace all references to "VENUS" with references to the models themselves.
+        # Add in hashes after the leading structural adapter so we can visually more easily inspect the results:
+        if lbl == "VENUS" or lbl == "10x_Adapter":
             for o in range(10, 50, 10):
-                if letters_seen + len(base_string) + o < line_length:
+                if row_letters_seen + len(base_string) + o < line_length:
                     ax.text(0, rows - row + 1.7, f"{' ' * o}'", transform=t, **kwargs)
 
         # Decide whether we need to break into a new row
-        letters_seen += len(base_string)
-        n += len(base_string)
+        row_letters_seen += len(base_string)
+        total_bases_seen += len(base_string)
         column += 1
 
-        if letters_seen >= columns:
-            letters_seen = 0
+        if row_letters_seen >= columns:
+            row_letters_seen = 0
 
             row += 1
             column = 0
@@ -463,8 +567,23 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
                 text.get_transform(), x=0, y=-30 * row, units="dots"
             )
 
-    y2tic = ax.text(0, rows - row, f"  {n}", transform=t, ha="left")
+        # Store our label so we don't write it twice:
+        last_label = lbl
+
+    y2tic = ax.text(0, rows - row, f"  {total_bases_seen}", transform=t, ha="left")
 
     plt.savefig(out, bbox_inches="tight")
 
     plt.close()
+
+
+def _get_segment_bases(seq, position, segments):
+    """Get the bases for the whole segment based on the given position in the given sequence."""
+    segment_bases = ""
+    for s in segments:
+        if s.start <= position <= s.end:
+            segment_bases = seq[s.start:s.end + 1]
+            break
+
+    return segment_bases.upper()
+

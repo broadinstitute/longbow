@@ -11,6 +11,7 @@ import pysam
 from construct import *
 
 from ..utils import bam_utils
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 from ..annotate.command import get_segments
 
@@ -39,7 +40,7 @@ click_log.basic_config(logger)
 @click.option(
     "-m",
     "--model",
-    default="mas15",
+    default=LongbowModel.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -63,11 +64,11 @@ def main(pbi, out_prefix, model, force, input_bam):
 
     # Get our model:
     if LibraryModel.has_prebuilt_model(model):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
         lb_model = LibraryModel.build_pre_configured_model(model)
     else:
         logger.info(f"Loading model from json file: %s", model)
         lb_model = LibraryModel.from_json_file(model)
+    logger.info(f"Using %s: %s", model, lb_model.description)
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None

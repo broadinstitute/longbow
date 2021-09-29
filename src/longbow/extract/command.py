@@ -11,7 +11,13 @@ import pysam
 from construct import *
 
 from ..utils import bam_utils
+from ..utils import model as LongbowModel
+from ..utils.model import LibraryModel
+
 from ..annotate.command import get_segments
+from ..segment.command import create_simple_delimiters
+from ..segment.command import segment_read_with_simple_splitting
+from ..segment.command import create_simple_split_array_element
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("extract")
@@ -53,31 +59,42 @@ click_log.basic_config(logger)
 )
 @click.option(
     "--leading-adapter",
-    default="10x_Adapter",
+    default=None,
     required=False,
-    show_default=True,
     type=str,
-    help="Adapter preceding the region to extract.",
+    help="Adapter preceding the region to extract.  Required if the given model does not name a `coding_region`",
 )
 @click.option(
     "--trailing-adapter",
-    default="Poly_A",
+    default=None,
     required=False,
-    show_default=True,
     type=str,
-    help="Adapter following the region to extract.",
+    help="Adapter following the region to extract.  Required if the given model does not name a `coding_region`",
 )
 @click.option(
+    # CBC + UMI for MAS15 is 26
     "--start-offset",
-    default=16+10,  # CBC + UMI for MAS15 is the default
+    default=None,
     required=False,
     show_default=True,
     type=int,
     help="Number of bases to ignore from the extracted region start.  "
-         "These bases will not be included in the extracted sequences.",
+         "These bases will not be included in the extracted sequences.  "
+         "Required if the given model does not name a `coding_region`",
+)
+@click.option(
+    "-m",
+    "--model",
+    type=str,
+    default=LongbowModel.DEFAULT_MODEL,
+    show_default=True,
+    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+         "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, start_offset, input_bam):
+def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, start_offset, model, input_bam):
     """Extract coding segments from the reads in the given bam.
     The main coding segments are assumed to be labeled as `random` segments.
     Uses known segments flanking the region to be extracted as markers to indicate
@@ -87,22 +104,53 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
+    # Get our model:
+    if LibraryModel.has_prebuilt_model(model):
+        m = LibraryModel.build_pre_configured_model(model)
+    else:
+        logger.info(f"Loading model from json file: %s", model)
+        m = LibraryModel.from_json_file(model)
+    logger.info(f"Using %s: %s", model, m.description)
+
+    # Validate our command line arguments:
+    has_coding_region = m.coding_region is not None
+    if has_coding_region:
+        logger.info(f"Extracting coding region from model {m.name}: {m.coding_region}")
+    else:
+        # We don't have a model with a coding region.
+        # We MUST make sure we have the other inputs that we need:
+        missing_args = []
+
+        if leading_adapter is None:
+            missing_args.append("--leading-adapter")
+        if trailing_adapter is None:
+            missing_args.append("--trailing-adapter")
+        if start_offset is None:
+            missing_args.append("--start-offset")
+
+        if len(missing_args) > 0:
+            message = f"ERROR: the following arguments must be specified when using a model that has no " \
+                      f"`coding_region`: {', '.join(missing_args)}"
+            logger.critical(message)
+            raise RuntimeError(message)
+
+        logger.info(f"Extracting `{LongbowModel.RANDOM_SEGMENT_NAME}` segments between {leading_adapter} and {trailing_adapter}.")
+        logger.info(f"Ignoring the first {start_offset} bases from extracted read segments.")
+
+    # Check to see if the output file exists:
+    bam_utils.check_for_preexisting_files(out_file, exist_ok=force)
+
+    logger.info(f"Writing extracted read segments to: {out_file}")
+    logger.info(f"Including {base_padding} flanking bases.")
+
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
         logger.info("About to Extract segments from %d reads", read_count)
 
-    # Check to see if the output file exists:
-    bam_utils.check_for_preexisting_files(out_file, exist_ok=force)
-
-    # TODO: We don't need to check our model right now because our models are SO similar.
-    #       This will need to be fixed when we start using more exotic models.
-
-    logger.info(f"Writing extracted read segments to: {out_file}")
-    logger.info(f"Extracting `random` segments between {leading_adapter} and {trailing_adapter}.")
-    logger.info(f"Ignoring the first {start_offset} bases from extracted read segments.")
-    logger.info(f"Including {base_padding} flanking bases.")
+    # Get our delimiters here just in case we have to split the reads later:
+    delimiters = create_simple_delimiters(m)
 
     # Open our input bam file:
     pysam.set_verbosity(0)
@@ -128,6 +176,7 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
             num_segments_skipped = 0
 
             for read in bam_file:
+
                 # Get our read segments:
                 try:
                     _, segments = get_segments(read)
@@ -136,60 +185,41 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
                                  f"No {bam_utils.SEGMENTS_TAG} tag detected on read {read.query_name} !")
                     sys.exit(1)
 
-                # Get our marker segments:
-                start_marker_list = [(i, s) for i, s in enumerate(segments) if s.name == leading_adapter]
-                end_marker_list = [(i, s) for i, s in enumerate(segments) if s.name == trailing_adapter]
-
-                if len(start_marker_list) != len(end_marker_list):
-                    logger.warning(f"Found %d start markers and %d end markers.  Only looking at first %d pairs.  "
-                                   f"(starts: %s, ends: %s)",
-                                   len(start_marker_list), len(end_marker_list),
-                                   min(len(start_marker_list), len(end_marker_list)),
-                                   " ".join([f"{i}:{s.name}" for i, s in start_marker_list]),
-                                   " ".join([f"{i}:{s.name}" for i, s in end_marker_list]))
+                # Check if the read is already segmented:
+                if (not read.has_tag(bam_utils.READ_IS_SEGMENTED_TAG)) or (not read.get_tag(bam_utils.READ_IS_SEGMENTED_TAG)):
+                    # The read is not segmented.  We should segment it first and then go through our segments one by one:
+                    segmented_reads = []
+                    segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segments)
+                    for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
+                        segmented_reads.append(
+                            create_simple_split_array_element(
+                                delim_name, end_coord, m, prev_delim_name, read, segments, start_coord
+                            )
+                        )
+                else:
+                    segmented_reads = [read]
 
                 extracted_segment = False
-
-                # Go through each marker pair and do the extraction:
-                for s_info, e_info in zip(start_marker_list, end_marker_list):
-
-                    si, start_marker = s_info
-                    ei, end_marker = e_info
-
-                    # Does the start marker come before the end marker and do we have exactly one random segment in
-                    # between them?
-                    if (start_marker.end < end_marker.start) and (ei - si == 2) and (segments[si + 1].name == "random"):
-                        # We have a valid segment to extract:
-                        logger.debug("Found a segment to extract: %s: %s", read.query_name, segments[si + 1])
-
-                        # Create an AlignedSegment to output:
-                        aligned_segment = _create_extracted_aligned_segment(
-                            read, segments[si + 1], start_offset, base_padding
-                        )
-
-                        if aligned_segment:
-                            extracted_bam_file.write(aligned_segment)
-                            num_segments_extracted += 1
-                            extracted_segment = True
-                        else:
-                            num_segments_skipped += 1
+                for r in segmented_reads:
+                    # If our model has a coding region, we should use it:
+                    if has_coding_region:
+                        es, nsx, nss = \
+                            _extract_region_from_model_with_coding_region(read, segments, m, base_padding, extracted_bam_file)
                     else:
-                        if start_marker.end >= end_marker.start:
-                            logger.warning("Read %s: start marker segment (i=%d) occurs at or after end segment (i=%d):"
-                                           " %d >= %d.  Skipping segment.",
-                                           read.query_name, si, ei, start_marker.end, end_marker.start)
-                        elif ei - si != 2:
-                            logger.warning("Read %s: start segment (i=%d) and end segment (i=%d) have more than one "
-                                           "segment between them.  Skipping segment.", read.query_name, si, ei)
-                        elif segments[si + 1].name != "random":
-                            logger.warning("Read %s: segment between start segment (i=%d) and end segment (i=%d) "
-                                           "is not a random segment.  Skipping segment.", read.query_name, si, ei)
-                        num_segments_skipped += 1
+                        # We do not have a coding section, so we'll need to do things the old fashioned way:
+                        es, nsx, nss = \
+                            _extract_region_from_model_without_coding_region(read, segments, leading_adapter, trailing_adapter, start_offset, base_padding, extracted_bam_file)
 
-                pbar.update(1)
+                    # Track our stats:
+                    extracted_segment |= es
+                    num_segments_extracted += nsx
+                    num_segments_skipped += nss
+
                 num_reads += 1
                 if extracted_segment:
                     num_reads_with_extracted_segments += 1
+
+                pbar.update(1)
 
     # Calc some stats:
     pct_reads_with_extracted_segments = 100 * num_reads_with_extracted_segments / num_reads if num_reads > 0 else 0
@@ -203,6 +233,92 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
     logger.info(f"Total # Segments Extracted: %d", num_segments_extracted)
     logger.info(f"Total # Segments Skipped: %d", num_segments_skipped)
     logger.info(f"# Segments extracted per read: %2.2f", segs_per_read)
+
+
+def _extract_region_from_model_without_coding_region(read, segments, leading_adapter, trailing_adapter, start_offset, base_padding, extracted_bam_file):
+    # Get our marker segments:
+    start_marker_list = [(i, s) for i, s in enumerate(segments) if s.name == leading_adapter]
+    end_marker_list = [(i, s) for i, s in enumerate(segments) if s.name == trailing_adapter]
+
+    if len(start_marker_list) != len(end_marker_list):
+        logger.warning(f"Found %d start markers and %d end markers.  Only looking at first %d pairs.  "
+                       f"(starts: %s, ends: %s)",
+                       len(start_marker_list), len(end_marker_list),
+                       min(len(start_marker_list), len(end_marker_list)),
+                       " ".join([f"{i}:{s.name}" for i, s in start_marker_list]),
+                       " ".join([f"{i}:{s.name}" for i, s in end_marker_list]))
+
+    extracted_segment = False
+
+    num_segments_skipped = 0
+    num_segments_extracted = 0
+
+    # Go through each marker pair and do the extraction:
+    for s_info, e_info in zip(start_marker_list, end_marker_list):
+
+        si, start_marker = s_info
+        ei, end_marker = e_info
+
+        # Does the start marker come before the end marker and do we have exactly one random segment in
+        # between them?
+        if (start_marker.end < end_marker.start) and (ei - si == 2) and (
+                segments[si + 1].name == "random"):
+            # We have a valid segment to extract:
+            logger.debug("Found a segment to extract: %s: %s", read.query_name, segments[si + 1])
+
+            # Create an AlignedSegment to output:
+            aligned_segment = _create_extracted_aligned_segment(
+                read, segments[si + 1], start_offset, base_padding
+            )
+
+            if aligned_segment:
+                extracted_bam_file.write(aligned_segment)
+                num_segments_extracted += 1
+                extracted_segment = True
+            else:
+                num_segments_skipped += 1
+        else:
+            if start_marker.end >= end_marker.start:
+                logger.warning(
+                    "Read %s: start marker segment (i=%d) occurs at or after end segment (i=%d):"
+                    " %d >= %d.  Skipping segment.",
+                    read.query_name, si, ei, start_marker.end, end_marker.start)
+            elif ei - si != 2:
+                logger.warning(
+                    "Read %s: start segment (i=%d) and end segment (i=%d) have more than one "
+                    "segment between them.  Skipping segment.", read.query_name, si, ei)
+            elif segments[si + 1].name != "random":
+                logger.warning("Read %s: segment between start segment (i=%d) and end segment (i=%d) "
+                               "is not a random segment.  Skipping segment.", read.query_name, si, ei)
+            num_segments_skipped += 1
+
+    return extracted_segment, num_segments_extracted, num_segments_skipped
+
+
+def _extract_region_from_model_with_coding_region(read, segments, m, base_padding, extracted_bam_file):
+    # Get our marker segments:
+    # NOTE: Even though this is a list, we only expect one segment to be here:
+    extraction_segments = [s for s in segments if s.name == m.coding_region]
+
+    if len(extraction_segments) == 0:
+        logger.warning(f"Did not find coding region in read: %s", read.query_name)
+        return False, 0, 1
+
+    else:
+        if len(extraction_segments) > 1:
+            logger.warning(f"Found %d coding regions in read %s.  Only looking at first coding region.",
+                           len(extraction_segments), read.query_name)
+
+        # Create an AlignedSegment to output:
+        aligned_segment = _create_extracted_aligned_segment(
+            read, extraction_segments[0], 0, base_padding
+        )
+
+        if aligned_segment:
+            extracted_bam_file.write(aligned_segment)
+            return True, 1, 0
+        else:
+            return False, 0, 1
 
 
 def _create_extracted_aligned_segment(read, seg_to_extract, start_offset, base_padding):
