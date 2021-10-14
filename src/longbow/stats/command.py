@@ -226,7 +226,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     array_element_lengths = np.array(array_element_lengths)
 
     # Write our stats out to the appropriate files:
-    _write_stats(input_bam.name, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix, model.name, output_prefix, do_simple_splitting)
+    _write_stats(input_bam.name, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix, model, output_prefix, do_simple_splitting)
 
     logger.info("Writing complete ligation matrix...")
     _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model.name})")
@@ -238,7 +238,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
 
 
 def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix,
-                 model_name, output_prefix, do_simple_splitting):
+                 model, output_prefix, do_simple_splitting):
     """Write out all basic statistics for the data in the input file."""
 
     # Calculate histogram of array lengths.  Bins are created around integer values.
@@ -255,31 +255,37 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
     array_element_length_median = np.median(array_element_lengths)
 
     num_array_element_length_bins = 100
-    array_element_length_bin_max = int(np.max(array_element_lengths))
+    try:
+        array_element_length_bin_max = int(np.max(array_element_lengths))
 
-    # Create a histogram centered around the mass of the array lengths
-    # Track outliers as the last bin of the histogram:
-    array_element_length_std = np.std(array_element_lengths)
-    sfactor = 3
-    range_scaler = np.abs(array_element_length_mean - array_element_length_median)
-    if range_scaler < array_element_length_mean * 0.05:
-        range_scaler = array_element_length_std
-    min_bin = array_element_length_mean - (range_scaler * sfactor)
-    if min_bin < 0:
-        min_bin = 0
-    max_bin = array_element_length_mean + (range_scaler * sfactor)
-    bin_width = (max_bin - min_bin) / num_array_element_length_bins
-    array_element_length_hist_bins = np.arange(min_bin, max_bin, bin_width, dtype=int)
-    array_element_length_hist_bins[-1] = array_element_length_bin_max + 1
-    array_element_length_count_hist, _ = np.histogram(array_element_lengths,
-                                                      bins=array_element_length_hist_bins-(bin_width * .5))
+        # Create a histogram centered around the mass of the array lengths
+        # Track outliers as the last bin of the histogram:
+        array_element_length_std = np.std(array_element_lengths)
+        sfactor = 3
+        range_scaler = np.abs(array_element_length_mean - array_element_length_median)
+        if range_scaler < array_element_length_mean * 0.05:
+            range_scaler = array_element_length_std
+        min_bin = array_element_length_mean - (range_scaler * sfactor)
+        if min_bin < 0:
+            min_bin = 0
+        max_bin = array_element_length_mean + (range_scaler * sfactor)
+        bin_width = (max_bin - min_bin) / num_array_element_length_bins
+        array_element_length_hist_bins = np.arange(min_bin, max_bin, bin_width, dtype=int)
+        array_element_length_hist_bins[-1] = array_element_length_bin_max + 1
+        array_element_length_count_hist, _ = np.histogram(array_element_lengths,
+                                                          bins=array_element_length_hist_bins-(bin_width * .5))
 
-    array_element_length_hist_bins = array_element_length_hist_bins[:-1]
-    array_element_length_hist_bins = array_element_length_hist_bins.astype(int)
+        array_element_length_hist_bins = array_element_length_hist_bins[:-1]
+        array_element_length_hist_bins = array_element_length_hist_bins.astype(int)
+    except ValueError:
+        # In this case, we had no array elements!
+        # This is probably because the wrong model was used.
+        array_element_length_hist_bins = []
+        array_element_length_count_hist = []
 
     logger.info("Writing summary stats file...")
     _write_summary_stats_file(input_bam,
-                              model_name,
+                              model,
                               output_prefix,
                               do_simple_splitting,
                               array_lengths,
@@ -299,7 +305,7 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
                                    array_length_hist_bins,
                                    array_length_mean,
                                    array_length_median,
-                                   model_name)
+                                   model.name)
 
     logger.info("Writing array element stat histograms...")
     _create_array_element_length_histogram(output_prefix,
@@ -308,11 +314,11 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
                                            array_element_length_hist_bins,
                                            array_element_length_mean,
                                            array_element_length_median,
-                                           model_name)
+                                           model.name)
 
 
 def _write_summary_stats_file(input_bam,
-                              model_name,
+                              model,
                               output_prefix,
                               do_simple_splitting,
                               array_lengths,
@@ -335,11 +341,18 @@ def _write_summary_stats_file(input_bam,
 
     # Calculate summary stats on array element lengths:
     num_array_elements = len(array_element_lengths)
-    array_element_length_min = np.min(array_element_lengths)
-    array_element_length_max = np.max(array_element_lengths)
-    array_element_length_mean = np.mean(array_element_lengths)
-    array_element_length_median = np.median(array_element_lengths)
-    array_element_length_std = np.std(array_element_lengths)
+    if num_array_elements == 0:
+        array_element_length_min = 0
+        array_element_length_max = 0
+        array_element_length_mean = 0
+        array_element_length_median = 0
+        array_element_length_std = 0
+    else:
+        array_element_length_min = np.min(array_element_lengths)
+        array_element_length_max = np.max(array_element_lengths)
+        array_element_length_mean = np.mean(array_element_lengths)
+        array_element_length_median = np.median(array_element_lengths)
+        array_element_length_std = np.std(array_element_lengths)
 
     logger.debug("Calculating ligation profiles...")
     ligation_profile_data = _calculate_top_ligation_profiles(len(array_lengths),
@@ -369,12 +382,62 @@ def _write_summary_stats_file(input_bam,
         f.write("\n")
         f.write("\n")
 
+        logger.debug("Number of reads processed: %d", len(array_lengths))
+        logger.debug("Number of array elements found: %d", len(array_element_lengths))
+
+        if len(array_element_lengths) == 0:
+            logger.warning("No array elements were found.  Either something went horribly wrong in library prep or "
+                           "you used the wrong model when running `longbow stats` (and the latter is more likely - "
+                           "CHECK YOUR INPUTS!).")
+            f.write("\n")
+            f.write("#" + ("=" * 80) + "\n")
+            f.write("""#                 __        ___    ____  _   _ ___ _   _  ____\n""")
+            f.write("""#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n""")
+            f.write("""#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n""")
+            f.write("""#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n""")
+            f.write("""#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n""")
+            f.write("#\n")
+            f.write("WARNING:                  No array elements were found.\n")
+            f.write("WARNING:        Either something went horribly wrong in library prep\n")
+            f.write("WARNING:                               or\n")
+            f.write("WARNING:        You used the wrong model when running `longbow stats`.\n")
+            f.write("WARNING:        The latter is more likely. CHECK YOUR INPUTS!!!!!!!!!!\n")
+            f.write("#" + ("=" * 80) + "\n")
+            f.write("\n")
+
+        if len(array_lengths) == len(array_element_lengths):
+            logger.warning("The number of array elements found was the same as the number of array reads processed.  "
+                           "Either something went horribly wrong in library prep or you used the wrong model when "
+                           "running `longbow stats` (and the latter is more likely - CHECK YOUR INPUTS!).")
+            f.write("\n")
+            f.write("#" + ("=" * 80) + "\n")
+            f.write("""#                 __        ___    ____  _   _ ___ _   _  ____\n""")
+            f.write("""#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n""")
+            f.write("""#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n""")
+            f.write("""#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n""")
+            f.write("""#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n""")
+            f.write("#\n")
+            f.write("WARNING:   The number of array elements found was the same as the number of\n")
+            f.write("WARNING:                        array reads processed.\n")
+            f.write("WARNING:        Either something went horribly wrong in library prep\n")
+            f.write("WARNING:                               or\n")
+            f.write("WARNING:        You used the wrong model when running `longbow stats`.\n")
+            f.write("WARNING:        The latter is more likely. CHECK YOUR INPUTS!!!!!!!!!!\n")
+            f.write("#" + ("=" * 80) + "\n")
+            f.write("\n")
+
         f.write("#" + ("-" * 80) + "\n")
-        f.write(f"MAS-seq / Longbow Model:\t{model_name}\n")
+        f.write(f"MAS-seq / Longbow Model:\t{model.name}\n")
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
         f.write(f"Total Num Array Elements (Segmented Arrays):\t{num_array_elements}\n")
         f.write(f"Output yield gain:\t{num_array_elements/len(array_lengths):.2f}x\n")
         f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
+        f.write("\n")
+        f.write("#" + ("-" * 80) + "\n")
+        f.write(f"Model structure ({model.name}):\n")
+        for array_element_structure in model.array_element_structure:
+            s = " ".join(array_element_structure)
+            f.write(f"\t{s}\n")
         f.write("\n")
 
         _write_length_stats_to_file(f, "Array Length", array_length_count_hist,
@@ -460,17 +523,18 @@ def _write_length_stats_to_file(f, name, count_hist, hist_bins, stat_min, stat_m
     f.write(f"median:\t{stat_median}\n")
     f.write(f"std:\t{stat_std}\n")
     f.write("\n")
-    f.write("#" + ("-" * 80) + "\n")
-    f.write(f"{name} Hist:\n")
-    f.write(f"Length   Count\n")
-    fstring = 'd' if (isinstance(hist_bins[0], np.signedinteger) or isinstance(hist_bins[0], np.unsignedinteger))  else 'f'
-    for i, h in enumerate(count_hist[:-1]):
-        f.write(f"{hist_bins[i]:2{fstring}}:\t{h}\n")
-    if do_outliers:
-        f.write(f"Outliers in higher bins:\t{count_hist[-1]}\n")
-    else:
-        f.write(f"{hist_bins[-1]:2{fstring}}:\t{count_hist[-1]}\n")
-    f.write("\n")
+    if len(count_hist) > 0:
+        f.write("#" + ("-" * 80) + "\n")
+        f.write(f"{name} Hist:\n")
+        f.write(f"Length   Count\n")
+        fstring = 'd' if (isinstance(hist_bins[0], np.signedinteger) or isinstance(hist_bins[0], np.unsignedinteger)) else 'f'
+        for i, h in enumerate(count_hist[:-1]):
+            f.write(f"{hist_bins[i]:2{fstring}}:\t{h}\n")
+        if do_outliers:
+            f.write(f"Outliers in higher bins:\t{count_hist[-1]}\n")
+        else:
+            f.write(f"{hist_bins[-1]:2{fstring}}:\t{count_hist[-1]}\n")
+        f.write("\n")
     f.write("\n")
 
 
@@ -538,7 +602,11 @@ def _create_array_length_histogram(output_prefix,
     ax = fig.add_subplot()
 
     # Plot the bar graph:
-    tic_width = hist_bins[-1] - hist_bins[-2]
+    if len(hist_bins) > 1:
+        tic_width = hist_bins[-1] - hist_bins[-2]
+    else:
+        tic_width = 1
+
     bar_width = tic_width*0.8
     h = ax.bar(hist_bins, count_hist, width=bar_width, label=f"{stat_name}s")
     handles.append(h)
@@ -579,7 +647,6 @@ def _create_array_length_histogram(output_prefix,
     ax.set_xlabel(stat_name)
     ax.set_ylabel("Number of Reads")
 
-    tic_width = hist_bins[-1] - hist_bins[-2]
     ax.set_xticks([x for x in range(0, 1+int(max(hist_bins)), tic_width)])
 
     fig.legend(handles=handles, loc="upper right")
@@ -629,14 +696,15 @@ def _create_array_element_length_histogram(output_prefix,
     )
     handles.append(h)
 
-    h, = ax.plot(
-        [hist_bins[-2] + (hist_bins[-1] - hist_bins[-2])]*2,
-        [ymin - (yrange * .1), ymax + (yrange * .2)],
-        "-",
-        color="red",
-        label="Outlier Break"
-    )
-    handles.append(h)
+    if len(hist_bins) > 1:
+        h, = ax.plot(
+            [hist_bins[-2] + (hist_bins[-1] - hist_bins[-2])]*2,
+            [ymin - (yrange * .1), ymax + (yrange * .2)],
+            "-",
+            color="red",
+            label="Outlier Break"
+        )
+        handles.append(h)
 
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax + (yrange * .1))
