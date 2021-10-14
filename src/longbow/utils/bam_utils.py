@@ -6,6 +6,8 @@ import logging
 import click_log
 import collections
 import re
+from collections import OrderedDict
+from math import ceil, floor
 
 from construct import *
 from inspect import getframeinfo, currentframe, getdoc
@@ -78,6 +80,66 @@ def load_read_count(pbi_file):
         idx_contents = fmt.parse_stream(f)
 
         return idx_contents.n_reads
+
+
+def compute_shard_offsets(pbi_file, num_shards):
+    """
+    Compute all possible shard offsets (keeping adjacent reads from the ZMW together)
+    """
+
+    # Decode PacBio .pbi file.  This is not a full decode of the index, only the parts we need for sharding.
+    # More on index format at https://pacbiofileformats.readthedocs.io/en/9.0/PacBioBamIndex.html .
+
+    fmt = Struct(
+        # Header
+        "magic" / Const(b"PBI\x01"),
+        "version_patch" / Int8ul,
+        "version_minor" / Int8ul,
+        "version_major" / Int8ul,
+        "version_empty" / Int8ul,
+        "pbi_flags" / Int16ul,
+        "n_reads" / Int32ul,
+        "reserved" / Padding(18),
+
+        # Basic information section (columnar format)
+        "rgId" / Padding(this.n_reads * 4),
+        "qStart" / Padding(this.n_reads * 4),
+        "qEnd" / Padding(this.n_reads * 4),
+        "holeNumber" / Array(this.n_reads, Int32sl),
+        "readQual" / Padding(this.n_reads * 4),
+        "ctxtFlag" / Padding(this.n_reads * 1),
+        "fileOffset" / Array(this.n_reads, Int64sl),
+        )
+
+    # Make a list of bgzf virtual file offsets for sharding and store ZMW counts.
+    file_offsets_hash = OrderedDict()
+    last_offset = 0
+    zmw_count_hash = {}
+    with gzip.open(pbi_file, "rb") as f:
+        idx_contents = fmt.parse_stream(f)
+
+        for j in range(0, idx_contents.n_reads):
+            # Save only the virtual file offset for the first ZMW hole number, so
+            # that shard boundaries always keep reads from the same ZMW together.
+            if idx_contents.holeNumber[j] not in file_offsets_hash:
+                file_offsets_hash[idx_contents.holeNumber[j]] = idx_contents.fileOffset[j]
+
+            last_offset = idx_contents.fileOffset[j]
+
+            zmw_count_hash[idx_contents.holeNumber[j]] = zmw_count_hash.get(idx_contents.holeNumber[j], 0) + 1
+
+    file_offsets = list(file_offsets_hash.values())
+    shard_offsets = []
+    read_counts = []
+    for j in range(0, len(file_offsets), ceil(len(file_offsets) / num_shards)):
+        shard_offsets.append(file_offsets[j])
+        read_counts.append(ceil(len(file_offsets) / num_shards))
+
+    # For the last read in the file, pad the offset so the final comparison in write_shard() retains the final read.
+    offset_padding = 100
+    shard_offsets.append(last_offset + offset_padding)
+
+    return shard_offsets, zmw_count_hash, idx_contents.n_reads, read_counts
 
 
 def create_bam_header_with_program_group(command_name, base_bam_header, description=None, models=None):

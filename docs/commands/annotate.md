@@ -49,6 +49,10 @@ Options:
                          will assume the contents are the configuration of a
                          LibraryModel as per LibraryModel.to_json().
                          [default: mas15]
+                         
+  -c, --chunk TEXT       Process a single chunk of data (e.g. specify '2/4' to
+                         process the second of four equally-sized chunks
+                         across the dataset)
 
   --help                 Show this message and exit.
 ```
