@@ -170,9 +170,13 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
                 delimiter_found, delimiter_segments = segment.segment_read_with_bounded_region_algorithm(read, model, segments)
                 array_len = sum(delimiter_found)
                 # Track segment lengths:
+                segment_tuples = []
                 for i, seg_list in enumerate(delimiter_segments):
                     if delimiter_found[i]:
                         array_element_lengths.append(seg_list[-1].end - seg_list[0].start + 1)
+                        segment_tuples.append(
+                            tuple([seg_list[0].name, seg_list[-1].name, seg_list[0].start, seg_list[-1].end])
+                        )
 
             # Here we need to adjust for our segmentation array count.
             # without this step, we will allow array elements consisting of only `random` sections
@@ -222,7 +226,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     array_element_lengths = np.array(array_element_lengths)
 
     # Write our stats out to the appropriate files:
-    _write_stats(input_bam.name, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix, model.name, output_prefix)
+    _write_stats(input_bam.name, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix, model.name, output_prefix, do_simple_splitting)
 
     logger.info("Writing complete ligation matrix...")
     _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model.name})")
@@ -234,7 +238,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
 
 
 def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix,
-                 model_name, output_prefix):
+                 model_name, output_prefix, do_simple_splitting):
     """Write out all basic statistics for the data in the input file."""
 
     # Calculate histogram of array lengths.  Bins are created around integer values.
@@ -277,6 +281,7 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
     _write_summary_stats_file(input_bam,
                               model_name,
                               output_prefix,
+                              do_simple_splitting,
                               array_lengths,
                               array_length_count_hist,
                               array_length_hist_bins,
@@ -309,6 +314,7 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
 def _write_summary_stats_file(input_bam,
                               model_name,
                               output_prefix,
+                              do_simple_splitting,
                               array_lengths,
                               array_length_count_hist,
                               array_length_hist_bins,
@@ -352,6 +358,12 @@ def _write_summary_stats_file(input_bam,
         f.write(f"#Time: {datetime.datetime.fromtimestamp(current_timestamp)} {timezone} ")
         f.write(f"({current_timestamp})\n")
         f.write(f"#Input file: {input_bam}\n")
+        f.write(f"#Splitting algorithm: ")
+        if do_simple_splitting:
+            f.write(f"Simple Splitting")
+        else:
+            f.write(f"Bounded Region")
+        f.write("\n")
         f.write("#")
         f.write("=" * 80)
         f.write("\n")
@@ -369,6 +381,11 @@ def _write_summary_stats_file(input_bam,
                                     array_length_hist_bins, array_length_min, array_length_max,
                                     array_length_mean, array_length_median, array_length_std)
 
+        f.write("#" + ("-" * 80) + "\n")
+        if do_simple_splitting:
+            f.write("#REMINDER: Array splitting performed with Simple Splitting algorithm.\n")
+        else:
+            f.write("#REMINDER: Array splitting performed with Bounded Region algorithm.\n")
         _write_length_stats_to_file(f, "Array Element Length", array_element_length_count_hist,
                                     array_element_length_hist_bins, array_element_length_min, array_element_length_max,
                                     array_element_length_mean, array_element_length_median, array_element_length_std,
