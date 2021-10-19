@@ -1,4 +1,5 @@
 import logging
+import re
 import sys
 import os
 
@@ -21,6 +22,9 @@ from ..utils.model import LibraryModel
 from ..segment import command as segment
 
 from ..annotate.command import get_segments
+
+
+plot_title_path_regex = re.compile(r".*/([^/].*?)/*$")
 
 
 logging.basicConfig(stream=sys.stderr)
@@ -270,6 +274,10 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
             min_bin = 0
         max_bin = array_element_length_mean + (range_scaler * sfactor)
         bin_width = (max_bin - min_bin) / num_array_element_length_bins
+
+        # Make sure we don't lose the left-hand tail:
+        min_bin = 0
+
         array_element_length_hist_bins = np.arange(min_bin, max_bin, bin_width, dtype=int)
         array_element_length_hist_bins[-1] = array_element_length_bin_max + 1
         array_element_length_count_hist, _ = np.histogram(array_element_lengths,
@@ -299,7 +307,7 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
 
     logger.info("Writing read stat histograms...")
     _create_array_length_histogram(output_prefix,
-                             "Array Length",
+                                   "Array Length",
                                    len(array_lengths),
                                    array_length_count_hist,
                                    array_length_hist_bins,
@@ -642,8 +650,14 @@ def _create_array_length_histogram(output_prefix,
     for c, l in zip(count_hist, hist_bins):
         h = ax.text(l, c + yoff, f"{c}\n{c / num_data_points * 100:.02f}%", horizontalalignment='center')
 
+    prefix_title = output_prefix
+    if "/" in output_prefix:
+        while prefix_title.endswith("/"):
+            prefix_title = prefix_title[:-1]
+        prefix_title = plot_title_path_regex.match(prefix_title).group(1)
+
     t = f"MAS-seq {stat_name} Counts\n({model_name})"
-    ax.set_title(f"{output_prefix} {t}")
+    ax.set_title(f"{prefix_title}\n{t}")
     ax.set_xlabel(stat_name)
     ax.set_ylabel("Number of Reads")
 
@@ -709,8 +723,14 @@ def _create_array_element_length_histogram(output_prefix,
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax + (yrange * .1))
 
+    prefix_title = output_prefix
+    if "/" in output_prefix:
+        while prefix_title.endswith("/"):
+            prefix_title = prefix_title[:-1]
+        prefix_title = plot_title_path_regex.match(prefix_title).group(1)
+
     t = f"MAS-seq {stat_name} Counts\n({model_name})"
-    ax.set_title(f"{output_prefix} {t}")
+    ax.set_title(f"{prefix_title}\n{t}")
     ax.set_xlabel(stat_name)
     ax.set_ylabel("Number of Reads")
 
