@@ -258,14 +258,14 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
     array_element_length_mean = np.mean(array_element_lengths)
     array_element_length_median = np.median(array_element_lengths)
 
-    num_array_element_length_bins = 100
+    num_array_element_length_bins = 150
     try:
         array_element_length_bin_max = int(np.max(array_element_lengths))
 
         # Create a histogram centered around the mass of the array lengths
         # Track outliers as the last bin of the histogram:
         array_element_length_std = np.std(array_element_lengths)
-        sfactor = 3
+        sfactor = 4
         range_scaler = np.abs(array_element_length_mean - array_element_length_median)
         if range_scaler < array_element_length_mean * 0.05:
             range_scaler = array_element_length_std
