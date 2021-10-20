@@ -114,7 +114,7 @@ def compute_shard_offsets(pbi_file, num_shards):
     # Make a list of bgzf virtual file offsets for sharding and store ZMW counts.
     file_offsets_hash = OrderedDict()
     last_offset = 0
-    zmw_count_hash = {}
+    zmw_count_hash = dict()
     with gzip.open(pbi_file, "rb") as f:
         idx_contents = fmt.parse_stream(f)
 
