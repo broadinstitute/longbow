@@ -126,7 +126,10 @@ def compute_shard_offsets(pbi_file, num_shards):
 
             last_offset = idx_contents.fileOffset[j]
 
-            zmw_count_hash[idx_contents.holeNumber[j]] = zmw_count_hash.get(idx_contents.holeNumber[j], 0) + 1
+            try:
+                zmw_count_hash[idx_contents.holeNumber[j]] += 1
+            except KeyError:
+                zmw_count_hash[idx_contents.holeNumber[j]] = 1
 
     file_offsets = list(file_offsets_hash.values())
     shard_offsets = []
