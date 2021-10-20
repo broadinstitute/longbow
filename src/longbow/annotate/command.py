@@ -1,4 +1,5 @@
 import logging
+import math
 import sys
 import itertools
 import re
@@ -62,8 +63,17 @@ click_log.basic_config(logger)
          "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
          "of a LibraryModel as per LibraryModel.to_json()."
 )
+@click.option(
+    "-c",
+    "--chunk",
+    type=str,
+    default="",
+    required=False,
+    help="Process a single chunk of data (e.g. specify '2/4' to process the second of four equally-sized "
+         "chunks across the dataset)"
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_bam, model, input_bam):
+def main(pbi, threads, output_bam, model, chunk, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
@@ -83,9 +93,29 @@ def main(pbi, threads, output_bam, model, input_bam):
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
+    start_offset = 0
+    end_offset = math.inf
+
+    if not os.path.exists(pbi) and chunk is not "":
+        raise ValueError(f"Chunking specified but pbi file '{pbi}' not found")
+
     if os.path.exists(pbi):
-        read_count = bam_utils.load_read_count(pbi)
-        logger.info("Annotating %d reads", read_count)
+        if chunk is not "":
+            (chunk, num_chunks) = re.split("/", chunk)
+            chunk = int(chunk)
+            num_chunks = int(num_chunks)
+
+            # Decode PacBio .pbi file and determine the shard offsets.
+            offsets, zmw_counts, read_count, read_counts_per_chunk = bam_utils.compute_shard_offsets(pbi, num_chunks)
+
+            start_offset = offsets[chunk - 1]
+            end_offset = offsets[chunk] if chunk < len(offsets) else offsets[chunk - 1]
+            read_count = read_counts_per_chunk[chunk - 1] if chunk < len(offsets) else 0
+
+            logger.info("Annotating %d reads from chunk %d/%d", read_count, chunk, num_chunks)
+        else:
+            read_count = bam_utils.load_read_count(pbi)
+            logger.info("Annotating %d reads", read_count)
 
     # Create queues for data:
     queue_size = threads * 2 if threads < 10 else 20
@@ -105,8 +135,12 @@ def main(pbi, threads, output_bam, model, input_bam):
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
-        input_bam, "rb", check_sq=False, require_index=False
+        input_bam if start_offset == 0 else input_bam.name, "rb", check_sq=False, require_index=False
     ) as bam_file:
+
+        # If we're chunking, advance to the specified virtual file offset.
+        if start_offset > 0:
+            bam_file.seek(start_offset)
 
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[m])
@@ -127,6 +161,11 @@ def main(pbi, threads, output_bam, model, input_bam):
             if r is not None:
                 r = r.to_string()
             input_data_queue.put(r)
+
+            if start_offset > 0:
+                if bam_file.tell() >= end_offset or r is None:
+                    [input_data_queue.put(None) for _ in range(threads)]
+                    break
 
         logger.debug("Finished reading data and sending it to sub-processes.")
         logger.debug("Waiting for sub-processes to finish...")
