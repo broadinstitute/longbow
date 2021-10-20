@@ -136,8 +136,7 @@ def compute_shard_offsets(pbi_file, num_shards):
         read_counts.append(ceil(len(file_offsets) / num_shards))
 
     # For the last read in the file, pad the offset so the final comparison in write_shard() retains the final read.
-    offset_padding = 100
-    shard_offsets.append(last_offset + offset_padding)
+    shard_offsets.append(os.path.getsize(pbi_file) + 1)
 
     return shard_offsets, zmw_count_hash, idx_contents.n_reads, read_counts
 

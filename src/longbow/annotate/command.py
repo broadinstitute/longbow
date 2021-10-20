@@ -95,6 +95,10 @@ def main(pbi, threads, output_bam, model, chunk, input_bam):
     read_count = None
     start_offset = 0
     end_offset = math.inf
+
+    if not os.path.exists(pbi) and chunk is not "":
+        raise ValueError(f"Chunking specified but pbi file '{pbi}' not found")
+
     if os.path.exists(pbi):
         if chunk is not "":
             (chunk, num_chunks) = re.split("/", chunk)
