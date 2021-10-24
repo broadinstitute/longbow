@@ -39,7 +39,7 @@ Usage: longbow annotate [OPTIONS] INPUT_BAM
 Options:
   -v, --verbosity LVL    Either CRITICAL, ERROR, WARNING, INFO or DEBUG
   -p, --pbi PATH         BAM .pbi index file
-  -t, --threads INTEGER  number of threads to use (0 for all)  [default: 7]
+  -t, --threads INTEGER  number of threads to use (0 for all)  [default: # Processors - 1]
   -o, --output-bam PATH  annotated bam output  [default: stdout]
   -m, --model TEXT       The model to use for annotation.  If the given value
                          is a pre-configured model name, then that model will
