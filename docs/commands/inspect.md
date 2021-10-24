@@ -28,7 +28,6 @@ Options:
   -v, --verbosity LVL          Either CRITICAL, ERROR, WARNING, INFO or DEBUG
   -r, --read-names TEXT        read names (or file(s) of read names) to
                                inspect
-
   -p, --pbi PATH               BAM .pbi index file
   -f, --file-format [png|pdf]  Image file format
   -o, --outdir PATH            Output directory
@@ -41,10 +40,17 @@ Options:
                                contents are the configuration of a
                                LibraryModel as per LibraryModel.to_json().
                                [default: mas15]
-
   --seg-score                  Display alignment score for annotated segments.
                                [default: False]
-
+  --max-length INTEGER         Maximum length of a read to process.  Reads
+                               beyond this length will not be annotated.  If
+                               the input file has already been annotated, this
+                               parameter is ignored.  [default: 60000]
+  --min-rq FLOAT               Minimum ccs-determined read quality for a read
+                               to be annotated.  CCS read quality range is
+                               [-1,1].  If the input file has already been
+                               annotated, this parameter is ignored.
+                               [default: -2.0]
   --help                       Show this message and exit.
 ```
 
