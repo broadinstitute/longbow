@@ -74,8 +74,24 @@ click_log.basic_config(logger)
     show_default=True,
     help="Display alignment score for annotated segments."
 )
+@click.option(
+    "--max-length",
+    type=int,
+    default=60000,
+    show_default=True,
+    required=False,
+    help="Maximum length of a read to process.  Reads beyond this length will not be annotated.  If the input file has already been annotated, this parameter is ignored."
+)
+@click.option(
+    "--min-rq",
+    type=float,
+    default=-2,
+    show_default=True,
+    required=False,
+    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].  If the input file has already been annotated, this parameter is ignored."
+)
 @click.argument("input-bam", type=click.Path(exists=True))
-def main(read_names, pbi, file_format, outdir, model, seg_score, input_bam):
+def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min_rq, input_bam):
     """Inspect the classification results on specified reads."""
 
     t_start = time.time()
@@ -116,25 +132,26 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, input_bam):
 
                 bf.seek(file_offsets[z]["offset"])
                 read = bf.__next__()
-                __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner)
+                __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner, max_length, min_rq)
         else:
             # Without read names we just inspect every read in the file:
             logger.info("No read names given.  Inspecting every read in the input bam file.")
             for read in bf:
-                __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner)
+                __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner, max_length, min_rq)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner):
+def __create_read_figure(file_format, lb_model, outdir, read, seg_score, ssw_aligner, max_length, min_rq):
     """Create a figure for the given read."""
 
     out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
 
-    seq, path, logp = annotate_read(read, lb_model)
+    seq, path, logp = annotate_read(read, lb_model, max_length, min_rq)
 
-    logger.info("Drawing read '%s' to '%s'", read.query_name, out)
-    draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
+    if seq is not None:
+        logger.info("Drawing read '%s' to '%s'", read.query_name, out)
+        draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, ssw_aligner, size=13, family="monospace")
 
 
 def load_read_names(read_name_args):
@@ -224,7 +241,7 @@ def load_read_offsets(pbi_file, read_names):
     return file_offsets_hash
 
 
-def annotate_read(read, m):
+def annotate_read(read, m, max_length, min_rq):
     flogp = -math.inf
     fseq = read.query_sequence
     fppath = []
@@ -242,6 +259,16 @@ def annotate_read(read, m):
         # Set our logp from the bam file:
         flogp = read.get_tag(bam_utils.READ_MODEL_SCORE_TAG)
     else:
+
+        # Check for max length and min quality:
+        if len(read.query_sequence) > max_length:
+            logger.warning(f"Read is longer than max length.  "
+                           f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
+            return [None] * 3
+        elif read.get_tag("rq") < min_rq:
+            logger.warning(f"Read quality is below the minimum.  "
+                           f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
+            return [None] * 3
         for seq in [read.query_sequence, reverse_complement(read.query_sequence)]:
             logp, ppath = m.annotate(seq)
 

@@ -72,8 +72,24 @@ click_log.basic_config(logger)
     help="Process a single chunk of data (e.g. specify '2/4' to process the second of four equally-sized "
          "chunks across the dataset)"
 )
+@click.option(
+    "--max-length",
+    type=int,
+    default=60000,
+    show_default=True,
+    required=False,
+    help="Maximum length of a read to process.  Reads beyond this length will not be annotated."
+)
+@click.option(
+    "--min-rq",
+    type=float,
+    default=-2,
+    show_default=True,
+    required=False,
+    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1]."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_bam, model, chunk, input_bam):
+def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
@@ -128,7 +144,7 @@ def main(pbi, threads, output_bam, model, chunk, input_bam):
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m)
+            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m, max_length, min_rq)
         )
         p.start()
         worker_pool.append(p)
@@ -251,7 +267,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             pbar.update(1)
 
 
-def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
+def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, max_length, min_rq):
     """Function to run in each subthread / subprocess.
     Segments each read and place the segments in the output queue."""
 
@@ -276,6 +292,16 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model):
         read = pysam.AlignedSegment.fromstring(
             read, pysam.AlignmentHeader.from_dict(dict())
         )
+
+        # Check for max length and min quality:
+        if len(read.query_sequence) > max_length:
+            logger.warning(f"Read is longer than max length.  "
+                           f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
+            continue
+        elif read.get_tag("rq") < min_rq:
+            logger.warning(f"Read quality is below the minimum.  "
+                           f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
+            continue
 
         # Process and place our data on the output queue:
         segment_info = _segment_read(read, model)

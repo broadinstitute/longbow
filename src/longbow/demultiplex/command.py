@@ -63,8 +63,24 @@ default_models = ("mas10", "mas15")
     help="Models to use to demultiplex the input bam file.  Given model must either be a Longbow built-in model, "
          "or a valid Longbow model json file.  If specified, this option must be specified at least twice."
 )
+@click.option(
+    "--max-length",
+    type=int,
+    default=60000,
+    show_default=True,
+    required=False,
+    help="Maximum length of a read to process.  Reads beyond this length will not be annotated."
+)
+@click.option(
+    "--min-rq",
+    type=float,
+    default=-2,
+    show_default=True,
+    required=False,
+    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1]."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, out_base_name, threads, model, input_bam):
+def main(pbi, out_base_name, threads, model, max_length, min_rq, input_bam):
     """Separate reads into files based on which model they fit best.
 
     Resulting reads will be annotated with the model they best fit as well as the score and segments for that model."""
@@ -136,7 +152,7 @@ def main(pbi, out_base_name, threads, model, input_bam):
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_demux_fn, args=(input_data_queue, results, model_list, i)
+            target=_worker_demux_fn, args=(input_data_queue, results, model_list, i, max_length, min_rq)
         )
         p.start()
         worker_pool.append(p)
@@ -260,7 +276,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, model_list, r
             out_file.close()
 
 
-def _worker_demux_fn(in_queue, out_queue, model_list, worker_num):
+def _worker_demux_fn(in_queue, out_queue, model_list, worker_num, max_length, min_rq):
     """Function to run in each subthread / subprocess.
     Annotates each read with both models and assigns the read to the model with the better score."""
 
@@ -285,6 +301,16 @@ def _worker_demux_fn(in_queue, out_queue, model_list, worker_num):
         read = pysam.AlignedSegment.fromstring(
             read, pysam.AlignmentHeader.from_dict(dict())
         )
+
+        # Check for max length and min quality:
+        if len(read.query_sequence) > max_length:
+            logger.warning(f"Read is longer than max length.  "
+                           f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
+            continue
+        elif read.get_tag("rq") < min_rq:
+            logger.warning(f"Read quality is below the minimum.  "
+                           f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
+            continue
 
         # Process and place our data on the output queue:
         segment_info = _annotate_and_assign_read_to_model(read, model_list)

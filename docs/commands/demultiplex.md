@@ -36,6 +36,12 @@ Options:
                             model, or a valid Longbow model json file.  If
                             specified, this option must be specified at least
                             twice.  [default: mas10, mas15]
+  --max-length INTEGER      Maximum length of a read to process.  Reads beyond
+                            this length will not be annotated.  [default:
+                            60000]
+  --min-rq FLOAT            Minimum ccs-determined read quality for a read to
+                            be annotated.  CCS read quality range is [-1,1].
+                            [default: -2.0]
   --help                    Show this message and exit.
 ```
 

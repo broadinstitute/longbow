@@ -39,7 +39,7 @@ Usage: longbow annotate [OPTIONS] INPUT_BAM
 Options:
   -v, --verbosity LVL    Either CRITICAL, ERROR, WARNING, INFO or DEBUG
   -p, --pbi PATH         BAM .pbi index file
-  -t, --threads INTEGER  number of threads to use (0 for all)  [default: 11]
+  -t, --threads INTEGER  number of threads to use (0 for all)  [default: 7]
   -o, --output-bam PATH  annotated bam output  [default: stdout]
   -m, --model TEXT       The model to use for annotation.  If the given value
                          is a pre-configured model name, then that model will
@@ -49,11 +49,14 @@ Options:
                          will assume the contents are the configuration of a
                          LibraryModel as per LibraryModel.to_json().
                          [default: mas15]
-                         
   -c, --chunk TEXT       Process a single chunk of data (e.g. specify '2/4' to
                          process the second of four equally-sized chunks
                          across the dataset)
-
+  --max-length INTEGER   Maximum length of a read to process.  Reads beyond
+                         this length will not be annotated.  [default: 60000]
+  --min-rq FLOAT         Minimum ccs-determined read quality for a read to be
+                         annotated.  CCS read quality range is [-1,1].
+                         [default: -2.0]
   --help                 Show this message and exit.
 ```
 
