@@ -1,7 +1,7 @@
 # Longbow 
 Annotation and segmentation of MAS-seq data
 
-Current version: 0.4.5
+Current version: 0.4.6
 
 ## Documentation
 
