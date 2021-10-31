@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 # following src dir layout according to
 # https://blog.ionelmc.ro/2014/05/25/python-packaging/#the-structure
-version = "0.4.4"
+version = "version = "0.4.4""
 setup(
     name="maslongbow",
     version=version,
@@ -27,7 +27,7 @@ setup(
         'chardet==4.0.0',
         'click==7.1.2',
         'click-log==0.3.2',
-        'colorama==0.4.4',
+        'colorama==version = "0.4.4"',
         'construct==2.10.67',
         'cycler==0.10.0',
         'Cython==0.29.23',
@@ -52,7 +52,7 @@ setup(
         'kiwisolver==1.3.1',
         'lazy-object-proxy==1.6.0',
         'MarkupSafe==1.1.1',
-        'maslongbow==0.4.4',
+        'maslongbow==version = "0.4.4"',
         'matplotlib==3.4.2',
         'mccabe==0.6.1',
         'multiprocess==0.70.11.1',
