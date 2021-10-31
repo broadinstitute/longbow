@@ -1,0 +1,13 @@
+name: longbow.env
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python==3.7.6
+  - samtools
+  - minimap2
+  - pbmm2
+  - pip
+  - pip:
+    - maslongbow==0.4.6
