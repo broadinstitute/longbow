@@ -1,3 +1,3 @@
 # Version number is automatically set via bumpversion.
 # DO NOT MODIFY:
-VERSION = "VERSION = "0.4.4""
+VERSION = "VERSION = "VERSION = "0.4.4"""
