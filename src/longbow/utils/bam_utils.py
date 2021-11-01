@@ -144,7 +144,7 @@ def compute_shard_offsets(pbi_file, num_shards):
     return shard_offsets, zmw_count_hash, idx_contents.n_reads, read_counts
 
 
-def create_bam_header_with_program_group(command_name, base_bam_header, description=None, models=None):
+def create_bam_header_with_program_group(command_name, base_bam_header, description=None, models=None, rg_dict=None):
     """Create a pysam.AlignmentHeader object with program group (PG) information populated by the given arguments.
 
     This function is intended to be called from the 'main' function of a longbow subcommand because it uses reflection
@@ -159,6 +159,10 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
     # If we have a model here, we should add the description of the model to our program group:
     if models:
         description = description + "  MODEL(s): " + ", ".join([m.to_json(indent=None) for m in models])
+
+    # If we were provided a read group dictionary, add it to the header:
+    if rg_dict:
+        bam_header_dict["RG"] = [rg_dict]
 
     # Add our program group to it:
     pg_dict = {
