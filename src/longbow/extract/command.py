@@ -14,6 +14,8 @@ from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
+from ..utils.bam_utils import SegmentInfo
+
 from ..annotate.command import get_segments
 from ..segment.command import create_simple_delimiters
 from ..segment.command import segment_read_with_simple_splitting
@@ -188,6 +190,7 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
                 # Check if the read is already segmented:
                 if (not read.has_tag(bam_utils.READ_IS_SEGMENTED_TAG)) or (not read.get_tag(bam_utils.READ_IS_SEGMENTED_TAG)):
                     # The read is not segmented.  We should segment it first and then go through our segments one by one:
+                    logger.debug(f"Read must be segmented prior to extraction: {read.query_name}")
                     segmented_reads = []
                     segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segments)
                     for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
@@ -201,14 +204,15 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
 
                 extracted_segment = False
                 for r in segmented_reads:
+                    segments = _get_segments_only(r)
                     # If our model has a coding region, we should use it:
                     if has_coding_region:
                         es, nsx, nss = \
-                            _extract_region_from_model_with_coding_region(read, segments, m, base_padding, extracted_bam_file)
+                            _extract_region_from_model_with_coding_region(r, segments, m, base_padding, extracted_bam_file)
                     else:
                         # We do not have a coding section, so we'll need to do things the old fashioned way:
                         es, nsx, nss = \
-                            _extract_region_from_model_without_coding_region(read, segments, leading_adapter, trailing_adapter, start_offset, base_padding, extracted_bam_file)
+                            _extract_region_from_model_without_coding_region(r, segments, leading_adapter, trailing_adapter, start_offset, base_padding, extracted_bam_file)
 
                     # Track our stats:
                     extracted_segment |= es
@@ -233,6 +237,13 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
     logger.info(f"Total # Segments Extracted: %d", num_segments_extracted)
     logger.info(f"Total # Segments Skipped: %d", num_segments_skipped)
     logger.info(f"# Segments extracted per read: %2.2f", segs_per_read)
+
+
+def _get_segments_only(read):
+    """Get the segments corresponding to a particular read by reading the segments tag information."""
+    return [
+        SegmentInfo.from_tag(s) for s in read.get_tag(bam_utils.SEGMENTS_TAG).split(bam_utils.SEGMENT_TAG_DELIMITER)
+    ]
 
 
 def _extract_region_from_model_without_coding_region(read, segments, leading_adapter, trailing_adapter, start_offset, base_padding, extracted_bam_file):
@@ -301,13 +312,13 @@ def _extract_region_from_model_with_coding_region(read, segments, m, base_paddin
     extraction_segments = [s for s in segments if s.name == m.coding_region]
 
     if len(extraction_segments) == 0:
-        logger.warning(f"Did not find coding region in read: %s", read.query_name)
+        logger.warning(f"Did not find coding region in read: %s: %s", read.query_name, segments)
         return False, 0, 1
 
     else:
         if len(extraction_segments) > 1:
-            logger.warning(f"Found %d coding regions in read %s.  Only looking at first coding region.",
-                           len(extraction_segments), read.query_name)
+            logger.warning(f"Found %d coding regions in read %s: %s.  Only looking at first coding region.  All Segments: %s",
+                           len(extraction_segments), read.query_name, extraction_segments, segments)
 
         # Create an AlignedSegment to output:
         aligned_segment = _create_extracted_aligned_segment(

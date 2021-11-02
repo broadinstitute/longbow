@@ -8,6 +8,10 @@ import collections
 import re
 import pysam
 
+import array
+import operator
+from functools import reduce
+
 from collections import OrderedDict
 from math import ceil, floor
 
@@ -51,6 +55,9 @@ READ_RAW_BARCODE_TAG = 'CR'
 READ_BARCODE_POS_TAG = "XB"
 READ_BARCODE_QUAL_TAG = "CY"
 READ_BARCODE_CORRECTED_TAG = "XC"
+READ_BARCODE_CONF_FACTOR_TAG = "XF"
+
+CONF_FACTOR_SCALE = 100
 
 READ_SPATIAL_BARCODE1_TAG = "X1"
 READ_SPATIAL_BARCODE1_POS_TAG = "XP"
@@ -358,3 +365,18 @@ def reverse_complement(base_string):
 
     return "".join(map(lambda b: RC_BASE_MAP[b], base_string[::-1]))
 
+
+def get_confidence_factor(qual_string: str, scale_factor: float = CONF_FACTOR_SCALE) -> float:
+    """Get the confidence factor for the given sequence to be tallied for use with STARCODE.
+    quals are assumed to be phred scale quality scores in string format and will be converted to numerical values."""
+    return scale_factor * reduce(
+        operator.mul, map(lambda q: 1. - 10 ** (-(ord(q) - 33.) / 10), qual_string)
+    )
+
+
+def get_confidence_factor_raw_quals(quals: array.array, scale_factor: float = CONF_FACTOR_SCALE) -> float:
+    """Get the confidence factor for the given sequence to be tallied for use with STARCODE.
+    quals are assumed to be numerical already and will not be type converted."""
+    return scale_factor * reduce(
+        operator.mul, map(lambda q: 1. - 10 ** (-q/10), quals)
+    )
