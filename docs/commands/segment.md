@@ -21,26 +21,33 @@ Usage: longbow segment [OPTIONS] INPUT_BAM
   Segment pre-annotated reads from an input BAM file.
 
 Options:
-  -v, --verbosity LVL        Either CRITICAL, ERROR, WARNING, INFO or DEBUG
-  -t, --threads INTEGER      number of threads to use (0 for all)  [default:
-                             11]
-
-  -o, --output-bam PATH      segment-annotated bam output  [default: stdout]
-  -s, --do-simple-splitting  Do splitting of reads based on splitter
-                             delimiters, rather than whole array structure.
-                             This splitting will cause delimiter sequences to
-                             be repeated in each read they bound.
-
-  -m, --model TEXT           The model to use for annotation.  If the given
-                             value is a pre-configured model name, then that
-                             model will be used.  Otherwise, the given value
-                             will be treated as a file name and Longbow will
-                             attempt to read in the file and create a
-                             LibraryModel from it.  Longbow will assume the
-                             contents are the configuration of a LibraryModel
-                             as per LibraryModel.to_json().  [default: mas15]
-
-  --help                     Show this message and exit.
+  -v, --verbosity LVL             Either CRITICAL, ERROR, WARNING, INFO or
+                                  DEBUG
+  -t, --threads INTEGER           number of threads to use (0 for all)
+                                  [default: 7]
+  -o, --output-bam PATH           segment-annotated bam output  [default:
+                                  stdout]
+  -s, --do-simple-splitting       DEPRECATED.  Do splitting of reads based on
+                                  splitter delimiters, rather than whole array
+                                  structure. This splitting will cause
+                                  delimiter sequences to be repeated in each
+                                  read they bound.  This is now the default
+                                  setting, and this flag has been DEPRECATED.
+  -b, --create-barcode-conf-file  Create a barcode confidence score file based
+                                  on the barcodes in the given model.  This
+                                  only applies for models that have
+                                  annotation_segments where one such segment
+                                  is annotated into the raw barcode field (CR)
+  -m, --model TEXT                The model to use for annotation.  If the
+                                  given value is a pre-configured model name,
+                                  then that model will be used.  Otherwise,
+                                  the given value will be treated as a file
+                                  name and Longbow will attempt to read in the
+                                  file and create a LibraryModel from it.
+                                  Longbow will assume the contents are the
+                                  configuration of a LibraryModel as per
+                                  LibraryModel.to_json().  [default: mas15]
+  --help                          Show this message and exit.
 ```
 
 ## Example

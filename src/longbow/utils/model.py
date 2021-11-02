@@ -1222,7 +1222,7 @@ class LibraryModel:
             "coding_region": "cDNA",
             "annotation_segments": {
                 "UMI": (bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG),
-                "CBC": (bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
+                "CBC": (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
             },
         },
         "mas15threeP": {
@@ -1320,7 +1320,7 @@ class LibraryModel:
             "coding_region": "cDNA",
             "annotation_segments": {
                 "UMI": (bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG),
-                "CBC": (bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
+                "CBC": (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
             },
         },
         "mas15BulkWithIndices": {
@@ -1417,7 +1417,7 @@ class LibraryModel:
             "coding_region": "cDNA",
             "annotation_segments": {
                 "UMI": (bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG),
-                "sample_index": (bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
+                "sample_index": (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
             },
         },
         "mas10": {
@@ -1556,7 +1556,7 @@ class LibraryModel:
             "coding_region": "cDNA",
             "annotation_segments": {
                 "UMI": (bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG),
-                "CBC": (bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
+                "CBC": (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
             },
         },
         "mas10threeP": {
@@ -1633,7 +1633,7 @@ class LibraryModel:
             "coding_region": "cDNA",
             "annotation_segments": {
                 "UMI": (bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG),
-                "CBC": (bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
+                "CBC": (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
             },
         },
         "slide-seq": {
@@ -1945,7 +1945,7 @@ class LibraryModel:
             "coding_region": "cDNA",
             "annotation_segments": {
                 "UMI": (bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG),
-                "CBC": (bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
+                "CBC": (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
             },
         }
     }

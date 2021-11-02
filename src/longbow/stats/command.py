@@ -65,7 +65,7 @@ click_log.basic_config(logger)
     required=False,
     is_flag=True,
     default=False,
-    help="Do splitting of reads based on splitter delimiters, rather than whole array structure. "
+    help="DEPRECATED.  Do splitting of reads based on splitter delimiters, rather than whole array structure. "
     "This splitting will cause delimiter sequences to be repeated in each read they bound.  "
     "This is now the default setting, and this flag has been DEPRECATED.",
 )

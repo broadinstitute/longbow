@@ -10,6 +10,7 @@ import tqdm
 
 import pysam
 import multiprocessing as mp
+import numpy as np
 
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
@@ -47,9 +48,19 @@ click_log.basic_config(logger)
     required=False,
     is_flag=True,
     default=False,
-    help="Do splitting of reads based on splitter delimiters, rather than whole array structure. "
+    help="DEPRECATED.  Do splitting of reads based on splitter delimiters, rather than whole array structure. "
     "This splitting will cause delimiter sequences to be repeated in each read they bound.  "
     "This is now the default setting, and this flag has been DEPRECATED.",
+)
+@click.option(
+    "-b",
+    "--create-barcode-conf-file",
+    required=False,
+    is_flag=True,
+    default=False,
+    help=f"Create a barcode confidence score file based on the barcodes in the given model.  "
+         f"This only applies for models that have annotation_segments where one such segment "
+         f"is annotated into the raw barcode field ({bam_utils.READ_RAW_BARCODE_TAG})",
 )
 @click.option(
     "-m",
@@ -62,7 +73,7 @@ click_log.basic_config(logger)
          "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, do_simple_splitting, model, input_bam):
+def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
@@ -112,7 +123,7 @@ def main(threads, output_bam, do_simple_splitting, model, input_bam):
             lb_model = LibraryModel.from_json_file(model)
         logger.info(f"Using %s: %s", model, lb_model.description)
 
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[m])
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Start output worker:
         res = manager.dict({"num_reads_segmented": 0, "num_segments": 0})
@@ -124,6 +135,7 @@ def main(threads, output_bam, do_simple_splitting, model, input_bam):
                 output_bam,
                 pbar,
                 do_simple_splitting,
+                create_barcode_conf_file,
                 model,
                 res,
             ),
@@ -186,6 +198,7 @@ def _sub_process_write_fn(
     out_bam_file_name,
     pbar,
     do_simple_splitting,
+    create_barcode_conf_file,
     model_name_or_file,
     res,
 ):
@@ -204,6 +217,17 @@ def _sub_process_write_fn(
 
     if do_simple_splitting:
         logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
+
+    barcode_conf_file_name = "barcode_confidence_scores.txt"
+    barcode_conf_file = None
+    if create_barcode_conf_file:
+        if (model.annotation_segments is not None) and \
+                (bam_utils.READ_RAW_BARCODE_TAG in [v[0] for v in model.annotation_segments.values()]):
+            logger.info(f"Creating barcode confidence file: {barcode_conf_file_name}")
+            barcode_conf_file = open(barcode_conf_file_name, 'w')
+        else:
+            logger.warning(f"Model does not have a barcode output, but barcode creation flag was given.  "
+                           f"Barcode confidence file will NOT be created.")
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
@@ -236,11 +260,15 @@ def _sub_process_write_fn(
                 do_simple_splitting,
                 delimiters,
                 out_bam_file,
+                barcode_conf_file,
             )
 
             # Increment our counters:
             res["num_reads_segmented"] += 1
             pbar.update(1)
+
+    if barcode_conf_file is not None:
+        barcode_conf_file.close()
 
 
 def create_simple_delimiters(model, num_seqs_from_each_array_element=1):
@@ -467,7 +495,7 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
 
 
 def _write_segmented_read(
-    model, read, segments, do_simple_splitting, delimiters, bam_out
+    model, read, segments, do_simple_splitting, delimiters, bam_out, barcode_conf_file
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -481,6 +509,7 @@ def _write_segmented_read(
                                 If False, will require reads to appear as expected in model.array_element_structure.
     :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
+    :param barcode_conf_file: An open file ready to write out the barcodes and confidence scores.
     :return: the number of segments written.
     """
 
@@ -493,6 +522,7 @@ def _write_segmented_read(
             _write_split_array_element(
                 model,
                 bam_out,
+                barcode_conf_file,
                 start_coord,
                 end_coord,
                 read,
@@ -527,6 +557,7 @@ def _write_segmented_read(
                 _write_split_array_element(
                     model,
                     bam_out,
+                    barcode_conf_file,
                     start_coord,
                     end_coord,
                     read,
@@ -548,6 +579,7 @@ def _transform_to_rc_coords(start, end, read_length):
 def _write_split_array_element(
     model,
     bam_out,
+    barcode_conf_file,
     start_coord,
     end_coord,
     read,
@@ -557,6 +589,11 @@ def _write_split_array_element(
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
     a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord)
+
+    # Write our confidence file if we have to:
+    if barcode_conf_file is not None and a.has_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG):
+        barcode_conf_file.write(f"{a.get_tag(bam_utils.READ_RAW_BARCODE_TAG)}\t{a.get_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG)}\n")
+
     bam_out.write(a)
 
 
@@ -592,13 +629,25 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     # Annotate any segments in this array element that we have to:
     for s in segments_to_annotate:
         # First annotate the segment itself:
-        tag_name = model.annotation_segments[s.name][0]
+        field_tag_name = model.annotation_segments[s.name][0]
         seq = read.query_sequence[s.start:s.end + 1]
-        a.set_tag(tag_name, seq)
+        a.set_tag(field_tag_name, seq)
 
         # Next annotate the starting position:
-        tag_name = model.annotation_segments[s.name][1]
-        a.set_tag(tag_name, s.start)
+        pos_tag_name = model.annotation_segments[s.name][1]
+        a.set_tag(pos_tag_name, s.start)
+
+        # Next check if the annotation is our READ_RAW_BARCODE_TAG.
+        # If so, we should annotate the confidence score as well:
+        if field_tag_name == bam_utils.READ_RAW_BARCODE_TAG:
+            # Get the length from the model:
+            barcode_length = list(model.adapter_dict[s.name].values())[0]
+            qual_bases = read.query_qualities[s.start:s.end + 1]
+            conf_factor = int(np.round(bam_utils.get_confidence_factor_raw_quals(qual_bases)))
+
+            a.set_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
+
     # Set our tag indicating that this read is now segmented:
     a.set_tag(bam_utils.READ_IS_SEGMENTED_TAG, True)
+
     return a
