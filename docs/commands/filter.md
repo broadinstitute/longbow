@@ -20,7 +20,7 @@ Such errors manifest as off-subdiagonal elements in our ligation heatmap (left p
 
 ```shell
 $ longbow filter --help
-Usage: longbow filter [OPTIONS] INPUT_BAM
+Usage: python -m longbow filter [OPTIONS] INPUT_BAM
 
   Filter reads by whether they conform to expected segment order.
 
@@ -36,10 +36,8 @@ Options:
                          will assume the contents are the configuration of a
                          LibraryModel as per LibraryModel.to_json().
                          [default: mas15]
-
-  --force                Force overwrite of the output files if they exist.
+  -f, --force            Force overwrite of the output files if they exist.
                          [default: False]
-
   --help                 Show this message and exit.
 ```
 

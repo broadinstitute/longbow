@@ -72,8 +72,16 @@ click_log.basic_config(logger)
          "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
          "of a LibraryModel as per LibraryModel.to_json()."
 )
+@click.option(
+    '-r',
+    '--require-cbc-and-umi',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Passing reads must have CBC and UMI."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, input_bam):
+def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, require_cbc_and_umi, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
@@ -138,6 +146,7 @@ def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, mod
                 create_barcode_conf_file,
                 model,
                 res,
+                require_cbc_and_umi
             ),
         )
         output_worker.start()
@@ -201,6 +210,7 @@ def _sub_process_write_fn(
     create_barcode_conf_file,
     model_name_or_file,
     res,
+    require_cbc_and_umi
 ):
     """Thread / process fn to write out all our data."""
 
@@ -261,6 +271,7 @@ def _sub_process_write_fn(
                 delimiters,
                 out_bam_file,
                 barcode_conf_file,
+                require_cbc_and_umi
             )
 
             # Increment our counters:
@@ -495,7 +506,7 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
 
 
 def _write_segmented_read(
-    model, read, segments, do_simple_splitting, delimiters, bam_out, barcode_conf_file
+    model, read, segments, do_simple_splitting, delimiters, bam_out, barcode_conf_file, require_cbc_and_umi
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -529,6 +540,7 @@ def _write_segmented_read(
                 segments,
                 delim_name,
                 prev_delim_name,
+                require_cbc_and_umi
             )
 
         return len(segment_bounds_tuples)
@@ -564,6 +576,7 @@ def _write_segmented_read(
                     seg_list,
                     end_delim_name,
                     start_delim_name,
+                    require_cbc_and_umi
                 )
 
         # Return the number of array elements.
@@ -586,6 +599,7 @@ def _write_split_array_element(
     segments,
     delim_name,
     prev_delim_name,
+    require_cbc_and_umi
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
     a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord)
@@ -594,7 +608,10 @@ def _write_split_array_element(
     if barcode_conf_file is not None and a.has_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG):
         barcode_conf_file.write(f"{a.get_tag(bam_utils.READ_RAW_BARCODE_TAG)}\t{a.get_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG)}\n")
 
-    bam_out.write(a)
+    has_cbc_and_umi = bam_utils.has_cbc_and_umi(a)
+
+    if not require_cbc_and_umi or has_cbc_and_umi:
+        bam_out.write(a)
 
 
 def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord):
