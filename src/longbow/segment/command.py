@@ -600,19 +600,20 @@ def _write_split_array_element(
 def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord):
     """Package an array element into an AlignedSegment from the results of simple splitting rules."""
 
-    zmw = 1 if not read.has_tag(bam_utils.READ_ZMW_TAG) else read.get_tag(bam_utils.READ_ZMW_TAG)
-
-    a = pysam.AlignedSegment()
-    a.query_name = (
-        f"molecule/{zmw}{start_coord}{end_coord}"
-    )
-
     # Add one to end_coord because coordinates are inclusive:
+    a = pysam.AlignedSegment()
     a.query_sequence = f"{read.query_sequence[start_coord:end_coord + 1]}"
     a.query_qualities = read.query_alignment_qualities[start_coord: end_coord + 1]
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
+
+    # Reset read name (we need a unique name for each read that's also compatible with IsoSeq3)
+    zmw = abs(hash(a.query_sequence)) % (10 ** 9)
+    movie_name = read.query_name.split("/")[0]
+    a.query_name = f'{movie_name}/{zmw}/ccs'
+    a.set_tag(bam_utils.READ_ZMW_TAG, zmw)
+
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
     out_segments = []
@@ -659,9 +660,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     a.set_tag(bam_utils.READ_NUM_CONSENSUS_PASSES_TAG, 1)
     a.set_tag(bam_utils.READ_ZMW_NAMES_TAG, read.query_name)
     a.set_tag(bam_utils.READ_NUM_ZMWS_TAG, 1)
-
-    # Reset ZMW tag (needs to be a unique value in the BAM file):
-    a.set_tag(bam_utils.READ_ZMW_TAG, int(f'{zmw}{start_coord}'))
+    a.set_tag(bam_utils.READ_TAGS_ORDER_TAG, f'{bam_utils.READ_RAW_BARCODE_TAG}-{bam_utils.READ_RAW_UMI_TAG}')
 
     # Set our tag indicating that this read is now segmented:
     a.set_tag(bam_utils.READ_IS_SEGMENTED_TAG, True)

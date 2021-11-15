@@ -58,6 +58,7 @@ READ_BARCODE_POS_TAG = "XB"
 READ_BARCODE_QUAL_TAG = "CY" # Cell barcode read quality
 READ_BARCODE_CORRECTED_TAG = 'CB' # Cell barcode that is error-corrected and confirmed against a list of known-good barcode sequences
 READ_BARCODE_CONF_FACTOR_TAG = "XF"
+READ_TAGS_ORDER_TAG = "XA" # Order of tag names
 
 READ_NUM_CONSENSUS_PASSES_TAG = "ic" # Sum of number of passes from all ZMWs used to create consensus (e.g. 1)
 READ_ZMW_NAMES_TAG = "im" # ZMW names associated with this isoform (e.g. m64013e_211031_055434/1/ccs)
@@ -395,3 +396,7 @@ def get_confidence_factor_raw_quals(quals: array.array, scale_factor: float = CO
     return scale_factor * reduce(
         operator.mul, map(lambda q: 1. - 10 ** (-q/10), quals)
     )
+
+
+def has_cbc_and_umi(read):
+    return read.has_tag(READ_RAW_BARCODE_TAG) and read.has_tag(READ_RAW_UMI_TAG)

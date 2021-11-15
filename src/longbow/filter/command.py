@@ -54,8 +54,16 @@ click_log.basic_config(logger)
     show_default=True,
     help="Force overwrite of the output files if they exist."
 )
+@click.option(
+    '-r',
+    '--require-cbc-and-umi',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Passing reads must have CBC and UMI."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, out_prefix, model, force, input_bam):
+def main(pbi, out_prefix, model, force, require_cbc_and_umi, input_bam):
     """Filter reads by whether they conform to expected segment order."""
 
     t_start = time.time()
@@ -130,6 +138,10 @@ def main(pbi, out_prefix, model, force, input_bam):
                 segment_names = [s.name for s in segments]
                 is_valid, num_valid_adapters, first_valid_adapter_index = \
                     lb_model.validate_segment_order(segment_names)
+
+                # Check to see if the read has the CBC and UMI
+                if require_cbc_and_umi:
+                    is_valid &= bam_utils.has_cbc_and_umi(read)
 
                 if is_valid:
                     logger.debug("Read is %s valid: %s: first key adapter: [%d, %s], # key adapters: %d",
