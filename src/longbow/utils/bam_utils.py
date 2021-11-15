@@ -1,3 +1,4 @@
+import math
 import sys
 import os
 import gzip
@@ -49,13 +50,21 @@ READ_ADAPTER_POS_TAG = "XA"
 
 READ_UMI_TAG = 'ZU'
 READ_UMI_POS_TAG = "XU"
+READ_RAW_UMI_TAG = "XM" # UMI sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
 
-READ_BARCODE_TAG = 'CB'
-READ_RAW_BARCODE_TAG = 'CR'
+READ_BARCODE_TAG = 'CR' # Cell barcode
+READ_RAW_BARCODE_TAG = "XC" # barcode sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
 READ_BARCODE_POS_TAG = "XB"
-READ_BARCODE_QUAL_TAG = "CY"
-READ_BARCODE_CORRECTED_TAG = "XC"
+READ_BARCODE_QUAL_TAG = "CY" # Cell barcode read quality
+READ_BARCODE_CORRECTED_TAG = 'CB' # Cell barcode that is error-corrected and confirmed against a list of known-good barcode sequences
 READ_BARCODE_CONF_FACTOR_TAG = "XF"
+
+READ_NUM_CONSENSUS_PASSES_TAG = "ic" # Sum of number of passes from all ZMWs used to create consensus (e.g. 1)
+READ_ZMW_NAMES_TAG = "im" # ZMW names associated with this isoform (e.g. m64013e_211031_055434/1/ccs)
+READ_NUM_ZMWS_TAG = "is" # Number of ZMWs associated with this isoform (e.g. 1)
+READ_CLIPPED_SEQS_LIST_TAG = "it" # List of barcodes/UMIs clipped during tag (e.g. TCAGGTGCAGGTCGGATCCTGCGCAT)
+
+READ_ZMW_TAG = "zm"
 
 CONF_FACTOR_SCALE = 100
 
@@ -162,14 +171,20 @@ def compute_shard_offsets(pbi_file, num_shards):
     file_offsets = list(file_offsets_hash.values())
     shard_offsets = []
     read_counts = []
-    for j in range(0, len(file_offsets), ceil(len(file_offsets) / num_shards)):
-        shard_offsets.append(file_offsets[j])
-        read_counts.append(ceil(len(file_offsets) / num_shards))
+    read_nums = []
+
+    read_num = 1
+    by = int(math.ceil(len(file_offsets) / num_shards))
+    for i in range(0, len(file_offsets), by):
+        shard_offsets.append(file_offsets[i])
+        read_counts.append(len(file_offsets[i:i + by]))
+        read_nums.append(read_num)
+        read_num += read_counts[-1]
 
     # For the last read in the file, pad the offset so the final comparison in write_shard() retains the final read.
-    shard_offsets.append(os.path.getsize(pbi_file) + 1)
+    shard_offsets.append(file_offsets[-1] + 1)
 
-    return shard_offsets, zmw_count_hash, idx_contents.n_reads, read_counts
+    return shard_offsets, zmw_count_hash, idx_contents.n_reads, read_counts, read_nums
 
 
 def create_bam_header_with_program_group(command_name, base_bam_header, description=None, models=None, rg_dict=None):
