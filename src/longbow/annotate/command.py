@@ -74,12 +74,22 @@ click_log.basic_config(logger)
          "chunks across the dataset)"
 )
 @click.option(
+    "-l",
+    "--min-length",
+    type=int,
+    default=0,
+    show_default=True,
+    required=False,
+    help="Minimum length of a read to process.  Reads shorter than this length will not be annotated."
+)
+@click.option(
+    "-L",
     "--max-length",
     type=int,
     default=60000,
     show_default=True,
     required=False,
-    help="Maximum length of a read to process.  Reads beyond this length will not be annotated."
+    help="Maximum length of a read to process.  Reads longer than this length will not be annotated."
 )
 @click.option(
     "--min-rq",
@@ -89,13 +99,24 @@ click_log.basic_config(logger)
     required=False,
     help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1]."
 )
+@click.option(
+    '-f',
+    '--force',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Force overwrite of the output files if they exist."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
+def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq, force, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
+
+    # Check to see if the output files exist:
+    bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
@@ -147,7 +168,7 @@ def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m, max_length, min_rq)
+            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m, min_length, max_length, min_rq)
         )
         p.start()
         worker_pool.append(p)
@@ -270,7 +291,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             pbar.update(1)
 
 
-def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, max_length, min_rq):
+def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, min_length, max_length, min_rq):
     """Function to run in each subthread / subprocess.
     Segments each read and place the segments in the output queue."""
 
@@ -296,8 +317,13 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, max_length, 
             read, pysam.AlignmentHeader.from_dict(dict())
         )
 
-        # Check for max length and min quality:
-        if len(read.query_sequence) > max_length:
+        # Check for min/max length and min quality:
+
+        if len(read.query_sequence) < min_length:
+            logger.warning(f"Read is shorter than min length.  "
+                           f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})")
+            continue
+        elif len(read.query_sequence) > max_length:
             logger.warning(f"Read is longer than max length.  "
                            f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
             continue

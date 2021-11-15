@@ -1,3 +1,4 @@
+import json
 import math
 import sys
 import os
@@ -234,7 +235,7 @@ def check_for_preexisting_files(file_list, exist_ok=False):
 
     do_files_exist = False
     for f in file_list:
-        if os.path.exists(f):
+        if os.path.exists(f) and not f == "/dev/null":
             if exist_ok:
                 logger.warning(f"Output file exists: {f}.  Overwriting.")
             else:
@@ -400,3 +401,13 @@ def get_confidence_factor_raw_quals(quals: array.array, scale_factor: float = CO
 
 def has_cbc_and_umi(read):
     return read.has_tag(READ_RAW_BARCODE_TAG) and read.has_tag(READ_RAW_UMI_TAG)
+
+
+def get_model_name_from_bam_header(header):
+    for pg in header.as_dict()['PG']:
+        if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
+            desc, models_str= pg['DS'].split('MODEL(s): ')
+            models_json = json.loads(models_str)
+            return models_json['name']
+
+    return None

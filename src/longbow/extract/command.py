@@ -37,13 +37,13 @@ click_log.basic_config(logger)
 )
 @click.option(
     "-o",
-    "--out-file",
-    default=".",
-    required=True,
-    type=str,
-    help="Output file name.",
+    "--output-bam",
+    default="-",
+    type=click.Path(exists=False),
+    help="extracted bam output  [default: stdout]",
 )
 @click.option(
+    '-f',
     '--force',
     is_flag=True,
     default=False,
@@ -87,16 +87,15 @@ click_log.basic_config(logger)
 @click.option(
     "-m",
     "--model",
-    type=str,
-    default=LongbowModel.DEFAULT_MODEL,
-    show_default=True,
-    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-         "of a LibraryModel as per LibraryModel.to_json()."
+    help="The model to use for annotation.  If not specified, it will be autodetected from "
+         "the BAM header.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name "
+         "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
+         "Longbow will assume the contents are the configuration of a LibraryModel as per "
+         "LibraryModel.to_json()."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, start_offset, model, input_bam):
+def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter, start_offset, model, input_bam):
     """Extract coding segments from the reads in the given bam.
     The main coding segments are assumed to be labeled as `random` segments.
     Uses known segments flanking the region to be extracted as markers to indicate
@@ -106,43 +105,10 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
-    # Get our model:
-    if LibraryModel.has_prebuilt_model(model):
-        m = LibraryModel.build_pre_configured_model(model)
-    else:
-        logger.info(f"Loading model from json file: %s", model)
-        m = LibraryModel.from_json_file(model)
-    logger.info(f"Using %s: %s", model, m.description)
-
-    # Validate our command line arguments:
-    has_coding_region = m.coding_region is not None
-    if has_coding_region:
-        logger.info(f"Extracting coding region from model {m.name}: {m.coding_region}")
-    else:
-        # We don't have a model with a coding region.
-        # We MUST make sure we have the other inputs that we need:
-        missing_args = []
-
-        if leading_adapter is None:
-            missing_args.append("--leading-adapter")
-        if trailing_adapter is None:
-            missing_args.append("--trailing-adapter")
-        if start_offset is None:
-            missing_args.append("--start-offset")
-
-        if len(missing_args) > 0:
-            message = f"ERROR: the following arguments must be specified when using a model that has no " \
-                      f"`coding_region`: {', '.join(missing_args)}"
-            logger.critical(message)
-            raise RuntimeError(message)
-
-        logger.info(f"Extracting `{LongbowModel.RANDOM_SEGMENT_NAME}` segments between {leading_adapter} and {trailing_adapter}.")
-        logger.info(f"Ignoring the first {start_offset} bases from extracted read segments.")
-
     # Check to see if the output file exists:
-    bam_utils.check_for_preexisting_files(out_file, exist_ok=force)
+    bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
-    logger.info(f"Writing extracted read segments to: {out_file}")
+    logger.info(f"Writing extracted read segments to: {output_bam}")
     logger.info(f"Including {base_padding} flanking bases.")
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
@@ -150,9 +116,6 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
         logger.info("About to Extract segments from %d reads", read_count)
-
-    # Get our delimiters here just in case we have to split the reads later:
-    delimiters = create_simple_delimiters(m)
 
     # Open our input bam file:
     pysam.set_verbosity(0)
@@ -166,11 +129,53 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
             total=read_count
             ) as pbar:
 
+        # Get our model:
+        if model is None:
+            model = bam_utils.get_model_name_from_bam_header(bam_file.header)
+            lb_model = LibraryModel.build_pre_configured_model(model)
+            logger.debug(f"Loading model from BAM header: %s", model)
+        elif model is not None and LibraryModel.has_prebuilt_model(model):
+            lb_model = LibraryModel.build_pre_configured_model(model)
+            logger.debug(f"Loading model from command line: %s", model)
+        else:
+            logger.debug(f"Loading model from json file: %s", model)
+            lb_model = LibraryModel.from_json_file(model)
+
+        logger.info(f"Using %s: %s", model, lb_model.description)
+
+        # Validate our command line arguments:
+        has_coding_region = lb_model.coding_region is not None
+        if has_coding_region:
+            logger.info(f"Extracting coding region from model {lb_model.name}: {lb_model.coding_region}")
+        else:
+            # We don't have a model with a coding region.
+            # We MUST make sure we have the other inputs that we need:
+            missing_args = []
+
+            if leading_adapter is None:
+                missing_args.append("--leading-adapter")
+            if trailing_adapter is None:
+                missing_args.append("--trailing-adapter")
+            if start_offset is None:
+                missing_args.append("--start-offset")
+
+            if len(missing_args) > 0:
+                message = f"ERROR: the following arguments must be specified when using a model that has no " \
+                        f"`coding_region`: {', '.join(missing_args)}"
+                logger.critical(message)
+                raise RuntimeError(message)
+
+            logger.info(f"Extracting `{LongbowModel.RANDOM_SEGMENT_NAME}` segments between {leading_adapter} and {trailing_adapter}.")
+            logger.info(f"Ignoring the first {start_offset} bases from extracted read segments.")
+
+        # Get our delimiters here just in case we have to split the reads later:
+        delimiters = create_simple_delimiters(lb_model)
+
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
 
         # Setup output files:
-        with pysam.AlignmentFile(out_file, "wb", header=out_header) as extracted_bam_file:
+        with pysam.AlignmentFile(output_bam, "wb", header=out_header) as extracted_bam_file:
 
             num_reads = 0
             num_reads_with_extracted_segments = 0
@@ -196,7 +201,7 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
                     for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
                         segmented_reads.append(
                             create_simple_split_array_element(
-                                delim_name, end_coord, m, prev_delim_name, read, segments, start_coord
+                                delim_name, end_coord, lb_model, prev_delim_name, read, segments, start_coord
                             )
                         )
                 else:
@@ -208,7 +213,7 @@ def main(pbi, out_file, force, base_padding, leading_adapter, trailing_adapter, 
                     # If our model has a coding region, we should use it:
                     if has_coding_region:
                         es, nsx, nss = \
-                            _extract_region_from_model_with_coding_region(r, segments, m, base_padding, extracted_bam_file)
+                            _extract_region_from_model_with_coding_region(r, segments, lb_model, base_padding, extracted_bam_file)
                     else:
                         # We do not have a coding section, so we'll need to do things the old fashioned way:
                         es, nsx, nss = \
@@ -312,13 +317,13 @@ def _extract_region_from_model_with_coding_region(read, segments, m, base_paddin
     extraction_segments = [s for s in segments if s.name == m.coding_region]
 
     if len(extraction_segments) == 0:
-        logger.warning(f"Did not find coding region in read: %s: %s", read.query_name, segments)
+        logger.debug(f"Did not find coding region in read: %s: %s", read.query_name, segments)
         return False, 0, 1
 
     else:
         if len(extraction_segments) > 1:
-            logger.warning(f"Found %d coding regions in read %s: %s.  Only looking at first coding region.  All Segments: %s",
-                           len(extraction_segments), read.query_name, extraction_segments, segments)
+            logger.debug(f"Found %d coding regions in read %s: %s.  Only looking at first coding region.  All Segments: %s",
+                         len(extraction_segments), read.query_name, extraction_segments, segments)
 
         # Create an AlignedSegment to output:
         aligned_segment = _create_extracted_aligned_segment(
