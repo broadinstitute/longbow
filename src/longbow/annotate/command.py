@@ -86,7 +86,7 @@ click_log.basic_config(logger)
     "-L",
     "--max-length",
     type=int,
-    default=60000,
+    default=30000,
     show_default=True,
     required=False,
     help="Maximum length of a read to process.  Reads longer than this length will not be annotated."
