@@ -77,6 +77,7 @@ __OUT_WHITELIST_FILE_SUFFIX = "_whitelist.txt"
     help=f"Write out an annotated bam file in addition to the mates files.",
 )
 @click.option(
+    '-f',
     '--force',
     is_flag=True,
     default=False,
