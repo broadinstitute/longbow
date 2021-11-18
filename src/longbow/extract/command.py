@@ -367,6 +367,6 @@ def _create_extracted_aligned_segment(read, seg_to_extract, start_offset, base_p
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
-    a.set_tag("XN", f"{read.query_name}/{start_coord}_{end_coord}")
+    a.set_tag(bam_utils.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}")
 
     return a
