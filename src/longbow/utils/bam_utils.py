@@ -66,6 +66,7 @@ READ_NUM_ZMWS_TAG = "is" # Number of ZMWs associated with this isoform (e.g. 1)
 READ_CLIPPED_SEQS_LIST_TAG = "it" # List of barcodes/UMIs clipped during tag (e.g. TCAGGTGCAGGTCGGATCCTGCGCAT)
 
 READ_ZMW_TAG = "zm"
+READ_ALTERED_NAME_TAG = "XN" # Altered read name given by Longbow to a segmented read (used for debugging)
 
 CONF_FACTOR_SCALE = 100
 

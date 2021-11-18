@@ -20,7 +20,7 @@ Such errors manifest as off-subdiagonal elements in our ligation heatmap (left p
 
 ```shell
 $ longbow filter --help
-Usage: python -m longbow filter [OPTIONS] INPUT_BAM
+Usage: longbow filter [OPTIONS] INPUT_BAM
 
   Filter reads by whether they conform to expected segment order.
 

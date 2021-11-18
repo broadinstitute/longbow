@@ -630,6 +630,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     movie_name = read.query_name.split("/")[0]
     a.query_name = f'{movie_name}/{zmw}/ccs'
     a.set_tag(bam_utils.READ_ZMW_TAG, zmw)
+    a.set_tag(bam_utils.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
 
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
