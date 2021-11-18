@@ -88,6 +88,14 @@ click_log.basic_config(logger)
     show_default=True,
     help="Force overwrite of the output files if they exist."
 )
+@click.option(
+    '-r',
+    '--require-cbc-and-umi',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Passing reads must have CBC and UMI."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, ignore_cbc_and_umi, force, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
@@ -647,6 +655,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     movie_name = read.query_name.split("/")[0]
     a.query_name = f'{movie_name}/{zmw}/ccs'
     a.set_tag(bam_utils.READ_ZMW_TAG, zmw)
+    a.set_tag(bam_utils.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
 
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
