@@ -45,9 +45,6 @@ The commands below illustrate the Longbow workflow on a small library of SIRVs (
       longbow segment | \                                 # Segment reads according to the model
       longbow extract -o filter_passed.bam                # Extract adapter-free cDNA sequences
 
-    # Generate annotation stats and automatic QC figures in .png and .svg format
-    longbow stats -o stats ann.bam
-
     # Align reads with long read aligner (e.g. minimap2, pbmm2)
     samtools fastq filter_passed.bam | \
         minimap2 -ayYL --MD -x splice:hq SIRV_Library.fasta - | \

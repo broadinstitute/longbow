@@ -108,17 +108,19 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    # Get our model:
-    if LibraryModel.has_prebuilt_model(model):
-        lb_model = LibraryModel.build_pre_configured_model(model)
-    else:
-        logger.info(f"Loading model from json file: %s", model)
-        lb_model = LibraryModel.from_json_file(model)
-    logger.info(f"Using %s: %s", model, lb_model.description)
-
     # Open our bam file:
     pysam.set_verbosity(0)
-    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bf:
+    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
+        # Get our model:
+        if model is None:
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
+        elif model is not None and LibraryModel.has_prebuilt_model(model):
+            lb_model = LibraryModel.build_pre_configured_model(model)
+        else:
+            lb_model = LibraryModel.from_json_file(model)
+
+        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
         # If we have read names, we should use them to inspect the file:
         if len(read_names) > 0:
 
@@ -134,13 +136,13 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
                     logger.error("Read not in index file: %s", read_names[i])
                     sys.exit(1)
 
-                bf.seek(file_offsets[z]["offset"])
-                read = bf.__next__()
+                bam_file.seek(file_offsets[z]["offset"])
+                read = bam_file.__next__()
                 __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
         else:
             # Without read names we just inspect every read in the file:
             logger.info("No read names given.  Inspecting every read in the input bam file.")
-            for read in bf:
+            for read in bam_file:
                 __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
