@@ -360,14 +360,13 @@ def _create_extracted_aligned_segment(read, seg_to_extract, start_offset, base_p
 
     # Create our segment:
     a = pysam.AlignedSegment()
-    a.query_name = (
-        f"{read.query_name}/{start_coord}_{end_coord}"
-    )
+    a.query_name = read.query_name
     # Add one to end_coord because coordinates are inclusive:
     a.query_sequence = f"{read.query_sequence[start_coord:end_coord+1]}"
     a.query_qualities = read.query_alignment_qualities[start_coord: end_coord + 1]
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
+    a.set_tag(bam_utils.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}")
 
     return a
