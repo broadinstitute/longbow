@@ -24,7 +24,7 @@ click_log.basic_config(logger)
 # # DEBUG:
 # logger.setLevel(logging.DEBUG)
 
-DEFAULT_MODEL = "mas15"
+DEFAULT_MODEL = "mas15v2"
 
 RANDOM_SEGMENT_NAME = "random"
 FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME = "FixedLengthRandomBases"
@@ -973,7 +973,7 @@ class LibraryModel:
 
     @staticmethod
     def from_json_file(json_file):
-        """Create a LibraryModel instance from the given json data.
+        """Create a LibraryModel instance from the given json file.
         This method will open the file at the given location and use the data in that file to create a LibraryModel."""
 
         try:
@@ -982,6 +982,13 @@ class LibraryModel:
         except FileNotFoundError:
             logger.error(f"File does not exist: {json_file}")
             sys.exit(1)
+
+        return LibraryModel.from_json_obj(json_data)
+
+    @staticmethod
+    def from_json_obj(json_data):
+        """Create a LibraryModel instance from the given json data.
+        This method will use the data in the JSON object to create a LibraryModel."""
 
         # Get "optional" new model params:
         try:

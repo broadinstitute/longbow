@@ -405,10 +405,14 @@ def has_cbc_and_umi(read):
 
 
 def get_model_name_from_bam_header(header):
+    return get_model_name_from_bam_header(header)['name']
+
+
+def get_model_from_bam_header(header):
     for pg in header.as_dict()['PG']:
         if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
             desc, models_str= pg['DS'].split('MODEL(s): ')
             models_json = json.loads(models_str)
-            return models_json['name']
+            return models_json
 
     return None

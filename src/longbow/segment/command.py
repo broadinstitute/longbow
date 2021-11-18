@@ -88,14 +88,6 @@ click_log.basic_config(logger)
     show_default=True,
     help="Force overwrite of the output files if they exist."
 )
-@click.option(
-    '-r',
-    '--require-cbc-and-umi',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Passing reads must have CBC and UMI."
-)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, ignore_cbc_and_umi, force, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
@@ -144,17 +136,13 @@ def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, mod
 
         # Get our model:
         if model is None:
-            model = bam_utils.get_model_name_from_bam_header(bam_file.header)
-            lb_model = LibraryModel.build_pre_configured_model(model)
-            logger.debug(f"Loading model from BAM header: %s", model)
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
         elif model is not None and LibraryModel.has_prebuilt_model(model):
             lb_model = LibraryModel.build_pre_configured_model(model)
-            logger.debug(f"Loading model from command line: %s", model)
         else:
-            logger.debug(f"Loading model from json file: %s", model)
             lb_model = LibraryModel.from_json_file(model)
 
-        logger.info(f"Using %s: %s", model, lb_model.description)
+        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
@@ -169,7 +157,7 @@ def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, mod
                 pbar,
                 do_simple_splitting,
                 create_barcode_conf_file,
-                model,
+                lb_model,
                 res,
                 ignore_cbc_and_umi
             ),
@@ -233,19 +221,11 @@ def _sub_process_write_fn(
     pbar,
     do_simple_splitting,
     create_barcode_conf_file,
-    model_name_or_file,
+    model,
     res,
     ignore_cbc_and_umi
 ):
     """Thread / process fn to write out all our data."""
-
-    # Get our model:
-    if LibraryModel.has_prebuilt_model(model_name_or_file):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model_name_or_file]["description"])
-        model = LibraryModel.build_pre_configured_model(model_name_or_file)
-    else:
-        logger.info(f"Loading model from json file: %s", model_name_or_file)
-        model = LibraryModel.from_json_file(model_name_or_file)
 
     # Create our delimiter sequences for simple splitting if we have to:
     delimiters = create_simple_delimiters(model) if do_simple_splitting else None

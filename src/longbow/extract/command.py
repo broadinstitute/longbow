@@ -131,17 +131,13 @@ def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter
 
         # Get our model:
         if model is None:
-            model = bam_utils.get_model_name_from_bam_header(bam_file.header)
-            lb_model = LibraryModel.build_pre_configured_model(model)
-            logger.debug(f"Loading model from BAM header: %s", model)
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
         elif model is not None and LibraryModel.has_prebuilt_model(model):
             lb_model = LibraryModel.build_pre_configured_model(model)
-            logger.debug(f"Loading model from command line: %s", model)
         else:
-            logger.debug(f"Loading model from json file: %s", model)
             lb_model = LibraryModel.from_json_file(model)
 
-        logger.info(f"Using %s: %s", model, lb_model.description)
+        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         # Validate our command line arguments:
         has_coding_region = lb_model.coding_region is not None

@@ -172,6 +172,16 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, model, writ
                     p.join()
                 sys.exit(1)
 
+        # Get our model:
+        if model is None:
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
+        elif model is not None and LibraryModel.has_prebuilt_model(model):
+            lb_model = LibraryModel.build_pre_configured_model(model)
+        else:
+            lb_model = LibraryModel.from_json_file(model)
+
+        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[model])
 
