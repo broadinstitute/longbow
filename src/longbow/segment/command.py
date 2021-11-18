@@ -72,8 +72,16 @@ click_log.basic_config(logger)
          "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
          "of a LibraryModel as per LibraryModel.to_json()."
 )
+@click.option(
+    '-r',
+    '--require-cbc-and-umi',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Passing reads must have CBC and UMI."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, input_bam):
+def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, require_cbc_and_umi, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
@@ -138,6 +146,7 @@ def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, mod
                 create_barcode_conf_file,
                 model,
                 res,
+                require_cbc_and_umi
             ),
         )
         output_worker.start()
@@ -201,6 +210,7 @@ def _sub_process_write_fn(
     create_barcode_conf_file,
     model_name_or_file,
     res,
+    require_cbc_and_umi
 ):
     """Thread / process fn to write out all our data."""
 
@@ -261,6 +271,7 @@ def _sub_process_write_fn(
                 delimiters,
                 out_bam_file,
                 barcode_conf_file,
+                require_cbc_and_umi
             )
 
             # Increment our counters:
@@ -495,7 +506,7 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
 
 
 def _write_segmented_read(
-    model, read, segments, do_simple_splitting, delimiters, bam_out, barcode_conf_file
+    model, read, segments, do_simple_splitting, delimiters, bam_out, barcode_conf_file, require_cbc_and_umi
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -529,6 +540,7 @@ def _write_segmented_read(
                 segments,
                 delim_name,
                 prev_delim_name,
+                require_cbc_and_umi
             )
 
         return len(segment_bounds_tuples)
@@ -564,6 +576,7 @@ def _write_segmented_read(
                     seg_list,
                     end_delim_name,
                     start_delim_name,
+                    require_cbc_and_umi
                 )
 
         # Return the number of array elements.
@@ -586,6 +599,7 @@ def _write_split_array_element(
     segments,
     delim_name,
     prev_delim_name,
+    require_cbc_and_umi
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
     a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord)
@@ -594,21 +608,30 @@ def _write_split_array_element(
     if barcode_conf_file is not None and a.has_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG):
         barcode_conf_file.write(f"{a.get_tag(bam_utils.READ_RAW_BARCODE_TAG)}\t{a.get_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG)}\n")
 
-    bam_out.write(a)
+    has_cbc_and_umi = bam_utils.has_cbc_and_umi(a)
+
+    if not require_cbc_and_umi or has_cbc_and_umi:
+        bam_out.write(a)
 
 
 def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord):
     """Package an array element into an AlignedSegment from the results of simple splitting rules."""
-    a = pysam.AlignedSegment()
-    a.query_name = (
-        f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}"
-    )
+
     # Add one to end_coord because coordinates are inclusive:
+    a = pysam.AlignedSegment()
     a.query_sequence = f"{read.query_sequence[start_coord:end_coord + 1]}"
     a.query_qualities = read.query_alignment_qualities[start_coord: end_coord + 1]
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
+
+    # Reset read name (we need a unique name for each read that's also compatible with IsoSeq3)
+    zmw = abs(hash(a.query_sequence)) % (10 ** 9)
+    movie_name = read.query_name.split("/")[0]
+    a.query_name = f'{movie_name}/{zmw}/ccs'
+    a.set_tag(bam_utils.READ_ZMW_TAG, zmw)
+    a.set_tag(bam_utils.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
+
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
     out_segments = []
@@ -626,16 +649,19 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
         bam_utils.SEGMENTS_TAG,
         bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
     )
-    # Annotate any segments in this array element that we have to:
-    for s in segments_to_annotate:
-        # First annotate the segment itself:
-        field_tag_name = model.annotation_segments[s.name][0]
-        seq = read.query_sequence[s.start:s.end + 1]
-        a.set_tag(field_tag_name, seq)
 
-        # Next annotate the starting position:
-        pos_tag_name = model.annotation_segments[s.name][1]
-        a.set_tag(pos_tag_name, s.start)
+    # Annotate any segments in this array element that we have to:
+    clipped_tags = set()
+    for s in segments_to_annotate:
+        for t in model.annotation_segments[s.name]:
+            field_tag_name, pos_tag_name = t
+            # First annotate the segment itself:
+            seq = read.query_sequence[s.start:s.end + 1]
+            a.set_tag(field_tag_name, seq)
+            clipped_tags.add(seq)
+
+            # Next annotate the starting position:
+            a.set_tag(pos_tag_name, s.start)
 
         # Next check if the annotation is our READ_RAW_BARCODE_TAG.
         # If so, we should annotate the confidence score as well:
@@ -646,6 +672,13 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
             conf_factor = int(np.round(bam_utils.get_confidence_factor_raw_quals(qual_bases)))
 
             a.set_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
+
+    # Set IsoSeq3-compatible tags:
+    a.set_tag(bam_utils.READ_CLIPPED_SEQS_LIST_TAG, ','.join(clipped_tags))
+    a.set_tag(bam_utils.READ_NUM_CONSENSUS_PASSES_TAG, 1)
+    a.set_tag(bam_utils.READ_ZMW_NAMES_TAG, read.query_name)
+    a.set_tag(bam_utils.READ_NUM_ZMWS_TAG, 1)
+    a.set_tag(bam_utils.READ_TAGS_ORDER_TAG, f'{bam_utils.READ_RAW_BARCODE_TAG}-{bam_utils.READ_RAW_UMI_TAG}')
 
     # Set our tag indicating that this read is now segmented:
     a.set_tag(bam_utils.READ_IS_SEGMENTED_TAG, True)

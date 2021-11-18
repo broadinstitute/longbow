@@ -47,6 +47,8 @@ Options:
                                   Longbow will assume the contents are the
                                   configuration of a LibraryModel as per
                                   LibraryModel.to_json().  [default: mas15]
+  -r, --require-cbc-and-umi       Passing reads must have CBC and UMI.
+                                  [default: False]
   --help                          Show this message and exit.
 ```
 

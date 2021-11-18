@@ -110,6 +110,7 @@ def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
+    read_num = 0
     start_offset = 0
     end_offset = math.inf
 
@@ -123,13 +124,14 @@ def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
             num_chunks = int(num_chunks)
 
             # Decode PacBio .pbi file and determine the shard offsets.
-            offsets, zmw_counts, read_count, read_counts_per_chunk = bam_utils.compute_shard_offsets(pbi, num_chunks)
+            offsets, zmw_counts, read_count, read_counts_per_chunk, read_nums = bam_utils.compute_shard_offsets(pbi, num_chunks)
 
             start_offset = offsets[chunk - 1]
             end_offset = offsets[chunk] if chunk < len(offsets) else offsets[chunk - 1]
             read_count = read_counts_per_chunk[chunk - 1] if chunk < len(offsets) else 0
+            read_num = read_nums[chunk - 1] if chunk < len(offsets) else 0
 
-            logger.info("Annotating %d reads from chunk %d/%d", read_count, chunk, num_chunks)
+            logger.info("Annotating %d reads from chunk %d/%d (reads %d-%d)", read_count, chunk, num_chunks, read_num, read_num + read_count - 1)
         else:
             read_count = bam_utils.load_read_count(pbi)
             logger.info("Annotating %d reads", read_count)

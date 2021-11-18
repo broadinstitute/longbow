@@ -48,6 +48,7 @@ click_log.basic_config(logger)
          "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.option(
+    '-f',
     '--force',
     is_flag=True,
     default=False,
