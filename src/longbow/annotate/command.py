@@ -92,6 +92,7 @@ click_log.basic_config(logger)
     help="Maximum length of a read to process.  Reads longer than this length will not be annotated."
 )
 @click.option(
+    "-q",
     "--min-rq",
     type=float,
     default=-2,
@@ -320,16 +321,16 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, min_length, 
         # Check for min/max length and min quality:
 
         if len(read.query_sequence) < min_length:
-            logger.warning(f"Read is shorter than min length.  "
-                           f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})")
+            logger.debug(f"Read is shorter than min length.  "
+                         f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})")
             continue
         elif len(read.query_sequence) > max_length:
-            logger.warning(f"Read is longer than max length.  "
-                           f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
+            logger.debug(f"Read is longer than max length.  "
+                         f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
             continue
         elif read.get_tag("rq") < min_rq:
-            logger.warning(f"Read quality is below the minimum.  "
-                           f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
+            logger.debug(f"Read quality is below the minimum.  "
+                         f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
             continue
 
         # Process and place our data on the output queue:

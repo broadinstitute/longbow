@@ -1320,7 +1320,7 @@ class LibraryModel:
                 "cDNA": {"MARS"},
             },
             "start_element_names": {"A", "VENUS"},
-            "end_element_names": {"cDNA", "P"},
+            "end_element_names": {"P"},
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {

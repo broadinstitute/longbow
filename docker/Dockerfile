@@ -17,27 +17,19 @@ RUN apt-get install -y gcc python3-dev python3-setuptools && \
 RUN apt-get install -y libtcmalloc-minimal4
 RUN echo 'export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"' >> ~/.bashrc
 
-# Create known hosts for github ssh info:
-RUN mkdir -p ~/.ssh && touch ~/.ssh/known_hosts
-RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
+# Set up pip environment (see https://pythonspeed.com/articles/activate-virtualenv-dockerfile/)
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-RUN --mount=type=ssh git clone git@github.com:broadinstitute/longbow.git 
-RUN cd longbow && \
-    git checkout v0.4.7 && \
-    python3 -mvenv venv && \
-    . venv/bin/activate && \
+RUN git clone https://github.com/broadinstitute/longbow.git && \
+    cd longbow && \
+    git checkout f3e3dbabfb9b3b035e9c1d9c318e8e8c5f35c4ad && \
     pip install -r dev-requirements.txt && \
     pip install -e .
 
-#RUN cd longbow && \
-#    git checkout 5f175d1cfb849cd21bb45036ea2abb156f7ea7e4 && \
-#    python3 -mvenv venv && \
-#    . venv/bin/activate && \
-#    pip install -r dev-requirements.txt && \
-#    pip install -e .
-
 # activate conda environment
-RUN echo "source /longbow/venv/bin/activate" >> ~/.bashrc
+RUN echo "source /opt/venv/bin/activate" >> ~/.bashrc
 
-# We want this to be interactive:
+# We want this to be interactive
 CMD ["/bin/bash"]
