@@ -250,7 +250,14 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     """Get the alignment score of the given segment against the read sequence."""
 
     # TODO: FIX THIS METHOD WITH NEW SCORING MODEL!
-    return 0, 0
+    # It should be something like:
+    #                         base, count = library_model.adapter_dict[lbl][special_seg_type]
+    #                         known_segment_seq = base * count
+    #                         segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
+    #
+    #                         seg_score_string = f" ({len(known_segment_seq) - editdistance.eval(segment_bases, known_segment_seq)}" \
+    #                                            f"/{len(known_segment_seq)})"
+
 
     # We don't score random segments:
     if segment.name == RANDOM_SEGMENT_NAME:
