@@ -260,7 +260,7 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
 
 
     # We don't score random segments:
-    if segment.name == RANDOM_SEGMENT_NAME:
+    if segment.name == RANDOM_SEGMENT_NAME or segment.name in library_model.named_random_segments:
         return 0, 0
 
     # Create a default aligner if we weren't given one:

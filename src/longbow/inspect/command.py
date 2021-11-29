@@ -52,7 +52,8 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
 @click.option(
     "-f",
     "--file-format",
-    default="png",
+    default="pdf",
+    show_default=True,
     type=click.Choice(["png", "pdf"]),
     help="Image file format",
 )
@@ -60,6 +61,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     "-o",
     "--outdir",
     default=".",
+    show_default=True,
     required=False,
     type=click.Path(exists=False),
     help="Output directory",
@@ -469,6 +471,7 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
     total_bases_seen = 0
 
     last_label = None
+    total_segments_seen = 0
 
     for base_string, color, lbl in zip(base_strings, colors, labels):
         if column == 0:
@@ -501,16 +504,24 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
                 # We want to label the random sections now, but we don't need to do anything fancy about it.
                 pass
             # Always display the length of known random segments of fixed length:
-            elif lbl in library_model.named_random_segments and type(library_model.adapter_dict[lbl]) is dict:
+            elif lbl in library_model.named_random_segments:
 
-                special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
-
-                if special_seg_type == model.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
-                    # Mark the length that this known random segment should be:
-                    length = list(library_model.adapter_dict[lbl].values())[0]
+                # Handle basic named random segment:
+                if library_model.adapter_dict[lbl] == model.RANDOM_SEGMENT_NAME:
+                    length = len(collapsed_annotations[total_segments_seen])
                     seg_score_string = f" [{length}]"
-                else:
-                    logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
+
+                # Handle special random segments:
+                elif type(library_model.adapter_dict[lbl]) is dict:
+
+                    special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
+
+                    if special_seg_type == model.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                        # Mark the length that this known random segment should be:
+                        length = list(library_model.adapter_dict[lbl].values())[0]
+                        seg_score_string = f" [{length}]"
+                    else:
+                        logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
 
             # If we want to show the segment scores, we calculate them here:
             elif show_seg_score and lbl not in library_model.named_random_segments:
@@ -544,6 +555,8 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
                 fontsize=8,
                 bbox=dict(facecolor="white", edgecolor="black"),
             )
+
+            total_segments_seen += 1
 
         # TODO: Replace all references to "VENUS" with references to the models themselves.
         # Add in hashes after the leading structural adapter so we can visually more easily inspect the results:

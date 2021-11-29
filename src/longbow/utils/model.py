@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
 
 # # DEBUG:
-# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.DEBUG)
 
 DEFAULT_MODEL = "mas15v2"
 
@@ -241,12 +241,15 @@ class LibraryModel:
         # Finalze our HMM:
         self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
 
-    def _initialize_hmm_transitions(self):
-        # dictionary of model starting states, random start, and random end
+    def _get_segment_start_end_rda_and_rdb_nodes(self):
+        """Create a Dictionary of model segment starting states, random start, and random end"""
         segment_starts = {}
+        segment_ends = {}
         rda = None
         rdb = None
         for s in self.hmm.states:
+            if self._is_state_last_in_section(s):
+                segment_ends[s.name] = s
             if s.name.endswith(START_STATE_INDICATOR) and not s.name.startswith(RANDOM_SEGMENT_NAME):
                 segment_starts[re.sub(START_STATE_INDICATOR, "", s.name)] = s
             elif s.name.startswith(f"{RANDOM_SEGMENT_NAME}:{RANDOM_SILENT_STATE_A}"):
@@ -256,11 +259,47 @@ class LibraryModel:
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Segment starts: {[s.name for s in segment_starts.values()]}")
+            logger.debug(f"RDA: {rda}")
+            logger.debug(f"RDB: {rdb}")
 
-        #########################
-        # OK
-        # link silent start state to all of our start nodes.
-        # this is the start of the array.
+        return segment_starts, segment_ends, rda, rdb
+
+    def _create_random_to_segment_start_transitions(self, segment_starts, rda):
+        """Create transitions from rda to all segments' start nodes.
+        NOTE: transitions are NOT made from rda to named random segments."""
+
+        # link random element model silent state A to all of our starts
+        # This is the transition from `random` to one of our array elements.
+        # This only happens for models with named random segments:
+        per_state_transition_prob = 1.0
+        if self.named_random_segments is not None:
+            # Get the number of "standard" segments.
+            # i.e. states that are not named random segments:
+            num_standard_states = 0
+            for sname in segment_starts:
+                if sname not in self.named_random_segments:
+                    num_standard_states += 1
+            per_state_transition_prob = 1.0 / num_standard_states
+
+        for sname in segment_starts:
+            # We do NOT account for rda -> start_element transitions here.
+            # Those should be accounted for in another method.
+            #
+            # We also exclude named random segments because they model the same thing.
+            if sname not in self.start_element_names and sname not in self.named_random_segments:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"Adding transition: {self.hmm.start.name} -> {segment_starts[sname].name} "
+                        f"@ {per_state_transition_prob:.3f}")
+                self.hmm.add_transition(rda, segment_starts[sname], per_state_transition_prob)
+
+    def _create_array_start_and_end_transitions(self, segment_starts, rda):
+        """Create transitions between:
+        self.model.start -> [ALL starting segments' start nodes]
+        rda -> [ALL ending segments' start nodes]"""
+
+        # Link the model's silent start state to all of our library start nodes.
+        # (These are not the same as start nodes for each segment.  This is the start of the array.)
         # NOTE: we cannot start in a named random segment.
         for sname in segment_starts:
             if sname in self.start_element_names:
@@ -270,8 +309,9 @@ class LibraryModel:
                         f"Adding transition: {self.hmm.start.name} -> {segment_starts[sname].name} @ {weight:.3f}")
                 self.hmm.add_transition(self.hmm.start, segment_starts[sname], weight)
 
-        # link random element model silent state A to all of our end elements.
+        # Link random element model silent state A to all of our end elements.
         # This is the transition from `random` to an element that ends an array.
+        # (i.e. these are not the same as end nodes for each segment.  This is the end of the array.)
         # NOTE: we cannot end in a named random segment.
         for sname in segment_starts:
             if sname in self.end_element_names:
@@ -279,82 +319,121 @@ class LibraryModel:
                     logger.debug(
                         f"Adding transition: RDA -> {segment_starts[sname].name} @ {1.0 / len(self.end_element_names):.3f}")
                 self.hmm.add_transition(rda, segment_starts[sname], 1.0 / len(self.end_element_names))
-        #########################
 
-        # # link random element model silent state A to all of our starts
-        # # This is the transition from `random` to one of our array elements.
-        # # This only happens for models with named random segments:
-        # if self.named_random_segments is not None:
-        #     # Get the number of "standard" segments.
-        #     # i.e. states that are not named random segments:
-        #     num_standard_states = 0
-        #     for sname in segment_starts:
-        #         if sname not in self.named_random_segments:
-        #             num_standard_states += 1
-        #
-        #     for sname in segment_starts:
-        #         if sname not in self.start_element_names and sname not in self.named_random_segments:
-        #             if logger.isEnabledFor(logging.DEBUG):
-        #                 logger.debug(
-        #                     f"Adding transition: {self.hmm.start.name} -> {segment_starts[sname].name} "
-        #                     f"@ {1.0 / num_standard_states:.3f}")
-        #             self.hmm.add_transition(rda, segment_starts[sname], 1.0 / num_standard_states)
+    def _initialize_hmm_transitions(self):
+        logger.debug("Identifying actionable nodes from model...")
+        segment_starts, segment_ends, rda, rdb = self._get_segment_start_end_rda_and_rdb_nodes()
+
+        # Create transitions for the array start and array end:
+        logger.debug("Creating start/end library model transitions...")
+        self._create_array_start_and_end_transitions(segment_starts, rda)
 
         # link up adapter final states according to our direct connections dictionary
-        logger.debug("Adding transitions for direct connections and short-circuit terminations...")
-        for s in self.hmm.states:
+        logger.debug("Adding transitions for direct connections...")
+        for _, s in segment_ends.items():
             logger.debug("State: %s", s.name)
-            is_last_section_state = self._is_state_last_in_section(s)
+            sname = LibraryModel._get_state_base_name(s)
 
-            # Only add these transitions if we're in the final state of each section / adapter:
-            if is_last_section_state:
-                sname = LibraryModel._get_state_base_name(s)
+            print(s)
 
-                # If we have direct connections from this state to some other states then we add
-                # them into the model:
-                if sname in self.direct_connections_dict:
-                    for dcname in self.direct_connections_dict[sname]:
-                        if logger.isEnabledFor(logging.DEBUG):
-                            logger.debug(
-                                f"    Adding transition: {s.name} -> {segment_starts[dcname].name} @ {(1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname]):.3f}")
-                        self.hmm.add_transition(
-                            s, segment_starts[dcname],
-                            # Original transition prob:
-                            1.0 / len(self.direct_connections_dict[sname])
-                            # Attempted new transition prob:
-                            # (1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname])
-                        )
-
-                    # # Also add in a connection to the silent random B state if this is a non-random section
-                    # # and it does not connect to a named random section:
-                    # has_direct_connection_to_named_random = False
-                    # if (self.named_random_segments is not None) and (sname not in self.named_random_segments):
-                    #     for n in self.direct_connections_dict[sname]:
-                    #         if n in self.named_random_segments:
-                    #             has_direct_connection_to_named_random = True
-                    #             break
-                    # if not has_direct_connection_to_named_random:
-                    #     # Verify this probability is the notional equivalent:
-                    #     if logger.isEnabledFor(logging.DEBUG):
-                    #         logger.debug(
-                    #             f"    Adding transition (no rand connections): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
-                    #     self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
-
-                # If we have no direct connections from this state, we add in a transition from this
-                # state to the silent random B state:
-                else:
-                    # Verify this probability is the notional equivalent:
+            # If we have direct connections from this state to some other states then we add
+            # them into the model:
+            if sname in self.direct_connections_dict:
+                for dcname in self.direct_connections_dict[sname]:
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug(
-                            f"    Adding transition (no DCs): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
-                    self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+                            f"    Adding transition: {s.name} -> {segment_starts[dcname].name} @ {(1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname]):.3f}")
+                    self.hmm.add_transition(
+                        s, segment_starts[dcname],
+                        1.0 / len(self.direct_connections_dict[sname])
+                    )
 
-                # Link up all adapters to model end state;
-                # Add a transition to the end of the model:
+            # If we have no direct connections from this state, we add in a transition from this
+            # state to the silent random B state:
+            else:
+                # Verify this probability is the notional equivalent:
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(
-                        f"    Adding transition: {s.name} -> {self.hmm.end.name} @ {LibraryModel.SUDDEN_END_PROB:.3f}")
-                self.hmm.add_transition(s, self.hmm.end, LibraryModel.SUDDEN_END_PROB)
+                        f"    Adding transition (no DCs): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
+                self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+        logger.debug("Adding transitions for short-circuit terminations...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            self._create_sudden_end_transitions(s)
+
+    def _initialize_hmm_transitions_new(self):
+        logger.debug("Identifying actionable nodes from model...")
+        segment_starts, segment_ends, rda, rdb = self._get_segment_start_end_rda_and_rdb_nodes()
+
+        # Create transitions for the array start and array end:
+        logger.debug("Creating start/end library model transitions...")
+        self._create_array_start_and_end_transitions(segment_starts, rda)
+
+        # Create transitions from RDA to segment starts:
+        # NOTE: This will NOT create transitions to start nodes of named random segments.
+        logger.debug("Creating random -> segment start node transitions...")
+        self._create_random_to_segment_start_transitions(segment_starts, rda)
+
+        # link up adapter final states according to our direct connections dictionary
+        logger.debug("Adding transitions for direct connections...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            sname = LibraryModel._get_state_base_name(s)
+
+            print(s)
+
+            # If we have direct connections from this state to some other states then we add
+            # them into the model:
+            if sname in self.direct_connections_dict:
+                for dcname in self.direct_connections_dict[sname]:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            f"    Adding transition: {s.name} -> {segment_starts[dcname].name} @ {(1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname]):.3f}")
+                    self.hmm.add_transition(
+                        s, segment_starts[dcname],
+                        # Original transition prob:
+                        1.0 / len(self.direct_connections_dict[sname])
+                        # Attempted new transition prob:
+                        # (1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname])
+                    )
+
+                # # Also add in a connection to the silent random B state if this is a non-random section
+                # # and it does not connect to a named random section:
+                # has_direct_connection_to_named_random = False
+                # if (self.named_random_segments is not None) and (sname not in self.named_random_segments):
+                #     for n in self.direct_connections_dict[sname]:
+                #         if n in self.named_random_segments:
+                #             has_direct_connection_to_named_random = True
+                #             break
+                # if not has_direct_connection_to_named_random:
+                #     # Verify this probability is the notional equivalent:
+                #     if logger.isEnabledFor(logging.DEBUG):
+                #         logger.debug(
+                #             f"    Adding transition (no rand connections): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
+                #     self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+            # If we have no direct connections from this state, we add in a transition from this
+            # state to the silent random B state:
+            else:
+                # Verify this probability is the notional equivalent:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"    Adding transition (no DCs): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
+                self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+        logger.debug("Adding transitions for short-circuit terminations...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            self._create_sudden_end_transitions(s)
+
+    def _create_sudden_end_transitions(self, s):
+        # Link up all adapters to model end state;
+        # Add a transition to the end of the model:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                f"    Adding transition: {s.name} -> {self.hmm.end.name} @ {LibraryModel.SUDDEN_END_PROB:.3f}")
+        self.hmm.add_transition(s, self.hmm.end, LibraryModel.SUDDEN_END_PROB)
 
     def _initialize_hmm_states(self):
         # Create the centralized random repeat model that allows for errors between the known markers:
@@ -395,13 +474,42 @@ class LibraryModel:
         if s.name == self.hmm.end.name:
             return False
 
+        # Get the base name of the node:
+        base_name = LibraryModel._get_state_base_name(s.name)
+
+        # Decode the segment number from the name:
         m = re.match(r"^(\w+):([MID])(\d+)", s.name)
+        if m is None and base_name not in self.named_random_segments:
+            return False
+        # Allow for the state number to be 0 in the case of a named random segment (e.g. cDNA):
+        segment_state_num = int(m.group(3)) if m is not None else 0
 
-        # Get the last state in each adapter:
-        if m is not None and int(m.group(3)) == len(self.adapter_dict[m.group(1)]):
-            return True
+        # Case for normal segments:
+        if type(self.adapter_dict[base_name]) == str:
+            if self.adapter_dict[base_name] == RANDOM_SEGMENT_NAME and base_name in self.named_random_segments:
 
-        return False
+                state_end_name = f"{base_name}{END_STATE_INDICATOR}"
+                print(f"Name: {s.name}:\t{base_name},\t{state_end_name},\t{s.name == state_end_name}")
+
+                # The final state for the named random segment types is the end state:
+                return s.name == state_end_name
+            else:
+                # Check to see if it's the last state in the segment:
+                return (m is not None) and (segment_state_num == len(self.adapter_dict[base_name]))
+        # case for special segment types (all of which are dictionaries):
+        else:
+            segment_type = list(self.adapter_dict[base_name].keys())[0]
+            if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                # For fixed length random segments, the value for the type dict is the length:
+                segment_length = self.adapter_dict[base_name][segment_type]
+            elif segment_type == HPR_SEGMENT_TYPE_NAME:
+                # For homopolymer repeat segments, the value for the type dict is a tuple of (NUCLEOTIDE, LENGTH):
+                segment_length = self.adapter_dict[base_name][segment_type][1]
+            else:
+                logger.error(f"UNKNOWN TYPE OF SEGMENT: {segment_type}")
+                return False
+
+            return segment_state_num == segment_length
 
         # # New logic for determining the above:
         # # The only restriction on reporting an end state is that we don't allow the final state of the model to
