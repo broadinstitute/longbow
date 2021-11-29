@@ -15,6 +15,7 @@ import pysam
 import numpy as np
 import matplotlib.pyplot as plt
 
+import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import plot_utils
 from ..utils import model as LongbowModel
@@ -52,7 +53,7 @@ click_log.basic_config(logger)
 @click.option(
     "-m",
     "--model",
-    default=LongbowModel.DEFAULT_MODEL,
+    default=longbow.utils.constants.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -152,7 +153,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
                 _, segments = get_segments(read)
             except KeyError:
                 logger.error(f"Input bam file does not contain longbow segmented reads!  "
-                             f"No {bam_utils.SEGMENTS_TAG} tag detected on read {read.query_name} !")
+                             f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
                 sys.exit(1)
 
             # Get the list of MAS-seq adapters in the segments and adjust for missing first adapters:
@@ -200,7 +201,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             array_lengths.append(array_len)
 
             # Adjust names for segmented direction:
-            if read.get_tag(bam_utils.SEGMENTS_RC_TAG) == 1:
+            if read.get_tag(longbow.utils.constants.SEGMENTS_RC_TAG) == 1:
                 read_mas_seq_adapters = [a + rc_decorator for a in read_mas_seq_adapters]
 
             # Add our tally for our heatmap:

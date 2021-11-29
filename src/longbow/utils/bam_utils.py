@@ -1,81 +1,30 @@
 import json
 import math
-import sys
-import os
 import gzip
-import re
 import logging
 import click_log
-import collections
 import re
 import pysam
-
+import sys
 import array
-import operator
+import collections
+
 from functools import reduce
-
 from collections import OrderedDict
-from math import ceil, floor
-
 from construct import *
-from inspect import getframeinfo, currentframe, getdoc
+from inspect import currentframe, getdoc
 
 from ..meta import VERSION
 
-# TODO: FIX THIS TO BE AN IMPORT - needs to be refactored so include order isn't circular.
-RANDOM_SEGMENT_NAME = "random"
+from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_QUAL_TAG, SEGMENTS_RC_TAG, \
+    SEGMENT_TAG_DELIMITER, READ_MODEL_NAME_TAG, READ_MODEL_SCORE_TAG, READ_APPROX_QUAL_TAG, READ_RAW_UMI_TAG, \
+    READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("bam_utils")
 click_log.basic_config(logger)
 
 PB_READ_NAME_RE = re.compile("m[0-9]+e?_[0-9]{6}_[0-9]{6}/[0-9]+/.*")
-
-# Constants for bam file reading / writing:
-SEGMENTS_TAG = "SG"
-SEGMENTS_QUAL_TAG = "XQ"
-SEGMENTS_RC_TAG = "RC"
-SEGMENT_TAG_DELIMITER = ","
-
-READ_IS_SEGMENTED_TAG = "ZS"
-
-READ_MODEL_NAME_TAG = "YN"
-READ_MODEL_SCORE_TAG = "YS"
-READ_IS_VALID_FOR_MODEL_TAG = "YV"
-READ_FIRST_KEY_SEG_TAG = "YK"
-READ_NUM_KEY_SEGMENTS_TAG = "YG"
-READ_APPROX_QUAL_TAG = "YQ"
-
-READ_ADAPTER_TAG = 'ZA'
-READ_ADAPTER_POS_TAG = "XA"
-
-READ_UMI_TAG = 'ZU'
-READ_UMI_POS_TAG = "XU"
-READ_RAW_UMI_TAG = "XM" # UMI sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
-
-READ_BARCODE_TAG = 'CR' # Cell barcode
-READ_RAW_BARCODE_TAG = "XC" # barcode sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
-READ_BARCODE_POS_TAG = "XB"
-READ_BARCODE_QUAL_TAG = "CY" # Cell barcode read quality
-READ_BARCODE_CORRECTED_TAG = 'CB' # Cell barcode that is error-corrected and confirmed against a list of known-good barcode sequences
-READ_BARCODE_CONF_FACTOR_TAG = "XF"
-READ_TAGS_ORDER_TAG = "XA" # Order of tag names
-
-READ_NUM_CONSENSUS_PASSES_TAG = "ic" # Sum of number of passes from all ZMWs used to create consensus (e.g. 1)
-READ_ZMW_NAMES_TAG = "im" # ZMW names associated with this isoform (e.g. m64013e_211031_055434/1/ccs)
-READ_NUM_ZMWS_TAG = "is" # Number of ZMWs associated with this isoform (e.g. 1)
-READ_CLIPPED_SEQS_LIST_TAG = "it" # List of barcodes/UMIs clipped during tag (e.g. TCAGGTGCAGGTCGGATCCTGCGCAT)
-
-READ_ZMW_TAG = "zm"
-READ_ALTERED_NAME_TAG = "XN" # Altered read name given by Longbow to a segmented read (used for debugging)
-
-CONF_FACTOR_SCALE = 100
-
-READ_SPATIAL_BARCODE1_TAG = "X1"
-READ_SPATIAL_BARCODE1_POS_TAG = "XP"
-
-READ_SPATIAL_BARCODE2_TAG = "X2"
-READ_SPATIAL_BARCODE2_POS_TAG = "XQ"
 
 
 # Named tuple to store alignment information:
@@ -84,7 +33,8 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
     _tag_regex = re.compile(r"(.*?):(\d+)-(\d+)")
 
     def __len__(self):
-        return self.end - self.start
+        # Must add 1 because the positions are inclusive coordinates:
+        return self.end - self.start + 1
 
     def __str__(self):
         return f"SegmentInfo({self.to_tag()})"
@@ -267,15 +217,30 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     if not ssw_aligner:
         ssw_aligner = ssw.Aligner()
 
+    # get our model segment so we can reference it later:
+    if type(library_model.adapter_dict[segment.name]) == str:
+        model_seg_sequence = library_model.adapter_dict[segment.name]
+    elif type(library_model.adapter_dict[segment.name]) == dict:
+        if list(library_model.adapter_dict[segment.name].keys())[0] == HPR_SEGMENT_TYPE_NAME:
+            b, l = list(library_model.adapter_dict[segment.name].values())[0]
+            model_seg_sequence = b * l
+        else:
+            raise RuntimeError(f"Cannot calculate score for dict segment type: "
+                               f"{type(library_model.adapter_dict[segment.name])}: {segment}")
+    else:
+        raise RuntimeError(
+            f"Unknown segment type: {type(library_model.adapter_dict[segment.name])} for segment: {segment}"
+        )
+
     # Get our alignment and our score:
     if segment.end - segment.start > 1:
-        alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], library_model.adapter_dict[segment.name])
+        alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], model_seg_sequence)
         optimal_score = alignment.score
     else:
         optimal_score = 0
 
     # The max score is the match score * the length of the reference segment
-    max_score = len(library_model.adapter_dict[segment.name]) * ssw_aligner.matrix.get_match()
+    max_score = len(model_seg_sequence) * ssw_aligner.matrix.get_match()
 
     return optimal_score, max_score
 

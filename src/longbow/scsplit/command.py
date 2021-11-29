@@ -13,6 +13,7 @@ import multiprocessing as mp
 
 from inspect import getframeinfo, currentframe, getdoc
 
+import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
@@ -87,7 +88,7 @@ __OUT_WHITELIST_FILE_SUFFIX = "_whitelist.txt"
 @click.option(
     "-m",
     "--model",
-    default=LongbowModel.DEFAULT_MODEL,
+    default=longbow.utils.constants.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "

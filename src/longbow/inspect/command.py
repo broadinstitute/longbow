@@ -22,6 +22,7 @@ from construct import *
 import matplotlib.pyplot as plt
 from matplotlib import transforms
 
+import longbow.utils.constants
 from ..utils import model
 from ..utils.model import LibraryModel
 from ..utils import bam_utils
@@ -69,7 +70,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
 @click.option(
     "-m",
     "--model",
-    default=model.DEFAULT_MODEL,
+    default=longbow.utils.constants.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -253,8 +254,8 @@ def annotate_read(read, m, max_length, min_rq):
     fseq = read.query_sequence
     fppath = []
 
-    if read.has_tag("SG"):
-        tag = re.split(",", read.get_tag("SG"))
+    if read.has_tag(longbow.utils.constants.SEGMENTS_TAG):
+        tag = re.split(",", read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
 
         for e in tag:
             state, rrange = re.split(":", e)
@@ -264,7 +265,7 @@ def annotate_read(read, m, max_length, min_rq):
             fppath.extend([state] * qLen)
 
         # Set our logp from the bam file:
-        flogp = read.get_tag(bam_utils.READ_MODEL_SCORE_TAG)
+        flogp = read.get_tag(longbow.utils.constants.READ_MODEL_SCORE_TAG)
     else:
 
         # Check for max length and min quality:
@@ -302,7 +303,7 @@ def create_colormap_for_model(m):
     default_color = "#c2a8f0"
 
     color_map = {
-        model.RANDOM_SEGMENT_NAME: random_color,
+        longbow.utils.constants.RANDOM_SEGMENT_NAME: random_color,
         DEFAULT_COLOR_MAP_ENTRY: default_color
     }
 
@@ -314,7 +315,7 @@ def create_colormap_for_model(m):
             c = adapter_state_color
         elif name == m.coding_region:
             c = coding_region_color
-        elif name in model.MAS_SCAFFOLD_NAMES:
+        elif name in longbow.utils.constants.MAS_SCAFFOLD_NAMES:
             c = scaffold_state_color
         elif name in m.named_random_segments:
             # We'll do these next:
@@ -500,14 +501,14 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
         # Write state label if we haven't already written it:
         if lbl != last_label:
             seg_score_string = ""
-            if lbl == model.RANDOM_SEGMENT_NAME:
+            if lbl == longbow.utils.constants.RANDOM_SEGMENT_NAME:
                 # We want to label the random sections now, but we don't need to do anything fancy about it.
                 pass
             # Always display the length of known random segments of fixed length:
             elif lbl in library_model.named_random_segments:
 
                 # Handle basic named random segment:
-                if library_model.adapter_dict[lbl] == model.RANDOM_SEGMENT_NAME:
+                if library_model.adapter_dict[lbl] == longbow.utils.constants.RANDOM_SEGMENT_NAME:
                     length = len(collapsed_annotations[total_segments_seen])
                     seg_score_string = f" [{length}]"
 
@@ -516,7 +517,7 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
 
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 
-                    if special_seg_type == model.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                    if special_seg_type == longbow.utils.constants.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
                         # Mark the length that this known random segment should be:
                         length = list(library_model.adapter_dict[lbl].values())[0]
                         seg_score_string = f" [{length}]"
@@ -529,13 +530,18 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
                 if type(library_model.adapter_dict[lbl]) is dict:
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 
-                    if special_seg_type == model.HPR_SEGMENT_TYPE_NAME:
+                    if special_seg_type == longbow.utils.constants.HPR_SEGMENT_TYPE_NAME:
                         base, count = library_model.adapter_dict[lbl][special_seg_type]
                         known_segment_seq = base * count
                         segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
 
+                        # Annotate the score
                         seg_score_string = f" ({len(known_segment_seq) - editdistance.eval(segment_bases, known_segment_seq)}" \
                                            f"/{len(known_segment_seq)})"
+
+                        # Also annotate the actual length:
+                        seg_score_string = f"{seg_score_string} [{len(collapsed_annotations[total_segments_seen])}]"
+
                     else:
                         logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
                 else:

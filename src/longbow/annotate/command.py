@@ -18,6 +18,7 @@ import multiprocessing as mp
 import gzip
 from construct import *
 
+import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils.bam_utils import SegmentInfo
 from ..utils import model as LongbowModel
@@ -57,7 +58,7 @@ click_log.basic_config(logger)
     "-m",
     "--model",
     type=str,
-    default=LongbowModel.DEFAULT_MODEL,
+    default=longbow.utils.constants.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -233,7 +234,8 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
 def get_segments(read):
     """Get the segments corresponding to a particular read by reading the segments tag information."""
     return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(bam_utils.SEGMENTS_TAG).split(bam_utils.SEGMENT_TAG_DELIMITER)
+        SegmentInfo.from_tag(s) for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
+            longbow.utils.constants.SEGMENT_TAG_DELIMITER)
     ]
 
 

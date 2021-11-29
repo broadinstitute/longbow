@@ -1,47 +1,24 @@
-import sys
 import re
-import json
 import logging
-import queue
 import pickle
-
-import networkx
 
 import click_log
 
-import numpy as np
-import pandas as pd
-
 from pomegranate import *
-from pomegranate.callbacks import History, ModelCheckpoint
 
-from ..utils import bam_utils
+import longbow.utils.constants
+from .constants import RANDOM_SEGMENT_NAME, FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME, HPR_SEGMENT_TYPE_NAME, \
+    RANDOM_SILENT_STATE_A, RANDOM_SILENT_STATE_B, RANDOM_BASE_STATE, START_STATE_INDICATOR, END_STATE_INDICATOR, \
+    BAKE_MERGE_STRATEGY
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
 
 # # DEBUG:
-logger.setLevel(logging.DEBUG)
-
-DEFAULT_MODEL = "mas15v2"
-
-RANDOM_SEGMENT_NAME = "random"
-FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME = "FixedLengthRandomBases"
-HPR_SEGMENT_TYPE_NAME = "HomopolymerRepeat"
-
-RANDOM_SILENT_STATE_A = "RDA"
-RANDOM_SILENT_STATE_B = "RDB"
-RANDOM_BASE_STATE = "RI"
-
-START_STATE_INDICATOR = "-start"
-END_STATE_INDICATOR = "-end"
+# logger.setLevel(logging.DEBUG)
 
 starts_with_number_re = re.compile(r"^\d")
-
-BAKE_MERGE_STRATEGY = "None"
-
-MAS_SCAFFOLD_NAMES = {"MARS", "VENUS", "ZEPHYR", "AUSTER", "BOREAS"}
 
 
 class LibraryModel:
@@ -226,7 +203,8 @@ class LibraryModel:
         self._initialize_hmm_states()
 
         # Initialize the transitions in our model:
-        self._initialize_hmm_transitions()
+        # self._initialize_hmm_transitions()
+        self._initialize_hmm_transitions_new()
 
         # DEBUGGING:
         self.dump_as_dotfile(do_subgraphs=False)
@@ -380,8 +358,6 @@ class LibraryModel:
         for _, s in segment_ends.items():
             logger.debug("State: %s", s.name)
             sname = LibraryModel._get_state_base_name(s)
-
-            print(s)
 
             # If we have direct connections from this state to some other states then we add
             # them into the model:
@@ -1305,7 +1281,8 @@ class LibraryModel:
             ),
             "adapters": {
                 "VENUS": "TCTACACGACGCTCTTCCGATCT",
-                "Poly_A": "A" * 30,
+                # "Poly_A": "A" * 30,
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
                 "MARS": "GTACTCTGCGTTGATACCACTGCTT",
                 "BOREAS": "TTTCTTATATGGG",
                 "A": "AGCTTACTTGTGAAGA",
@@ -1375,8 +1352,10 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG), (bam_utils.READ_RAW_UMI_TAG, bam_utils.READ_UMI_POS_TAG)],
-                "CBC": [(bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG), (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
         },
         "mas15threeP": {
@@ -1473,8 +1452,10 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG), (bam_utils.READ_RAW_UMI_TAG, bam_utils.READ_UMI_POS_TAG)],
-                "CBC": [(bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG), (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
         },
         "mas15BulkWithIndices": {
@@ -1570,8 +1551,8 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "sample_index"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": (bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG),
-                "sample_index": (bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG),
+                "UMI": (longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                "sample_index": (longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG),
             },
         },
         "mas10": {
@@ -1709,8 +1690,10 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG), (bam_utils.READ_RAW_UMI_TAG, bam_utils.READ_UMI_POS_TAG)],
-                "CBC": [(bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG), (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
         },
         "mas10threeP": {
@@ -1786,8 +1769,10 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG), (bam_utils.READ_RAW_UMI_TAG, bam_utils.READ_UMI_POS_TAG)],
-                "CBC": [(bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG), (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
         },
         "slide-seq": {
@@ -1982,9 +1967,11 @@ class LibraryModel:
             "named_random_segments": {"UMI", "SBC2", "SBC1", "cDNA"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": (bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG),
-                "SBC1": (bam_utils.READ_SPATIAL_BARCODE1_TAG, bam_utils.READ_SPATIAL_BARCODE1_POS_TAG),
-                "SBC2": (bam_utils.READ_SPATIAL_BARCODE2_TAG, bam_utils.READ_SPATIAL_BARCODE2_POS_TAG),
+                "UMI": (longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                "SBC1": (longbow.utils.constants.READ_SPATIAL_BARCODE1_TAG,
+                         longbow.utils.constants.READ_SPATIAL_BARCODE1_POS_TAG),
+                "SBC2": (longbow.utils.constants.READ_SPATIAL_BARCODE2_TAG,
+                         longbow.utils.constants.READ_SPATIAL_BARCODE2_POS_TAG),
             },
         },
         "mas8prototype": {
@@ -2098,8 +2085,10 @@ class LibraryModel:
             "named_random_segments": {"UMI", "CBC", "cDNA"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(bam_utils.READ_UMI_TAG, bam_utils.READ_UMI_POS_TAG), (bam_utils.READ_RAW_UMI_TAG, bam_utils.READ_UMI_POS_TAG)],
-                "CBC": [(bam_utils.READ_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG), (bam_utils.READ_RAW_BARCODE_TAG, bam_utils.READ_BARCODE_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
         }
     }

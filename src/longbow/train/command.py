@@ -12,6 +12,7 @@ import concurrent.futures
 
 import pysam
 
+import longbow.utils.constants
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
@@ -58,7 +59,7 @@ click_log.basic_config(logger)
 @click.option(
     "-m",
     "--model",
-    default=LongbowModel.DEFAULT_MODEL,
+    default=longbow.utils.constants.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "

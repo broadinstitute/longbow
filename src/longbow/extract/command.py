@@ -10,6 +10,7 @@ import tqdm
 import pysam
 from construct import *
 
+import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
@@ -161,7 +162,7 @@ def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter
                 logger.critical(message)
                 raise RuntimeError(message)
 
-            logger.info(f"Extracting `{LongbowModel.RANDOM_SEGMENT_NAME}` segments between {leading_adapter} and {trailing_adapter}.")
+            logger.info(f"Extracting `{longbow.utils.constants.RANDOM_SEGMENT_NAME}` segments between {leading_adapter} and {trailing_adapter}.")
             logger.info(f"Ignoring the first {start_offset} bases from extracted read segments.")
 
         # Get our delimiters here just in case we have to split the reads later:
@@ -185,11 +186,12 @@ def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter
                     _, segments = get_segments(read)
                 except KeyError:
                     logger.error(f"Input bam file does not contain longbow segmented reads!  "
-                                 f"No {bam_utils.SEGMENTS_TAG} tag detected on read {read.query_name} !")
+                                 f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
                     sys.exit(1)
 
                 # Check if the read is already segmented:
-                if (not read.has_tag(bam_utils.READ_IS_SEGMENTED_TAG)) or (not read.get_tag(bam_utils.READ_IS_SEGMENTED_TAG)):
+                if (not read.has_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG)) or (not read.get_tag(
+                        longbow.utils.constants.READ_IS_SEGMENTED_TAG)):
                     # The read is not segmented.  We should segment it first and then go through our segments one by one:
                     logger.debug(f"Read must be segmented prior to extraction: {read.query_name}")
                     segmented_reads = []
@@ -243,7 +245,8 @@ def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter
 def _get_segments_only(read):
     """Get the segments corresponding to a particular read by reading the segments tag information."""
     return [
-        SegmentInfo.from_tag(s) for s in read.get_tag(bam_utils.SEGMENTS_TAG).split(bam_utils.SEGMENT_TAG_DELIMITER)
+        SegmentInfo.from_tag(s) for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
+            longbow.utils.constants.SEGMENT_TAG_DELIMITER)
     ]
 
 
@@ -367,6 +370,6 @@ def _create_extracted_aligned_segment(read, seg_to_extract, start_offset, base_p
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
-    a.set_tag(bam_utils.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}")
+    a.set_tag(longbow.utils.constants.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}")
 
     return a

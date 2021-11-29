@@ -12,6 +12,7 @@ import pysam
 import multiprocessing as mp
 import numpy as np
 
+import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
@@ -60,7 +61,7 @@ click_log.basic_config(logger)
     default=False,
     help=f"Create a barcode confidence score file based on the barcodes in the given model.  "
          f"This only applies for models that have annotation_segments where one such segment "
-         f"is annotated into the raw barcode field ({bam_utils.READ_RAW_BARCODE_TAG})",
+         f"is annotated into the raw barcode field ({longbow.utils.constants.READ_RAW_BARCODE_TAG})",
 )
 @click.option(
     "-m",
@@ -237,7 +238,7 @@ def _sub_process_write_fn(
     barcode_conf_file = None
     if create_barcode_conf_file:
         if (model.annotation_segments is not None) and \
-                (bam_utils.READ_RAW_BARCODE_TAG in [v[0] for v in model.annotation_segments.values()]):
+                (longbow.utils.constants.READ_RAW_BARCODE_TAG in [v[0] for v in model.annotation_segments.values()]):
             logger.info(f"Creating barcode confidence file: {barcode_conf_file_name}")
             barcode_conf_file = open(barcode_conf_file_name, 'w')
         else:
@@ -610,8 +611,8 @@ def _write_split_array_element(
     a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord)
 
     # Write our confidence file if we have to:
-    if barcode_conf_file is not None and a.has_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG):
-        barcode_conf_file.write(f"{a.get_tag(bam_utils.READ_RAW_BARCODE_TAG)}\t{a.get_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG)}\n")
+    if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
+        barcode_conf_file.write(f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n")
 
     has_cbc_and_umi = bam_utils.has_cbc_and_umi(a)
 
@@ -634,8 +635,8 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     zmw = abs(hash(a.query_sequence)) % (10 ** 9)
     movie_name = read.query_name.split("/")[0]
     a.query_name = f'{movie_name}/{zmw}/ccs'
-    a.set_tag(bam_utils.READ_ZMW_TAG, zmw)
-    a.set_tag(bam_utils.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
+    a.set_tag(longbow.utils.constants.READ_ZMW_TAG, zmw)
+    a.set_tag(longbow.utils.constants.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
 
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
@@ -651,8 +652,8 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
                 segments_to_annotate.append(seg_info)
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
-        bam_utils.SEGMENTS_TAG,
-        bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
+        longbow.utils.constants.SEGMENTS_TAG,
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
     )
 
     # Annotate any segments in this array element that we have to:
@@ -670,22 +671,22 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
 
         # Next check if the annotation is our READ_RAW_BARCODE_TAG.
         # If so, we should annotate the confidence score as well:
-        if field_tag_name == bam_utils.READ_RAW_BARCODE_TAG:
+        if field_tag_name == longbow.utils.constants.READ_RAW_BARCODE_TAG:
             # Get the length from the model:
             barcode_length = list(model.adapter_dict[s.name].values())[0]
             qual_bases = read.query_qualities[s.start:s.end + 1]
             conf_factor = int(np.round(bam_utils.get_confidence_factor_raw_quals(qual_bases)))
 
-            a.set_tag(bam_utils.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
+            a.set_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
 
     # Set IsoSeq3-compatible tags:
-    a.set_tag(bam_utils.READ_CLIPPED_SEQS_LIST_TAG, ','.join(clipped_tags))
-    a.set_tag(bam_utils.READ_NUM_CONSENSUS_PASSES_TAG, 1)
-    a.set_tag(bam_utils.READ_ZMW_NAMES_TAG, read.query_name)
-    a.set_tag(bam_utils.READ_NUM_ZMWS_TAG, 1)
-    a.set_tag(bam_utils.READ_TAGS_ORDER_TAG, f'{bam_utils.READ_RAW_BARCODE_TAG}-{bam_utils.READ_RAW_UMI_TAG}')
+    a.set_tag(longbow.utils.constants.READ_CLIPPED_SEQS_LIST_TAG, ','.join(clipped_tags))
+    a.set_tag(longbow.utils.constants.READ_NUM_CONSENSUS_PASSES_TAG, 1)
+    a.set_tag(longbow.utils.constants.READ_ZMW_NAMES_TAG, read.query_name)
+    a.set_tag(longbow.utils.constants.READ_NUM_ZMWS_TAG, 1)
+    a.set_tag(longbow.utils.constants.READ_TAGS_ORDER_TAG, f'{longbow.utils.constants.READ_RAW_BARCODE_TAG}-{longbow.utils.constants.READ_RAW_UMI_TAG}')
 
     # Set our tag indicating that this read is now segmented:
-    a.set_tag(bam_utils.READ_IS_SEGMENTED_TAG, True)
+    a.set_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG, True)
 
     return a

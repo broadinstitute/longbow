@@ -11,6 +11,7 @@ import tqdm
 import pysam
 from construct import *
 
+import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
@@ -126,11 +127,11 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                     _, segments = get_segments(read)
                 except KeyError:
                     logger.error(f"Input bam file does not contain longbow segmented reads!  "
-                                 f"No {bam_utils.SEGMENTS_TAG} tag detected on read {read.query_name} !")
+                                 f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
                     sys.exit(1)
 
                 # Annotate the read with the model that was used in its validation:
-                read.set_tag(bam_utils.READ_MODEL_NAME_TAG, lb_model.name)
+                read.set_tag(longbow.utils.constants.READ_MODEL_NAME_TAG, lb_model.name)
 
                 # Check to see if the read is valid by this model and write it out:
                 segment_names = [s.name for s in segments]
@@ -145,9 +146,9 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                                  lb_model.key_adapters[first_valid_adapter_index],
                                  num_valid_adapters)
 
-                    read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, True)
-                    read.set_tag(bam_utils.READ_NUM_KEY_SEGMENTS_TAG, num_valid_adapters)
-                    read.set_tag(bam_utils.READ_FIRST_KEY_SEG_TAG, lb_model.key_adapters[first_valid_adapter_index])
+                    read.set_tag(longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, True)
+                    read.set_tag(longbow.utils.constants.READ_NUM_KEY_SEGMENTS_TAG, num_valid_adapters)
+                    read.set_tag(longbow.utils.constants.READ_FIRST_KEY_SEG_TAG, lb_model.key_adapters[first_valid_adapter_index])
                     passing_bam_file.write(read)
                     tot_num_valid_adapters += num_valid_adapters
                     num_passed += 1
@@ -162,7 +163,7 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                                      num_valid_adapters,
                                      lb_model.extract_key_segment_names(segment_names))
 
-                    read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, False)
+                    read.set_tag(longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, False)
                     failing_bam_file.write(read)
                     tot_num_failed_adapters += num_valid_adapters
                     num_failed += 1
