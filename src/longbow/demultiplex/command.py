@@ -17,12 +17,11 @@ import multiprocessing as mp
 from ..utils import bam_utils
 from ..utils.model import LibraryModel
 
+import longbow.utils.constants
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("demultiplex")
 click_log.basic_config(logger)
-
-default_models = ("mas10", "mas15")
 
 
 @click.command(name=logger.name)
@@ -58,14 +57,14 @@ default_models = ("mas10", "mas15")
     type=str,
     multiple=True,
     show_default=True,
-    default=default_models,
+    default=longbow.utils.constants.DEFAULT_DEMULTIPLEX_MODELS,
     help="Models to use to demultiplex the input bam file.  Given model must either be a Longbow built-in model, "
          "or a valid Longbow model json file.  If specified, this option must be specified at least twice."
 )
 @click.option(
     "--max-length",
     type=int,
-    default=60000,
+    default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
     show_default=True,
     required=False,
     help="Maximum length of a read to process.  Reads beyond this length will not be annotated."

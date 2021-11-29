@@ -87,7 +87,7 @@ click_log.basic_config(logger)
     "-L",
     "--max-length",
     type=int,
-    default=30000,
+    default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
     show_default=True,
     required=False,
     help="Maximum length of a read to process.  Reads longer than this length will not be annotated."

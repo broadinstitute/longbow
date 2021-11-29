@@ -98,6 +98,10 @@ class LibraryModel:
         if do_build:
             self.build()
 
+    @property
+    def has_named_random_segments(self):
+        return self.named_random_segments is not None
+
     def annotate(self, seq):
         """Annotate the given segment using this model."""
         logp, path = self.hmm.viterbi(seq)
@@ -250,7 +254,7 @@ class LibraryModel:
         # This is the transition from `random` to one of our array elements.
         # This only happens for models with named random segments:
         per_state_transition_prob = 1.0
-        if self.named_random_segments is not None:
+        if self.has_named_random_segments:
             # Get the number of "standard" segments.
             # i.e. states that are not named random segments:
             num_standard_states = 0
@@ -264,7 +268,8 @@ class LibraryModel:
             # Those should be accounted for in another method.
             #
             # We also exclude named random segments because they model the same thing.
-            if sname not in self.start_element_names and sname not in self.named_random_segments:
+            if sname not in self.start_element_names and \
+                    (self.has_named_random_segments and sname not in self.named_random_segments):
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(
                         f"Adding transition: {self.hmm.start.name} -> {segment_starts[sname].name} "
@@ -377,7 +382,7 @@ class LibraryModel:
                 # # Also add in a connection to the silent random B state if this is a non-random section
                 # # and it does not connect to a named random section:
                 # has_direct_connection_to_named_random = False
-                # if (self.named_random_segments is not None) and (sname not in self.named_random_segments):
+                # if self.has_named_random_segments and (sname not in self.named_random_segments):
                 #     for n in self.direct_connections_dict[sname]:
                 #         if n in self.named_random_segments:
                 #             has_direct_connection_to_named_random = True
@@ -419,7 +424,7 @@ class LibraryModel:
         for k, v in self.adapter_dict.items():
             adapter_hmm = None
             if type(v) is str:
-                if (self.named_random_segments is not None) and (k in self.named_random_segments):
+                if self.has_named_random_segments and (k in self.named_random_segments):
                     # We have a named random segment.
                     # We need to make a named random model:
                     adapter_hmm = LibraryModel._make_named_random_model(name=k)
@@ -445,6 +450,7 @@ class LibraryModel:
         self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
 
     def _is_state_last_in_section(self, s):
+        """Returns True if the given state is considered to be the last state in its segment."""
 
         # This is the old logic for determining if a state is the last one in a segment:
         if s.name == self.hmm.end.name:
@@ -455,17 +461,19 @@ class LibraryModel:
 
         # Decode the segment number from the name:
         m = re.match(r"^(\w+):([MID])(\d+)", s.name)
-        if m is None and base_name not in self.named_random_segments:
+        if m is None and (base_name == RANDOM_SEGMENT_NAME or
+                          (self.has_named_random_segments and base_name not in self.named_random_segments)):
             return False
         # Allow for the state number to be 0 in the case of a named random segment (e.g. cDNA):
         segment_state_num = int(m.group(3)) if m is not None else 0
 
         # Case for normal segments:
         if type(self.adapter_dict[base_name]) == str:
-            if self.adapter_dict[base_name] == RANDOM_SEGMENT_NAME and base_name in self.named_random_segments:
+            if self.adapter_dict[base_name] == RANDOM_SEGMENT_NAME \
+                    and self.has_named_random_segments \
+                    and base_name in self.named_random_segments:
 
                 state_end_name = f"{base_name}{END_STATE_INDICATOR}"
-                print(f"Name: {s.name}:\t{base_name},\t{state_end_name},\t{s.name == state_end_name}")
 
                 # The final state for the named random segment types is the end state:
                 return s.name == state_end_name
@@ -598,12 +606,11 @@ class LibraryModel:
             f.write("}\n")
 
     def validate_model(self):
-        """Ensure that the configuration of this model conforms to the semantics that we require for it to be
-        well-formed."""
+        """Ensure that the configuration of this model is well-formed and conforms to the semantics that we require."""
 
         # Ensure that our model does not start with a named random segment:
         for name in self.start_element_names:
-            if (self.named_random_segments is not None) and (name in self.named_random_segments):
+            if self.has_named_random_segments and (name in self.named_random_segments):
                 message = f"ERROR: start segment name is a named random segment: {name}.  " \
                           f"Start segments cannot be named random segments."
                 logger.critical(message)
@@ -611,14 +618,14 @@ class LibraryModel:
 
         # Ensure that our model does not end with a named random segment:
         for name in self.end_element_names:
-            if (self.named_random_segments is not None) and (name in self.named_random_segments):
+            if self.has_named_random_segments and (name in self.named_random_segments):
                 message = f"ERROR: end segment name is a named random segment: {name}.  " \
                           f"End segments cannot be named random segments."
                 logger.critical(message)
                 raise RuntimeError(message)
 
         # Ensure all named random segments have direct connections:
-        if self.named_random_segments is not None:
+        if self.has_named_random_segments:
             for name in self.named_random_segments:
                 if name not in self.direct_connections_dict:
                     message = f"ERROR: Named random segment has no direct connections: {name}.  " \
@@ -626,15 +633,41 @@ class LibraryModel:
                     logger.critical(message)
                     raise RuntimeError(message)
 
+        # Ensure that the coding region is specified somewhere in the model as a string:
         if self.coding_region is not None:
             if type(self.coding_region) is not str:
                 message = f"ERROR: coding_region must be a string."
                 logger.critical(message)
                 raise RuntimeError(message)
             elif self.coding_region not in self.adapter_dict:
-                message = f"ERROR: coding_region name does not appear in adapter dictionary: {self.coding_region} not in ({self.adapter_dict.keys()})."
+                message = f"ERROR: coding_region name does not appear in adapter dictionary: " \
+                          f"{self.coding_region} not in ({self.adapter_dict.keys()})."
                 logger.critical(message)
                 raise RuntimeError(message)
+
+        # Ensure that all segments in the array element structure show up in the adapter dictionary:
+        for array_element in self.array_element_structure:
+            for adapter in array_element:
+                # `random` nodes are OK in the array element structure:
+                if adapter not in self.adapter_dict and adapter != RANDOM_SEGMENT_NAME:
+                    message = f"ERROR: adapter from array element structure does not appear in adapter dictionary: " \
+                              f"{adapter} not in ({self.adapter_dict.keys()})."
+                    logger.critical(message)
+                    raise RuntimeError(message)
+
+        # Ensure that all segments in the direct connections dict exist in the adapter dictionary:
+        for source, destination_nodes in self.direct_connections_dict.items():
+            if source not in self.adapter_dict:
+                message = f"ERROR: source adapter from direct connections does not appear in adapter dictionary: " \
+                          f"{source} not in ({self.adapter_dict.keys()})."
+                logger.critical(message)
+                raise RuntimeError(message)
+            for dest in destination_nodes:
+                if dest not in self.adapter_dict:
+                    message = f"ERROR: dest adapter from direct connections does not appear in adapter dictionary: " \
+                              f"{dest} not in ({self.adapter_dict.keys()})."
+                    logger.critical(message)
+                    raise RuntimeError(message)
 
     @staticmethod
     def _get_state_base_name(state):
@@ -1079,7 +1112,7 @@ class LibraryModel:
         }
 
         # Set our new "optional" fields here:
-        if self.named_random_segments is not None:
+        if self.has_named_random_segments:
             model_data["named_random_segments"] = list(self.named_random_segments)
 
         if self.coding_region is not None:
@@ -1400,7 +1433,6 @@ class LibraryModel:
                 "N": "AGGTATGCCGGTTAAG",
                 "O": "AAGTCACCGGCACCTT",
                 "P": "ATGAAGTGGCTCGAGA",
-                # "Poly_T": "T" * 30,
                 "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
                 "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
                 "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
@@ -1481,7 +1513,7 @@ class LibraryModel:
             ),
             "adapters": {
                 "VENUS": "TCTACACGACGCTCTTCCGATCT",
-                "Poly_A": "A" * 30,
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
                 "MARS": "CTCTGCGTTGATACCACTGCTT",
                 "BOREAS": "TTTCTTATATGGG",
                 "A": "AGCTTACTTGTGAAGA",
@@ -1635,7 +1667,7 @@ class LibraryModel:
             ),
             "adapters": {
                 "VENUS": "TCTACACGACGCTCTTCCGATCT",
-                "Poly_A": "A" * 30,
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
                 "MARS": "GTACTCTGCGTTGATACCACTGCTT",
                 "BOREAS": "TTTCTTATATGGG",
                 "B": "ACTTGTAAGCTGTCTA",
@@ -1727,7 +1759,6 @@ class LibraryModel:
                 "O": "AAGTCACCGGCACCTT",
                 "Q": "AAGCACCATAATGTGT",
                 "R": "AACCGGACACACTTAG",
-                # "Poly_T": "T" * 30,
                 "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
                 "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
                 "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
@@ -1913,7 +1944,7 @@ class LibraryModel:
                 "N": "AGGTATGCCGGTTAAG",
                 "O": "AAGTCACCGGCACCTT",
                 "P": "ATGAAGTGGCTCGAGA",
-                "Poly_T": "T" * 30,
+                "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
                 "SBC1": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 6},
                 "SBC2": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 8},
                 # The UMI might be 7, rather than 9 elements long - not clear from the geneious file.
@@ -2040,7 +2071,7 @@ class LibraryModel:
             ),
             "adapters": {
                 "VENUS": "CTACACGACGCTCTTCCGATCT",
-                "Poly_T": "T" * 30,
+                "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
                 "ZEPHYR": "CCCATGTA",
                 "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
                 "A": "ACGTACAGT",
@@ -2081,7 +2112,7 @@ class LibraryModel:
                 "cDNA": {"MARS"},
             },
             "start_element_names": {"A", "VENUS"},
-            "end_element_names": {"TSO", "A"},
+            "end_element_names": {"MARS", "A"},
             "named_random_segments": {"UMI", "CBC", "cDNA"},
             "coding_region": "cDNA",
             "annotation_segments": {

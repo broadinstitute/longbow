@@ -3,7 +3,9 @@
 #######################################
 
 DEFAULT_MODEL = "mas15v2"
+DEFAULT_MAX_READ_LENGTH = 30000
 
+DEFAULT_DEMULTIPLEX_MODELS = ("mas10", "mas15")
 
 ################################################################################
 # Constants for model construction:
@@ -44,22 +46,28 @@ READ_ADAPTER_TAG = 'ZA'
 READ_ADAPTER_POS_TAG = "XA"
 READ_UMI_TAG = 'ZU'
 READ_UMI_POS_TAG = "XU"
-READ_RAW_UMI_TAG = "XM"  # UMI sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
 READ_BARCODE_TAG = 'CR'  # Cell barcode
-READ_RAW_BARCODE_TAG = "XC"  # barcode sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
+
 READ_BARCODE_POS_TAG = "XB"
 READ_BARCODE_QUAL_TAG = "CY"  # Cell barcode read quality
 READ_BARCODE_CORRECTED_TAG = 'CB'  # Cell barcode that is error-corrected and confirmed against a list of known-good barcode sequences
 READ_BARCODE_CONF_FACTOR_TAG = "XF"
 READ_TAGS_ORDER_TAG = "XA"  # Order of tag names
+
+CONF_FACTOR_SCALE = 100
+READ_SPATIAL_BARCODE1_TAG = "X1"
+READ_SPATIAL_BARCODE1_POS_TAG = "XP"
+READ_SPATIAL_BARCODE2_TAG = "X2"
+READ_SPATIAL_BARCODE2_POS_TAG = "XQ"
+
+################################################################################
+# Constants for PacBio compatibility:
+#######################################
+READ_RAW_UMI_TAG = "XM"  # UMI sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
+READ_RAW_BARCODE_TAG = "XC"  # barcode sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
 READ_NUM_CONSENSUS_PASSES_TAG = "ic"  # Sum of number of passes from all ZMWs used to create consensus (e.g. 1)
 READ_ZMW_NAMES_TAG = "im"  # ZMW names associated with this isoform (e.g. m64013e_211031_055434/1/ccs)
 READ_NUM_ZMWS_TAG = "is"  # Number of ZMWs associated with this isoform (e.g. 1)
 READ_CLIPPED_SEQS_LIST_TAG = "it"  # List of barcodes/UMIs clipped during tag (e.g. TCAGGTGCAGGTCGGATCCTGCGCAT)
 READ_ZMW_TAG = "zm"
 READ_ALTERED_NAME_TAG = "XN"  # Altered read name given by Longbow to a segmented read (used for debugging)
-CONF_FACTOR_SCALE = 100
-READ_SPATIAL_BARCODE1_TAG = "X1"
-READ_SPATIAL_BARCODE1_POS_TAG = "XP"
-READ_SPATIAL_BARCODE2_TAG = "X2"
-READ_SPATIAL_BARCODE2_POS_TAG = "XQ"

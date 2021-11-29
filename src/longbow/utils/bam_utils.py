@@ -8,6 +8,7 @@ import pysam
 import sys
 import array
 import collections
+import os
 
 from functools import reduce
 from collections import OrderedDict
@@ -199,7 +200,7 @@ def check_for_preexisting_files(file_list, exist_ok=False):
 def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     """Get the alignment score of the given segment against the read sequence."""
 
-    # TODO: FIX THIS METHOD WITH NEW SCORING MODEL!
+    # TODO: FIX THIS METHOD WITH NEW SCORING MODEL FROM INSPECT!
     # It should be something like:
     #                         base, count = library_model.adapter_dict[lbl][special_seg_type]
     #                         known_segment_seq = base * count
@@ -210,7 +211,8 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
 
 
     # We don't score random segments:
-    if segment.name == RANDOM_SEGMENT_NAME or segment.name in library_model.named_random_segments:
+    if segment.name == RANDOM_SEGMENT_NAME or \
+            (library_model.has_named_random_segments and segment.name in library_model.named_random_segments):
         return 0, 0
 
     # Create a default aligner if we weren't given one:

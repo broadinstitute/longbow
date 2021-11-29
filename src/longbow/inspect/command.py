@@ -87,7 +87,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
 @click.option(
     "--max-length",
     type=int,
-    default=60000,
+    default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
     show_default=True,
     required=False,
     help="Maximum length of a read to process.  Reads beyond this length will not be annotated.  If the input file has already been annotated, this parameter is ignored."
