@@ -313,11 +313,11 @@ def create_colormap_for_model(m):
             continue
         if len(name) == 1:
             c = adapter_state_color
-        elif name == m.coding_region:
+        elif m.has_coding_region and name == m.coding_region:
             c = coding_region_color
         elif name in longbow.utils.constants.MAS_SCAFFOLD_NAMES:
             c = scaffold_state_color
-        elif name in m.named_random_segments:
+        elif m.has_named_random_segments and name in m.named_random_segments:
             # We'll do these next:
             continue
         elif name.upper().startswith("POLY"):
@@ -327,22 +327,23 @@ def create_colormap_for_model(m):
 
         color_map[name] = c
 
-    # Now generate random segment colors:
-    # Start from the color of the coding region:
-    rc = [
-        int(cbc_color[1:3], 16),
-        int(cbc_color[3:5], 16),
-        int(cbc_color[5:7], 16),
-    ]
-    step = int(256 / len(m.named_random_segments))
-    for name in m.named_random_segments:
-        if name == m.coding_region:
-            continue
-        c = [(c + step) % 256 for c in rc]
-        c = adjust_color_for_existing_colors(c, color_map.values(), step)
+    if m.has_named_random_segments:
+        # Now generate random segment colors:
+        # Start from the color of the coding region:
+        rc = [
+            int(cbc_color[1:3], 16),
+            int(cbc_color[3:5], 16),
+            int(cbc_color[5:7], 16),
+        ]
+        step = int(256 / len(m.named_random_segments))
+        for name in m.named_random_segments:
+            if m.has_coding_region and name == m.coding_region:
+                continue
+            c = [(c + step) % 256 for c in rc]
+            c = adjust_color_for_existing_colors(c, color_map.values(), step)
 
-        color_map[name] = f"#{c[0]:02X}{c[1]:02X}{c[2]:02X}"
-        rc = c
+            color_map[name] = f"#{c[0]:02X}{c[1]:02X}{c[2]:02X}"
+            rc = c
 
     return color_map
 
@@ -502,10 +503,12 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
         if lbl != last_label:
             seg_score_string = ""
             if lbl == longbow.utils.constants.RANDOM_SEGMENT_NAME:
-                # We want to label the random sections now, but we don't need to do anything fancy about it.
-                pass
+                # Let's add the length of the random segment to the label:
+                length = len(collapsed_annotations[total_segments_seen])
+                seg_score_string = f" [{length}]"
+
             # Always display the length of known random segments of fixed length:
-            elif lbl in library_model.named_random_segments:
+            elif library_model.has_named_random_segments and lbl in library_model.named_random_segments:
 
                 # Handle basic named random segment:
                 if library_model.adapter_dict[lbl] == longbow.utils.constants.RANDOM_SEGMENT_NAME:
@@ -525,7 +528,7 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
                         logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
 
             # If we want to show the segment scores, we calculate them here:
-            elif show_seg_score and lbl not in library_model.named_random_segments:
+            elif show_seg_score and (not library_model.has_named_random_segments or lbl not in library_model.named_random_segments):
 
                 if type(library_model.adapter_dict[lbl]) is dict:
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]

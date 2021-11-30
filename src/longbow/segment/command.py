@@ -234,13 +234,11 @@ def _sub_process_write_fn(
     if do_simple_splitting:
         logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
 
-    barcode_conf_file_name = "barcode_confidence_scores.txt"
     barcode_conf_file = None
     if create_barcode_conf_file:
-        if (model.annotation_segments is not None) and \
-                (longbow.utils.constants.READ_RAW_BARCODE_TAG in [v[0] for v in model.annotation_segments.values()]):
-            logger.info(f"Creating barcode confidence file: {barcode_conf_file_name}")
-            barcode_conf_file = open(barcode_conf_file_name, 'w')
+        if model.has_barcode_annotation:
+            logger.info(f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}")
+            barcode_conf_file = open(longbow.utils.constants.BARCODE_CONF_FILE_NAME, 'w')
         else:
             logger.warning(f"Model does not have a barcode output, but barcode creation flag was given.  "
                            f"Barcode confidence file will NOT be created.")
@@ -610,7 +608,7 @@ def _write_split_array_element(
     """Write out an individual array element that has been split out according to the given coordinates."""
     a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord)
 
-    # Write our confidence file if we have to:
+    # Write our barcode confidence to the file if we have to:
     if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
         barcode_conf_file.write(f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n")
 

@@ -9,6 +9,7 @@ import sys
 import array
 import collections
 import os
+import operator
 
 from functools import reduce
 from collections import OrderedDict

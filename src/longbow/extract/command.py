@@ -41,7 +41,7 @@ click_log.basic_config(logger)
     "--output-bam",
     default="-",
     type=click.Path(exists=False),
-    help="extracted bam output  [default: stdout]",
+    help="extracted bam output.  [default: stdout]",
 )
 @click.option(
     '-f',
@@ -50,6 +50,15 @@ click_log.basic_config(logger)
     default=False,
     show_default=True,
     help="Force overwrite of the output files if they exist."
+)
+@click.option(
+    "--create-barcode-conf-file",
+    required=False,
+    is_flag=True,
+    default=False,
+    help=f"Create a barcode confidence score file based on the barcodes in the given model.  "
+         f"This only applies for models that have annotation_segments where one such segment "
+         f"is annotated into the raw barcode field ({longbow.utils.constants.READ_RAW_BARCODE_TAG})",
 )
 @click.option(
     "-b",
@@ -65,14 +74,14 @@ click_log.basic_config(logger)
     default=None,
     required=False,
     type=str,
-    help="Adapter preceding the region to extract.  Required if the given model does not name a `coding_region`",
+    help="Adapter preceding the region to extract.  Required if the given model does not name a `coding_region`.",
 )
 @click.option(
     "--trailing-adapter",
     default=None,
     required=False,
     type=str,
-    help="Adapter following the region to extract.  Required if the given model does not name a `coding_region`",
+    help="Adapter following the region to extract.  Required if the given model does not name a `coding_region`.",
 )
 @click.option(
     # CBC + UMI for MAS15 is 26
@@ -83,7 +92,7 @@ click_log.basic_config(logger)
     type=int,
     help="Number of bases to ignore from the extracted region start.  "
          "These bases will not be included in the extracted sequences.  "
-         "Required if the given model does not name a `coding_region`",
+         "Required if the given model does not name a `coding_region`.",
 )
 @click.option(
     "-m",
@@ -96,11 +105,20 @@ click_log.basic_config(logger)
          "LibraryModel.to_json()."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter, start_offset, model, input_bam):
+def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
+         leading_adapter, trailing_adapter, start_offset, model, input_bam):
     """Extract coding segments from the reads in the given bam.
-    The main coding segments are assumed to be labeled as `random` segments.
+    The main coding segments are assumed to be labeled as `random` segments or labeled with the same name as the
+    `coding_region` in the model (if specified).
+
+    For `random` segment extraction:
     Uses known segments flanking the region to be extracted as markers to indicate
-    the start and end of what to extract."""
+    the start and end of what to extract.
+
+    For `coding_region` segment extraction:
+    Looks for any section of the reads labeled with the same name as the `coding_region` in the model, regardless of
+    position.
+    """
 
     t_start = time.time()
 
@@ -141,8 +159,7 @@ def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         # Validate our command line arguments:
-        has_coding_region = lb_model.coding_region is not None
-        if has_coding_region:
+        if lb_model.has_coding_region:
             logger.info(f"Extracting coding region from model {lb_model.name}: {lb_model.coding_region}")
         else:
             # We don't have a model with a coding region.
@@ -164,6 +181,16 @@ def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter
 
             logger.info(f"Extracting `{longbow.utils.constants.RANDOM_SEGMENT_NAME}` segments between {leading_adapter} and {trailing_adapter}.")
             logger.info(f"Ignoring the first {start_offset} bases from extracted read segments.")
+
+        # Set up our barcode confidence file here:
+        barcode_conf_file = None
+        if create_barcode_conf_file:
+            if lb_model.has_barcode_annotation:
+                logger.info(f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}")
+                barcode_conf_file = open(longbow.utils.constants.BARCODE_CONF_FILE_NAME, 'w')
+            else:
+                logger.warning(f"Model does not have a barcode output, but barcode creation flag was given.  "
+                               f"Barcode confidence file will NOT be created.")
 
         # Get our delimiters here just in case we have to split the reads later:
         delimiters = create_simple_delimiters(lb_model)
@@ -209,13 +236,13 @@ def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter
                 for r in segmented_reads:
                     segments = _get_segments_only(r)
                     # If our model has a coding region, we should use it:
-                    if has_coding_region:
+                    if lb_model.has_coding_region:
                         es, nsx, nss = \
-                            _extract_region_from_model_with_coding_region(r, segments, lb_model, base_padding, extracted_bam_file)
+                            _extract_region_from_model_with_coding_region(r, segments, lb_model, base_padding, extracted_bam_file, barcode_conf_file)
                     else:
                         # We do not have a coding section, so we'll need to do things the old fashioned way:
                         es, nsx, nss = \
-                            _extract_region_from_model_without_coding_region(r, segments, leading_adapter, trailing_adapter, start_offset, base_padding, extracted_bam_file)
+                            _extract_region_from_model_without_coding_region(r, segments, leading_adapter, trailing_adapter, start_offset, base_padding, extracted_bam_file, barcode_conf_file)
 
                     # Track our stats:
                     extracted_segment |= es
@@ -227,6 +254,10 @@ def main(pbi, output_bam, force, base_padding, leading_adapter, trailing_adapter
                     num_reads_with_extracted_segments += 1
 
                 pbar.update(1)
+
+    # Close our barcode file if it was opened:
+    if barcode_conf_file is not None:
+        barcode_conf_file.close()
 
     # Calc some stats:
     pct_reads_with_extracted_segments = 100 * num_reads_with_extracted_segments / num_reads if num_reads > 0 else 0
@@ -250,7 +281,9 @@ def _get_segments_only(read):
     ]
 
 
-def _extract_region_from_model_without_coding_region(read, segments, leading_adapter, trailing_adapter, start_offset, base_padding, extracted_bam_file):
+def _extract_region_from_model_without_coding_region(array_element_read, segments, leading_adapter,
+                                                     trailing_adapter, start_offset, base_padding, extracted_bam_file,
+                                                     barcode_conf_file):
     # Get our marker segments:
     start_marker_list = [(i, s) for i, s in enumerate(segments) if s.name == leading_adapter]
     end_marker_list = [(i, s) for i, s in enumerate(segments) if s.name == trailing_adapter]
@@ -279,11 +312,11 @@ def _extract_region_from_model_without_coding_region(read, segments, leading_ada
         if (start_marker.end < end_marker.start) and (ei - si == 2) and (
                 segments[si + 1].name == "random"):
             # We have a valid segment to extract:
-            logger.debug("Found a segment to extract: %s: %s", read.query_name, segments[si + 1])
+            logger.debug("Found a segment to extract: %s: %s", array_element_read.query_name, segments[si + 1])
 
             # Create an AlignedSegment to output:
             aligned_segment = _create_extracted_aligned_segment(
-                read, segments[si + 1], start_offset, base_padding
+                array_element_read, segments[si + 1], start_offset, base_padding, barcode_conf_file
             )
 
             if aligned_segment:
@@ -297,36 +330,36 @@ def _extract_region_from_model_without_coding_region(read, segments, leading_ada
                 logger.warning(
                     "Read %s: start marker segment (i=%d) occurs at or after end segment (i=%d):"
                     " %d >= %d.  Skipping segment.",
-                    read.query_name, si, ei, start_marker.end, end_marker.start)
+                    array_element_read.query_name, si, ei, start_marker.end, end_marker.start)
             elif ei - si != 2:
                 logger.warning(
                     "Read %s: start segment (i=%d) and end segment (i=%d) have more than one "
-                    "segment between them.  Skipping segment.", read.query_name, si, ei)
+                    "segment between them.  Skipping segment.", array_element_read.query_name, si, ei)
             elif segments[si + 1].name != "random":
                 logger.warning("Read %s: segment between start segment (i=%d) and end segment (i=%d) "
-                               "is not a random segment.  Skipping segment.", read.query_name, si, ei)
+                               "is not a random segment.  Skipping segment.", array_element_read.query_name, si, ei)
             num_segments_skipped += 1
 
     return extracted_segment, num_segments_extracted, num_segments_skipped
 
 
-def _extract_region_from_model_with_coding_region(read, segments, m, base_padding, extracted_bam_file):
+def _extract_region_from_model_with_coding_region(array_element_read, segments, m, base_padding, extracted_bam_file, barcode_conf_file):
     # Get our marker segments:
     # NOTE: Even though this is a list, we only expect one segment to be here:
     extraction_segments = [s for s in segments if s.name == m.coding_region]
 
     if len(extraction_segments) == 0:
-        logger.debug(f"Did not find coding region in read: %s: %s", read.query_name, segments)
+        logger.debug(f"Did not find coding region in read: %s: %s", array_element_read.query_name, segments)
         return False, 0, 1
 
     else:
         if len(extraction_segments) > 1:
             logger.debug(f"Found %d coding regions in read %s: %s.  Only looking at first coding region.  All Segments: %s",
-                         len(extraction_segments), read.query_name, extraction_segments, segments)
+                         len(extraction_segments), array_element_read.query_name, extraction_segments, segments)
 
         # Create an AlignedSegment to output:
         aligned_segment = _create_extracted_aligned_segment(
-            read, extraction_segments[0], 0, base_padding
+            array_element_read, extraction_segments[0], 0, base_padding, barcode_conf_file
         )
 
         if aligned_segment:
@@ -336,7 +369,7 @@ def _extract_region_from_model_with_coding_region(read, segments, m, base_paddin
             return False, 0, 1
 
 
-def _create_extracted_aligned_segment(read, seg_to_extract, start_offset, base_padding):
+def _create_extracted_aligned_segment(read, seg_to_extract, start_offset, base_padding, barcode_conf_file):
     """Create a pysam.AlignedSegment object to store the information from the extracted bases."""
 
     start_coord = seg_to_extract.start + start_offset - base_padding
@@ -371,5 +404,9 @@ def _create_extracted_aligned_segment(read, seg_to_extract, start_offset, base_p
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
     a.set_tag(longbow.utils.constants.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}")
+
+    # Write our barcode confidence to the file if we have to:
+    if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
+        barcode_conf_file.write(f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n")
 
     return a

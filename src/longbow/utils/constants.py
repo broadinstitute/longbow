@@ -7,6 +7,8 @@ DEFAULT_MAX_READ_LENGTH = 30000
 
 DEFAULT_DEMULTIPLEX_MODELS = ("mas10", "mas15")
 
+BARCODE_CONF_FILE_NAME = "barcode_confidence_scores.txt"
+
 ################################################################################
 # Constants for model construction:
 #######################################
