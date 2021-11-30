@@ -726,6 +726,12 @@ class LibraryModel:
 
     @staticmethod
     def _make_homopolymer_repeat_model(name, nucleotide, expected_length):
+        # TODO: Do a better bake-off for the HPR models.
+        #  Currently v1 works very well, but you should still verify it's the best.
+        #  Actually, it should be refined to "center" on the specified length and have "extra"
+        #  transitions at the 90% and 110% marks.  This is similar to what you're doing now,
+        #  but a little different.
+
         # return LibraryModel._make_homopolymer_repeat_model_v0(name, nucleotide, expected_length)
         return LibraryModel._make_homopolymer_repeat_model_v1(name, nucleotide, expected_length)
         # return LibraryModel._make_homopolymer_repeat_model_v2(name, nucleotide, expected_length)
