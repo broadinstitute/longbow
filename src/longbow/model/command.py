@@ -47,7 +47,7 @@ def main(list_models, dump):
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
-    if list_models:
+    if list_models or (not list_models and dump is None):
         print("Longbow includes the following models:")
         model_info_list = []
         col_widths = [0, 0, 0]
