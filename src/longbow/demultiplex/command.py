@@ -103,7 +103,7 @@ def main(pbi, out_base_name, threads, model, max_length, min_rq, input_bam):
     results = manager.Queue()
 
     # Use defaults if model is not specified:
-    model_names = default_models
+    model_names = longbow.utils.constants.DEFAULT_DEMULTIPLEX_MODELS
 
     if len(model) == 0:
         logger.info(f"No models specified.  Using defaults.")

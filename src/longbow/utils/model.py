@@ -1218,6 +1218,19 @@ class LibraryModel:
         if model_name not in LibraryModel.pre_configured_models:
             raise KeyError(f"Model not found in pre-configured models: {model_name}")
 
+        # New "optional" parameters:
+        named_random_segments = None
+        if "named_random_segments" in LibraryModel.pre_configured_models[model_name]:
+            named_random_segments = LibraryModel.pre_configured_models[model_name]["named_random_segments"]
+
+        coding_region = None
+        if "coding_region" in LibraryModel.pre_configured_models[model_name]:
+            coding_region = LibraryModel.pre_configured_models[model_name]["coding_region"]
+
+        annotation_segments = None
+        if "annotation_segments" in LibraryModel.pre_configured_models[model_name]:
+            annotation_segments = LibraryModel.pre_configured_models[model_name]["annotation_segments"]
+
         return LibraryModel(
             name=model_name,
             description=LibraryModel.pre_configured_models[model_name]["description"],
@@ -1228,9 +1241,9 @@ class LibraryModel:
             start_element_names=LibraryModel.pre_configured_models[model_name]["start_element_names"],
             end_element_names=LibraryModel.pre_configured_models[model_name]["end_element_names"],
             # New "optional" model parameters:
-            named_random_segments=LibraryModel.pre_configured_models[model_name]["named_random_segments"],
-            coding_region=LibraryModel.pre_configured_models[model_name]["coding_region"],
-            annotation_segments=LibraryModel.pre_configured_models[model_name]["annotation_segments"],
+            named_random_segments=named_random_segments,
+            coding_region=coding_region,
+            annotation_segments=annotation_segments,
         )
 
     # TODO: Make an enum for this...
