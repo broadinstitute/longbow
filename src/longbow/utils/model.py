@@ -1459,7 +1459,6 @@ class LibraryModel:
             ),
             "adapters": {
                 "VENUS": "TCTACACGACGCTCTTCCGATCT",
-                "ZEPHYR": "CCCATGTA",
                 "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
                 "A": "AGCTTACTTGTGAAGA",
                 "B": "ACTTGTAAGCTGTCTA",
@@ -1790,7 +1789,6 @@ class LibraryModel:
             ),
             "adapters": {
                 "VENUS": "TCTACACGACGCTCTTCCGATCT",
-                "ZEPHYR": "CCCATGTA",
                 "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
                 "B": "ACTTGTAAGCTGTCTA",
                 "C": "ACTCTGTCAGGTCCGA",
@@ -1969,7 +1967,6 @@ class LibraryModel:
             ),
             "adapters": {
                 "VENUS": "TCTACACGACGCTCTTCCGATCT",
-                "ZEPHYR": "CCCATGTA",
                 "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
                 "AUSTER": "TCTTCAGCGTTCCCGAGA",
                 "A": "AGCTTACTTGTGAAGA",
