@@ -29,13 +29,6 @@ RUN cd longbow && \
     pip install -r dev-requirements.txt && \
     pip install -e .
 
-#RUN cd longbow && \
-#    git checkout 5f175d1cfb849cd21bb45036ea2abb156f7ea7e4 && \
-#    python3 -mvenv venv && \
-#    . venv/bin/activate && \
-#    pip install -r dev-requirements.txt && \
-#    pip install -e .
-
 # activate conda environment
 RUN echo "source /longbow/venv/bin/activate" >> ~/.bashrc
 

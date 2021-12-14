@@ -23,7 +23,7 @@ Commands:
   annotate     Annotate reads in a BAM file with segments from the model.
   demultiplex  Separate reads into files based on which model they fit best.
   extract      Extract coding segments from the reads in the given bam.
-  filter       Filter reads by whether they conform to expected segment...
+  filter       Filter reads by whether they conform to expected segment order.
   inspect      Inspect the classification results on specified reads.
   model        Get information about built-in Longbow models.
   scsplit      Create files for use in `alevin` for single-cell analysis.
