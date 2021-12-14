@@ -10,8 +10,11 @@ import tqdm
 
 import pysam
 import multiprocessing as mp
+import numpy as np
 
+import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
 from ..annotate.command import SegmentInfo
@@ -46,34 +49,64 @@ click_log.basic_config(logger)
     required=False,
     is_flag=True,
     default=False,
-    help="Do splitting of reads based on splitter delimiters, rather than whole array structure. "
-    "This splitting will cause delimiter sequences to be repeated in each read they bound.",
+    help="DEPRECATED.  Do splitting of reads based on splitter delimiters, rather than whole array structure. "
+    "This splitting will cause delimiter sequences to be repeated in each read they bound.  "
+    "This is now the default setting, and this flag has been DEPRECATED.",
+)
+@click.option(
+    "-b",
+    "--create-barcode-conf-file",
+    required=False,
+    is_flag=True,
+    default=False,
+    help=f"Create a barcode confidence score file based on the barcodes in the given model.  "
+         f"This only applies for models that have annotation_segments where one such segment "
+         f"is annotated into the raw barcode field ({longbow.utils.constants.READ_RAW_BARCODE_TAG})",
 )
 @click.option(
     "-m",
     "--model",
-    default="mas15",
+    help="The model to use for annotation.  If not specified, it will be autodetected from "
+         "the BAM header.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name "
+         "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
+         "Longbow will assume the contents are the configuration of a LibraryModel as per "
+         "LibraryModel.to_json()."
+)
+@click.option(
+    '-i',
+    '--ignore-cbc-and-umi',
+    is_flag=True,
+    default=False,
     show_default=True,
-    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-         "of a LibraryModel as per LibraryModel.to_json()."
+    help="Do not require passing reads to have CBC and UMI."
+)
+@click.option(
+    '-f',
+    '--force',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Force overwrite of the output files if they exist."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, do_simple_splitting, model, input_bam):
+def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, ignore_cbc_and_umi, force, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
+    # Check to see if the output files exist:
+    bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
+
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
     if do_simple_splitting:
-        logger.info("Using simple splitting mode.")
-    else:
-        logger.info("Using bounded region splitting mode.")
+        logger.warning("Simple splitting is now the default.  \"-s\" / \"--do-simple-splitting\" is now DEPRECATED.")
+    do_simple_splitting = True
+    logger.info("Using simple splitting mode.")
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
@@ -103,14 +136,16 @@ def main(threads, output_bam, do_simple_splitting, model, input_bam):
     ) as pbar:
 
         # Get our model:
-        if LibraryModel.has_prebuilt_model(model):
-            logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
-            m = LibraryModel.build_pre_configured_model(model)
+        if model is None:
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
+        elif model is not None and LibraryModel.has_prebuilt_model(model):
+            lb_model = LibraryModel.build_pre_configured_model(model)
         else:
-            logger.info(f"Loading model from json file: %s", model)
-            m = LibraryModel.from_json_file(model)
+            lb_model = LibraryModel.from_json_file(model)
 
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[m])
+        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Start output worker:
         res = manager.dict({"num_reads_segmented": 0, "num_segments": 0})
@@ -122,8 +157,10 @@ def main(threads, output_bam, do_simple_splitting, model, input_bam):
                 output_bam,
                 pbar,
                 do_simple_splitting,
-                model,
+                create_barcode_conf_file,
+                lb_model,
                 res,
+                ignore_cbc_and_umi
             ),
         )
         output_worker.start()
@@ -184,24 +221,27 @@ def _sub_process_write_fn(
     out_bam_file_name,
     pbar,
     do_simple_splitting,
-    model_name_or_file,
+    create_barcode_conf_file,
+    model,
     res,
+    ignore_cbc_and_umi
 ):
     """Thread / process fn to write out all our data."""
-
-    # Get our model:
-    if LibraryModel.has_prebuilt_model(model_name_or_file):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model_name_or_file]["description"])
-        model = LibraryModel.build_pre_configured_model(model_name_or_file)
-    else:
-        logger.info(f"Loading model from json file: %s", model_name_or_file)
-        model = LibraryModel.from_json_file(model_name_or_file)
 
     # Create our delimiter sequences for simple splitting if we have to:
     delimiters = create_simple_delimiters(model) if do_simple_splitting else None
 
     if do_simple_splitting:
         logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
+
+    barcode_conf_file = None
+    if create_barcode_conf_file:
+        if model.has_barcode_annotation:
+            logger.info(f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}")
+            barcode_conf_file = open(longbow.utils.constants.BARCODE_CONF_FILE_NAME, 'w')
+        else:
+            logger.warning(f"Model does not have a barcode output, but barcode creation flag was given.  "
+                           f"Barcode confidence file will NOT be created.")
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
@@ -234,11 +274,16 @@ def _sub_process_write_fn(
                 do_simple_splitting,
                 delimiters,
                 out_bam_file,
+                barcode_conf_file,
+                ignore_cbc_and_umi
             )
 
             # Increment our counters:
             res["num_reads_segmented"] += 1
             pbar.update(1)
+
+    if barcode_conf_file is not None:
+        barcode_conf_file.close()
 
 
 def create_simple_delimiters(model, num_seqs_from_each_array_element=1):
@@ -465,7 +510,7 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
 
 
 def _write_segmented_read(
-    model, read, segments, do_simple_splitting, delimiters, bam_out
+    model, read, segments, do_simple_splitting, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -479,6 +524,7 @@ def _write_segmented_read(
                                 If False, will require reads to appear as expected in model.array_element_structure.
     :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
+    :param barcode_conf_file: An open file ready to write out the barcodes and confidence scores.
     :return: the number of segments written.
     """
 
@@ -489,13 +535,16 @@ def _write_segmented_read(
         for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
             # Write our segment here:
             _write_split_array_element(
+                model,
                 bam_out,
+                barcode_conf_file,
                 start_coord,
                 end_coord,
                 read,
                 segments,
                 delim_name,
                 prev_delim_name,
+                ignore_cbc_and_umi
             )
 
         return len(segment_bounds_tuples)
@@ -522,13 +571,16 @@ def _write_segmented_read(
 
                 # Write our segment here:
                 _write_split_array_element(
+                    model,
                     bam_out,
+                    barcode_conf_file,
                     start_coord,
                     end_coord,
                     read,
                     seg_list,
                     end_delim_name,
                     start_delim_name,
+                    ignore_cbc_and_umi
                 )
 
         # Return the number of array elements.
@@ -542,39 +594,97 @@ def _transform_to_rc_coords(start, end, read_length):
 
 
 def _write_split_array_element(
+    model,
     bam_out,
+    barcode_conf_file,
     start_coord,
     end_coord,
     read,
     segments,
     delim_name,
     prev_delim_name,
+    ignore_cbc_and_umi
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
-    a = pysam.AlignedSegment()
-    a.query_name = (
-        f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}"
-    )
+    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord)
+
+    # Write our barcode confidence to the file if we have to:
+    if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
+        barcode_conf_file.write(f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n")
+
+    has_cbc_and_umi = bam_utils.has_cbc_and_umi(a)
+
+    if has_cbc_and_umi or ignore_cbc_and_umi:
+        bam_out.write(a)
+
+
+def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord):
+    """Package an array element into an AlignedSegment from the results of simple splitting rules."""
+
     # Add one to end_coord because coordinates are inclusive:
-    a.query_sequence = f"{read.query_sequence[start_coord:end_coord+1]}"
+    a = pysam.AlignedSegment()
+    a.query_sequence = f"{read.query_sequence[start_coord:end_coord + 1]}"
     a.query_qualities = read.query_alignment_qualities[start_coord: end_coord + 1]
     a.tags = read.get_tags()
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
 
+    # Reset read name (we need a unique name for each read that's also compatible with IsoSeq3)
+    zmw = abs(hash(a.query_sequence)) % (10 ** 9)
+    movie_name = read.query_name.split("/")[0]
+    a.query_name = f'{movie_name}/{zmw}/ccs'
+    a.set_tag(longbow.utils.constants.READ_ZMW_TAG, zmw)
+    a.set_tag(longbow.utils.constants.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
+
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
     out_segments = []
+    segments_to_annotate = []
     for s in segments:
         if start_coord <= s.start <= end_coord:
-            out_segments.append(
-                SegmentInfo(s.name, s.start - start_coord, s.end - start_coord)
-            )
+            seg_info = SegmentInfo(s.name, s.start - start_coord, s.end - start_coord)
+            out_segments.append(seg_info)
 
+            # If we have to annotate this segment, store it here for annotation later:
+            if (model.annotation_segments is not None) and (s.name in model.annotation_segments.keys()):
+                segments_to_annotate.append(seg_info)
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
-        bam_utils.SEGMENTS_TAG,
-        bam_utils.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
+        longbow.utils.constants.SEGMENTS_TAG,
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
     )
 
-    bam_out.write(a)
+    # Annotate any segments in this array element that we have to:
+    clipped_tags = set()
+    for s in segments_to_annotate:
+        for t in model.annotation_segments[s.name]:
+            field_tag_name, pos_tag_name = t
+            # First annotate the segment itself:
+            seq = read.query_sequence[s.start:s.end + 1]
+            a.set_tag(field_tag_name, seq)
+            clipped_tags.add(seq)
+
+            # Next annotate the starting position:
+            a.set_tag(pos_tag_name, s.start)
+
+        # Next check if the annotation is our READ_RAW_BARCODE_TAG.
+        # If so, we should annotate the confidence score as well:
+        if field_tag_name == longbow.utils.constants.READ_RAW_BARCODE_TAG:
+            # Get the length from the model:
+            barcode_length = list(model.adapter_dict[s.name].values())[0]
+            qual_bases = read.query_qualities[s.start:s.end + 1]
+            conf_factor = int(np.round(bam_utils.get_confidence_factor_raw_quals(qual_bases)))
+
+            a.set_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
+
+    # Set IsoSeq3-compatible tags:
+    a.set_tag(longbow.utils.constants.READ_CLIPPED_SEQS_LIST_TAG, ','.join(clipped_tags))
+    a.set_tag(longbow.utils.constants.READ_NUM_CONSENSUS_PASSES_TAG, 1)
+    a.set_tag(longbow.utils.constants.READ_ZMW_NAMES_TAG, read.query_name)
+    a.set_tag(longbow.utils.constants.READ_NUM_ZMWS_TAG, 1)
+    a.set_tag(longbow.utils.constants.READ_TAGS_ORDER_TAG, f'{longbow.utils.constants.READ_RAW_BARCODE_TAG}-{longbow.utils.constants.READ_RAW_UMI_TAG}')
+
+    # Set our tag indicating that this read is now segmented:
+    a.set_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG, True)
+
+    return a

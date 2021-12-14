@@ -13,7 +13,9 @@ import multiprocessing as mp
 
 from inspect import getframeinfo, currentframe, getdoc
 
+import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
 from ..annotate.command import get_segments
@@ -76,6 +78,7 @@ __OUT_WHITELIST_FILE_SUFFIX = "_whitelist.txt"
     help=f"Write out an annotated bam file in addition to the mates files.",
 )
 @click.option(
+    '-f',
     '--force',
     is_flag=True,
     default=False,
@@ -85,7 +88,7 @@ __OUT_WHITELIST_FILE_SUFFIX = "_whitelist.txt"
 @click.option(
     "-m",
     "--model",
-    default="mas15",
+    default=longbow.utils.constants.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -122,11 +125,12 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, model, writ
 
     # Get our model:
     if LibraryModel.has_prebuilt_model(model):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
-        model = LibraryModel.build_pre_configured_model(model)
+        lb_model = LibraryModel.build_pre_configured_model(model)
     else:
         logger.info(f"Loading model from json file: %s", model)
-        model = LibraryModel.from_json_file(model)
+        lb_model = LibraryModel.from_json_file(model)
+    logger.info(f"Using %s: %s", model, lb_model.description)
+    model = lb_model
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
@@ -168,6 +172,16 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, model, writ
                 for p in worker_process_pool:
                     p.join()
                 sys.exit(1)
+
+        # Get our model:
+        if model is None:
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
+        elif model is not None and LibraryModel.has_prebuilt_model(model):
+            lb_model = LibraryModel.build_pre_configured_model(model)
+        else:
+            lb_model = LibraryModel.from_json_file(model)
+
+        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[model])

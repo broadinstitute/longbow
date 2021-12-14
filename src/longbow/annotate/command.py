@@ -18,8 +18,10 @@ import multiprocessing as mp
 import gzip
 from construct import *
 
+import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils.bam_utils import SegmentInfo
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
 
@@ -56,7 +58,7 @@ click_log.basic_config(logger)
     "-m",
     "--model",
     type=str,
-    default="mas15",
+    default=longbow.utils.constants.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
@@ -73,12 +75,22 @@ click_log.basic_config(logger)
          "chunks across the dataset)"
 )
 @click.option(
-    "--max-length",
+    "-l",
+    "--min-length",
     type=int,
-    default=60000,
+    default=0,
     show_default=True,
     required=False,
-    help="Maximum length of a read to process.  Reads beyond this length will not be annotated."
+    help="Minimum length of a read to process.  Reads shorter than this length will not be annotated."
+)
+@click.option(
+    "-L",
+    "--max-length",
+    type=int,
+    default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
+    show_default=True,
+    required=False,
+    help="Maximum length of a read to process.  Reads longer than this length will not be annotated."
 )
 @click.option(
     "--min-rq",
@@ -88,27 +100,39 @@ click_log.basic_config(logger)
     required=False,
     help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1]."
 )
+@click.option(
+    '-f',
+    '--force',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Force overwrite of the output files if they exist."
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
+def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq, force, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
+    # Check to see if the output files exist:
+    bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
+
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
     # Get our model:
     if LibraryModel.has_prebuilt_model(model):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
         m = LibraryModel.build_pre_configured_model(model)
     else:
         logger.info(f"Loading model from json file: %s", model)
         m = LibraryModel.from_json_file(model)
+    logger.info(f"Using %s: %s", model, m.description)
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
+    read_num = 0
     start_offset = 0
     end_offset = math.inf
 
@@ -122,13 +146,14 @@ def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
             num_chunks = int(num_chunks)
 
             # Decode PacBio .pbi file and determine the shard offsets.
-            offsets, zmw_counts, read_count, read_counts_per_chunk = bam_utils.compute_shard_offsets(pbi, num_chunks)
+            offsets, zmw_counts, read_count, read_counts_per_chunk, read_nums = bam_utils.compute_shard_offsets(pbi, num_chunks)
 
             start_offset = offsets[chunk - 1]
             end_offset = offsets[chunk] if chunk < len(offsets) else offsets[chunk - 1]
             read_count = read_counts_per_chunk[chunk - 1] if chunk < len(offsets) else 0
+            read_num = read_nums[chunk - 1] if chunk < len(offsets) else 0
 
-            logger.info("Annotating %d reads from chunk %d/%d", read_count, chunk, num_chunks)
+            logger.info("Annotating %d reads from chunk %d/%d (reads %d-%d)", read_count, chunk, num_chunks, read_num, read_num + read_count - 1)
         else:
             read_count = bam_utils.load_read_count(pbi)
             logger.info("Annotating %d reads", read_count)
@@ -144,7 +169,7 @@ def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m, max_length, min_rq)
+            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m, min_length, max_length, min_rq)
         )
         p.start()
         worker_pool.append(p)
@@ -209,7 +234,8 @@ def main(pbi, threads, output_bam, model, chunk, max_length, min_rq, input_bam):
 def get_segments(read):
     """Get the segments corresponding to a particular read by reading the segments tag information."""
     return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(bam_utils.SEGMENTS_TAG).split(bam_utils.SEGMENT_TAG_DELIMITER)
+        SegmentInfo.from_tag(s) for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
+            longbow.utils.constants.SEGMENT_TAG_DELIMITER)
     ]
 
 
@@ -267,7 +293,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             pbar.update(1)
 
 
-def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, max_length, min_rq):
+def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, min_length, max_length, min_rq):
     """Function to run in each subthread / subprocess.
     Segments each read and place the segments in the output queue."""
 
@@ -293,8 +319,13 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, max_length, 
             read, pysam.AlignmentHeader.from_dict(dict())
         )
 
-        # Check for max length and min quality:
-        if len(read.query_sequence) > max_length:
+        # Check for min/max length and min quality:
+
+        if len(read.query_sequence) < min_length:
+            logger.warning(f"Read is shorter than min length.  "
+                           f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})")
+            continue
+        elif len(read.query_sequence) > max_length:
             logger.warning(f"Read is longer than max length.  "
                            f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
             continue
@@ -317,6 +348,10 @@ def _segment_read(read, model):
     logp, ppath = model.annotate(read.query_sequence)
 
     rc_logp, rc_ppath = model.annotate(bam_utils.reverse_complement(read.query_sequence))
+
+    # print(f"Forward Path: {logp}: {ppath}")
+    # print(f"Reverse Path: {rc_logp}: {rc_ppath}")
+
     if rc_logp > logp:
         logp = rc_logp
         ppath = rc_ppath

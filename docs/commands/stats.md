@@ -37,11 +37,14 @@ Options:
                              LibraryModel from it.  Longbow will assume the
                              contents are the configuration of a LibraryModel
                              as per LibraryModel.to_json().  [default: mas15]
-  -s, --do-simple-splitting  Do splitting of reads based on splitter
-                             delimiters, rather than whole array structure.
-                             This splitting will cause delimiter sequences to
-                             be repeated in each read they bound.
+  -s, --do-simple-splitting  DEPRECATED.  Do splitting of reads based on
+                             splitter delimiters, rather than whole array
+                             structure. This splitting will cause delimiter
+                             sequences to be repeated in each read they bound.
+                             This is now the default setting, and this flag
+                             has been DEPRECATED.
   --help                     Show this message and exit.
+
 ```
 
 ## Example

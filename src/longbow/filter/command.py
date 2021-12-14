@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 import os
@@ -10,7 +11,9 @@ import tqdm
 import pysam
 from construct import *
 
+import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 from ..annotate.command import get_segments
 
@@ -30,23 +33,30 @@ click_log.basic_config(logger)
 )
 @click.option(
     "-o",
-    "--out-prefix",
-    default=".",
-    required=True,
-    type=str,
-    help="Output file prefix",
+    "--output-bam",
+    default="-",
+    type=click.Path(exists=False),
+    help="filtered bam output (passing reads only)  [default: stdout]",
+)
+@click.option(
+    "-x",
+    "--reject-bam",
+    default="/dev/null",
+    type=click.Path(exists=False),
+    help="Filtered bam output (failing reads only)  [default: /dev/null]",
 )
 @click.option(
     "-m",
     "--model",
-    default="mas15",
-    show_default=True,
-    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-         "of a LibraryModel as per LibraryModel.to_json()."
+    help="The model to use for annotation.  If not specified, it will be autodetected from "
+         "the BAM header.  If the given value is a pre-configured model name, then that "
+         "model will be used.  Otherwise, the given value will be treated as a file name "
+         "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
+         "Longbow will assume the contents are the configuration of a LibraryModel as per "
+         "LibraryModel.to_json()."
 )
 @click.option(
+    '-f',
     '--force',
     is_flag=True,
     default=False,
@@ -54,20 +64,12 @@ click_log.basic_config(logger)
     help="Force overwrite of the output files if they exist."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, out_prefix, model, force, input_bam):
+def main(pbi, output_bam, reject_bam, model, force, input_bam):
     """Filter reads by whether they conform to expected segment order."""
 
     t_start = time.time()
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
-    # Get our model:
-    if LibraryModel.has_prebuilt_model(model):
-        logger.info(f"Using %s", LibraryModel.pre_configured_models[model]["description"])
-        lb_model = LibraryModel.build_pre_configured_model(model)
-    else:
-        logger.info(f"Loading model from json file: %s", model)
-        lb_model = LibraryModel.from_json_file(model)
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
@@ -75,18 +77,11 @@ def main(pbi, out_prefix, model, force, input_bam):
         read_count = bam_utils.load_read_count(pbi)
         logger.info("About to Filter %d reads", read_count)
 
-    # Create some output file names:
-    passing_out_name = f"{out_prefix}_longbow_filter_passed.bam"
-    failing_out_name = f"{out_prefix}_longbow_filter_failed.bam"
-
     # Check to see if the output files exist:
-    bam_utils.check_for_preexisting_files([passing_out_name, failing_out_name], exist_ok=force)
+    bam_utils.check_for_preexisting_files([output_bam, reject_bam], exist_ok=force)
 
-    logger.info(f"Writing reads that conform to the model to: {passing_out_name}")
-    logger.info(f"Writing reads that do not conform to the model to: {failing_out_name}")
-
-    logger.info(f"Filtering according to {lb_model.name} model ordered key adapters: "
-                f"{', '.join(lb_model.key_adapters)}")
+    logger.info(f"Writing reads that conform to the model to: {output_bam}")
+    logger.info(f"Writing reads that do not conform to the model to: {reject_bam}")
 
     # Open our input bam file:
     pysam.set_verbosity(0)
@@ -100,12 +95,25 @@ def main(pbi, out_prefix, model, force, input_bam):
             total=read_count
             ) as pbar:
 
+        # Get our model:
+        if model is None:
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
+        elif model is not None and LibraryModel.has_prebuilt_model(model):
+            lb_model = LibraryModel.build_pre_configured_model(model)
+        else:
+            lb_model = LibraryModel.from_json_file(model)
+
+        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
+        logger.info(f"Filtering according to {lb_model.name} model ordered key adapters: "
+                    f"{', '.join(lb_model.key_adapters)}")
+
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Setup output files:
-        with pysam.AlignmentFile(passing_out_name, "wb", header=out_header) as passing_bam_file, \
-                pysam.AlignmentFile(failing_out_name, "wb", header=out_header) as failing_bam_file:
+        with pysam.AlignmentFile(output_bam, "wb", header=out_header) as passing_bam_file, \
+                pysam.AlignmentFile(reject_bam, "wb", header=out_header) as failing_bam_file:
 
             num_passed = 0
             num_failed = 0
@@ -119,11 +127,11 @@ def main(pbi, out_prefix, model, force, input_bam):
                     _, segments = get_segments(read)
                 except KeyError:
                     logger.error(f"Input bam file does not contain longbow segmented reads!  "
-                                 f"No {bam_utils.SEGMENTS_TAG} tag detected on read {read.query_name} !")
+                                 f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
                     sys.exit(1)
 
                 # Annotate the read with the model that was used in its validation:
-                read.set_tag(bam_utils.READ_MODEL_NAME_TAG, lb_model.name)
+                read.set_tag(longbow.utils.constants.READ_MODEL_NAME_TAG, lb_model.name)
 
                 # Check to see if the read is valid by this model and write it out:
                 segment_names = [s.name for s in segments]
@@ -138,9 +146,9 @@ def main(pbi, out_prefix, model, force, input_bam):
                                  lb_model.key_adapters[first_valid_adapter_index],
                                  num_valid_adapters)
 
-                    read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, True)
-                    read.set_tag(bam_utils.READ_NUM_KEY_SEGMENTS_TAG, num_valid_adapters)
-                    read.set_tag(bam_utils.READ_FIRST_KEY_SEG_TAG, lb_model.key_adapters[first_valid_adapter_index])
+                    read.set_tag(longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, True)
+                    read.set_tag(longbow.utils.constants.READ_NUM_KEY_SEGMENTS_TAG, num_valid_adapters)
+                    read.set_tag(longbow.utils.constants.READ_FIRST_KEY_SEG_TAG, lb_model.key_adapters[first_valid_adapter_index])
                     passing_bam_file.write(read)
                     tot_num_valid_adapters += num_valid_adapters
                     num_passed += 1
@@ -155,7 +163,7 @@ def main(pbi, out_prefix, model, force, input_bam):
                                      num_valid_adapters,
                                      lb_model.extract_key_segment_names(segment_names))
 
-                    read.set_tag(bam_utils.READ_IS_VALID_FOR_MODEL_TAG, False)
+                    read.set_tag(longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, False)
                     failing_bam_file.write(read)
                     tot_num_failed_adapters += num_valid_adapters
                     num_failed += 1

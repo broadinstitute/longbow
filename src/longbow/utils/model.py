@@ -1,20 +1,24 @@
-import sys
 import re
-import json
 import logging
+import pickle
 
 import click_log
 
-import numpy as np
-import pandas as pd
-
 from pomegranate import *
-from pomegranate.callbacks import History, ModelCheckpoint
 
+import longbow.utils.constants
+from .constants import RANDOM_SEGMENT_NAME, FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME, HPR_SEGMENT_TYPE_NAME, \
+    RANDOM_SILENT_STATE_A, RANDOM_SILENT_STATE_B, RANDOM_BASE_STATE, START_STATE_INDICATOR, END_STATE_INDICATOR, \
+    BAKE_MERGE_STRATEGY
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
+
+# # DEBUG:
+# logger.setLevel(logging.DEBUG)
+
+starts_with_number_re = re.compile(r"^\d")
 
 
 class LibraryModel:
@@ -22,7 +26,8 @@ class LibraryModel:
     The model can annotate the known sections of a read from the library it describes."""
 
     # Define constants for all our default probabilities here:
-    RANDOM_BASE_PROB = 0.5
+    RANDOM_BASE_PROB = 0.25
+
     PER_BASE_MATCH_PROB = 0.94
     PER_BASE_MISMATCH_PROB = 0.02
 
@@ -33,11 +38,25 @@ class LibraryModel:
     INDEL_CONTINUATION_PROB = 0.7
     INDEL_SWITCH_PROB = 0.3
 
+    START_RANDOM_PROB = 1.0
+
     START_AND_END_RANDOM_PROB = 0.5
     RAND_RAND_PROB = 0.5
     RAND_INS_CONTINUATION_PROB = 0.8
     RAND_INS_TO_DEL_PROB = 0.1
     RAND_INS_END_PROB = 0.1
+
+    NAMED_RAND_CONTINUE_PROB = 0.9
+    NAMED_RAND_EXIT_PROB = 1-NAMED_RAND_CONTINUE_PROB
+
+    HPR_MATCH_PROB = 0.9
+    HPR_MISMATCH_PROB = (1-HPR_MATCH_PROB) / 3
+
+    HPR_BOOKEND_MATCH_PROB = 0.99
+    HPR_BOOKEND_MISMATCH_PROB = (1-HPR_BOOKEND_MATCH_PROB)/3
+
+    HPR_SUDDEN_END_PROB = 0.01
+    HPR_MODEL_RECURRENCE_PROB = 0.1
 
     SUDDEN_END_PROB = 0.01
     MATCH_END_PROB = 0.1
@@ -51,6 +70,9 @@ class LibraryModel:
                  direct_connections,
                  start_element_names,
                  end_element_names,
+                 named_random_segments,
+                 coding_region,
+                 annotation_segments,
                  do_build=True):
 
         self.name = name
@@ -64,12 +86,47 @@ class LibraryModel:
         self.start_element_names = start_element_names
         self.end_element_names = end_element_names
 
+        self.named_random_segments = named_random_segments
+
+        self.coding_region = coding_region
+        self.annotation_segments = annotation_segments
+
         self.hmm = None
         self.key_adapters = self._create_key_adapter_order()
         self.key_adapter_set = set(self.key_adapters)
 
         if do_build:
             self.build()
+
+    @property
+    def has_umi_annotation(self):
+        return self._has_annotation(longbow.utils.constants.READ_RAW_UMI_TAG)
+
+    @property
+    def has_barcode_annotation(self):
+        return self._has_annotation(longbow.utils.constants.READ_RAW_BARCODE_TAG)
+
+    def _has_annotation(self, annotation_tag):
+        if self.annotation_segments is None:
+            return False
+
+        # Get all annotation tags:
+        for k, tag_tuple_list in self.annotation_segments.items():
+            for tag_tuple in tag_tuple_list:
+                if annotation_tag in tag_tuple:
+                    return True
+
+        # If we're still running, we didn't find our annotation tag.
+        # Therefore we don't have the given annotation.
+        return False
+
+    @property
+    def has_coding_region(self):
+        return self.coding_region is not None
+
+    @property
+    def has_named_random_segments(self):
+        return self.named_random_segments is not None
 
     def annotate(self, seq):
         """Annotate the given segment using this model."""
@@ -78,11 +135,12 @@ class LibraryModel:
         ppath = []
         for p, (idx, state) in enumerate(path[1:-1]):
             if (
-                    "start" not in state.name
+                    not state.name.endswith(START_STATE_INDICATOR)
+                    and not state.name.endswith(END_STATE_INDICATOR)
                     and ":RD" not in state.name
                     and ":D" not in state.name
             ):
-                ppath.append(f'{re.split(":", state.name)[0]}')
+                ppath.append(f"{re.split(':', state.name)[0]}")
 
         return logp, ppath
 
@@ -111,8 +169,9 @@ class LibraryModel:
                     # TODO: This can be eliminated for newer datasets, but is here because we're still testing with
                     #       older data that does not have the first MAS-seq overhang.  The model has already been
                     #       updated to handle these segments.
+                    # TODO: Replace all references to "VENUS" with references to the models themselves.
                     if allow_missing_first_adapter and (key_adapter_indx == 1) and \
-                            (ordered_segment_names[0] == "10x_Adapter"):
+                            (ordered_segment_names[0] == "VENUS"):
                         num_key_adapters_found += 1
                         first_key_adapter_index = 0
 
@@ -141,68 +200,521 @@ class LibraryModel:
         """Return a list of key segment names from the given list of segment_names."""
         return [n for n in segment_names if n in self.key_adapter_set]
 
+    def get_all_node_names(self):
+        """Return a list containing the names of all nodes in this model."""
+
+        # Let's be exhaustive here just to make sure we don't miss anything:
+        all_node_names = {n for element in self.array_element_structure for n in element}
+
+        if self.named_random_segments is not None:
+            for n in self.named_random_segments:
+                all_node_names.add(n)
+
+        for n in self.start_element_names:
+            all_node_names.add(n)
+
+        for n in self.end_element_names:
+            all_node_names.add(n)
+
+        for k in self.direct_connections_dict:
+            all_node_names.add(k)
+            for n in self.direct_connections_dict[k]:
+                all_node_names.add(n)
+
+        return sorted(list(all_node_names))
+
     def build(self):
         """Build the HMM underlying this model given our segment information."""
-        self.hmm = LibraryModel._make_random_repeat_model()
-        for k, v in self.adapter_dict.items():
-            self.hmm.add_model(LibraryModel._make_global_alignment_model(v, k))
 
-        self.hmm.bake(merge="None")
+        # Validate our model here so we can go through and just worry about creating it:
+        self.validate_model()
 
-        # dictionary of model starting states, random start, and random end
-        starts = {}
+        # Initialize the states in our model:
+        self._initialize_hmm_states()
+
+        # Initialize the transitions in our model:
+        # self._initialize_hmm_transitions()
+        self._initialize_hmm_transitions_new()
+
+        # DEBUGGING:
+        self.dump_as_dotfile(do_subgraphs=False)
+        self.dump_as_dotfile_simple()
+        self.to_json(f"longbow_model_{self.name}.v{self.version}.json")
+
+        with open(f"longbow_model_{self.name}.v{self.version}.dense_transition_matrix.pickle", 'wb') as f:
+            pickle.dump(self.hmm.dense_transition_matrix(), f)
+        with open(f"longbow_model_{self.name}.v{self.version}.emission_distributions.txt", 'w') as f:
+            print(self.hmm, file=f, flush=True)
+
+        # Finalze our HMM:
+        self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
+
+    def _get_segment_start_end_rda_and_rdb_nodes(self):
+        """Create a Dictionary of model segment starting states, random start, and random end"""
+        segment_starts = {}
+        segment_ends = {}
         rda = None
         rdb = None
         for s in self.hmm.states:
-            if "-start" in s.name and "random" not in s.name:
-                starts[re.sub("-start", "", s.name)] = s
-            elif "random:RDA" in s.name:
+            if self._is_state_last_in_section(s):
+                segment_ends[s.name] = s
+            if s.name.endswith(START_STATE_INDICATOR) and not s.name.startswith(RANDOM_SEGMENT_NAME):
+                segment_starts[re.sub(START_STATE_INDICATOR, "", s.name)] = s
+            elif s.name.startswith(f"{RANDOM_SEGMENT_NAME}:{RANDOM_SILENT_STATE_A}"):
                 rda = s
-            elif "random:RDB" in s.name:
+            elif s.name.startswith(f"{RANDOM_SEGMENT_NAME}:{RANDOM_SILENT_STATE_B}"):
                 rdb = s
 
-        # link silent start state to all of our start nodes
-        # this is the start of the array.
-        for sname in starts:
-            if sname in self.start_element_names:
-                self.hmm.add_transition(self.hmm.start, starts[sname], 1.0/len(self.start_element_names))
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Segment starts: {[s.name for s in segment_starts.values()]}")
+            logger.debug(f"RDA: {rda}")
+            logger.debug(f"RDB: {rdb}")
+
+        return segment_starts, segment_ends, rda, rdb
+
+    def _create_random_to_segment_start_transitions(self, segment_starts, rda):
+        """Create transitions from rda to all segments' start nodes.
+        NOTE: transitions are NOT made from rda to named random segments."""
 
         # link random element model silent state A to all of our starts
         # This is the transition from `random` to one of our array elements.
-        for sname in starts:
+        # This only happens for models with named random segments:
+        per_state_transition_prob = 1.0
+        if self.has_named_random_segments:
+            # Get the number of "standard" segments.
+            # i.e. states that are not named random segments:
+            num_standard_states = 0
+            for sname in segment_starts:
+                if sname not in self.named_random_segments:
+                    num_standard_states += 1
+            per_state_transition_prob = 1.0 / num_standard_states
+
+        for sname in segment_starts:
+            # We do NOT account for rda -> start_element transitions here.
+            # Those should be accounted for in another method.
+            #
+            # We also exclude named random segments because they model the same thing.
+            if sname not in self.start_element_names and \
+                    (self.has_named_random_segments and sname not in self.named_random_segments):
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"Adding transition: {self.hmm.start.name} -> {segment_starts[sname].name} "
+                        f"@ {per_state_transition_prob:.3f}")
+                self.hmm.add_transition(rda, segment_starts[sname], per_state_transition_prob)
+
+    def _create_array_start_and_end_transitions(self, segment_starts, rda):
+        """Create transitions between:
+        self.model.start -> [ALL starting segments' start nodes]
+        rda -> [ALL ending segments' start nodes]"""
+
+        # Link the model's silent start state to all of our library start nodes.
+        # (These are not the same as start nodes for each segment.  This is the start of the array.)
+        # NOTE: we cannot start in a named random segment.
+        for sname in segment_starts:
+            if sname in self.start_element_names:
+                weight = LibraryModel.START_RANDOM_PROB / len(self.start_element_names)
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"Adding transition: {self.hmm.start.name} -> {segment_starts[sname].name} @ {weight:.3f}")
+                self.hmm.add_transition(self.hmm.start, segment_starts[sname], weight)
+
+        # Link random element model silent state A to all of our end elements.
+        # This is the transition from `random` to an element that ends an array.
+        # (i.e. these are not the same as end nodes for each segment.  This is the end of the array.)
+        # NOTE: we cannot end in a named random segment.
+        for sname in segment_starts:
             if sname in self.end_element_names:
-                self.hmm.add_transition(rda, starts[sname], 1.0/len(self.end_element_names))
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"Adding transition: RDA -> {segment_starts[sname].name} @ {1.0 / len(self.end_element_names):.3f}")
+                self.hmm.add_transition(rda, segment_starts[sname], 1.0 / len(self.end_element_names))
+
+    def _initialize_hmm_transitions(self):
+        logger.debug("Identifying actionable nodes from model...")
+        segment_starts, segment_ends, rda, rdb = self._get_segment_start_end_rda_and_rdb_nodes()
+
+        # Create transitions for the array start and array end:
+        logger.debug("Creating start/end library model transitions...")
+        self._create_array_start_and_end_transitions(segment_starts, rda)
 
         # link up adapter final states according to our direct connections dictionary
-        for s in self.hmm.states:
-            m = re.match(r"^(\w+):([MID])(\d+)", s.name)
+        logger.debug("Adding transitions for direct connections...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            sname = LibraryModel._get_state_base_name(s)
 
-            # If we're in the last state of each adapter:
-            if m is not None and int(m.group(3)) == len(self.adapter_dict[m.group(1)]):
-                sname = m.group(1)
+            print(s)
 
-                # If we have direct connections from this state to some other states then we add
-                # them into the model:
-                if sname in self.direct_connections_dict:
-                    for dcname in self.direct_connections_dict[sname]:
-                        self.hmm.add_transition(
-                            s, starts[dcname], 1.0 / len(self.direct_connections_dict[sname])
-                        )
-                # If we have no direct connections from this state, we add in a transition from this
-                # state to the silent random B state:
+            # If we have direct connections from this state to some other states then we add
+            # them into the model:
+            if sname in self.direct_connections_dict:
+                for dcname in self.direct_connections_dict[sname]:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            f"    Adding transition: {s.name} -> {segment_starts[dcname].name} @ {(1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname]):.3f}")
+                    self.hmm.add_transition(
+                        s, segment_starts[dcname],
+                        1.0 / len(self.direct_connections_dict[sname])
+                    )
+
+            # If we have no direct connections from this state, we add in a transition from this
+            # state to the silent random B state:
+            else:
+                # Verify this probability is the notional equivalent:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"    Adding transition (no DCs): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
+                self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+        logger.debug("Adding transitions for short-circuit terminations...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            self._create_sudden_end_transitions(s)
+
+    def _initialize_hmm_transitions_new(self):
+        logger.debug("Identifying actionable nodes from model...")
+        segment_starts, segment_ends, rda, rdb = self._get_segment_start_end_rda_and_rdb_nodes()
+
+        # Create transitions for the array start and array end:
+        logger.debug("Creating start/end library model transitions...")
+        self._create_array_start_and_end_transitions(segment_starts, rda)
+
+        # Create transitions from RDA to segment starts:
+        # NOTE: This will NOT create transitions to start nodes of named random segments.
+        logger.debug("Creating random -> segment start node transitions...")
+        self._create_random_to_segment_start_transitions(segment_starts, rda)
+
+        # link up adapter final states according to our direct connections dictionary
+        logger.debug("Adding transitions for direct connections...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            sname = LibraryModel._get_state_base_name(s)
+
+            # If we have direct connections from this state to some other states then we add
+            # them into the model:
+            if sname in self.direct_connections_dict:
+                for dcname in self.direct_connections_dict[sname]:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            f"    Adding transition: {s.name} -> {segment_starts[dcname].name} @ {(1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname]):.3f}")
+                    self.hmm.add_transition(
+                        s, segment_starts[dcname],
+                        # Original transition prob:
+                        1.0 / len(self.direct_connections_dict[sname])
+                        # Attempted new transition prob:
+                        # (1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname])
+                    )
+
+                # # Also add in a connection to the silent random B state if this is a non-random section
+                # # and it does not connect to a named random section:
+                # has_direct_connection_to_named_random = False
+                # if self.has_named_random_segments and (sname not in self.named_random_segments):
+                #     for n in self.direct_connections_dict[sname]:
+                #         if n in self.named_random_segments:
+                #             has_direct_connection_to_named_random = True
+                #             break
+                # if not has_direct_connection_to_named_random:
+                #     # Verify this probability is the notional equivalent:
+                #     if logger.isEnabledFor(logging.DEBUG):
+                #         logger.debug(
+                #             f"    Adding transition (no rand connections): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
+                #     self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+            # If we have no direct connections from this state, we add in a transition from this
+            # state to the silent random B state:
+            else:
+                # Verify this probability is the notional equivalent:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"    Adding transition (no DCs): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
+                self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+        logger.debug("Adding transitions for short-circuit terminations...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            self._create_sudden_end_transitions(s)
+
+    def _create_sudden_end_transitions(self, s):
+        # Link up all adapters to model end state;
+        # Add a transition to the end of the model:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                f"    Adding transition: {s.name} -> {self.hmm.end.name} @ {LibraryModel.SUDDEN_END_PROB:.3f}")
+        self.hmm.add_transition(s, self.hmm.end, LibraryModel.SUDDEN_END_PROB)
+
+    def _initialize_hmm_states(self):
+        # Create the centralized random repeat model that allows for errors between the known markers:
+        self.hmm = LibraryModel._make_random_repeat_model()
+        # Create models for individual adapter sequences,
+        # taking special care with named random sections:
+        for k, v in self.adapter_dict.items():
+            adapter_hmm = None
+            if type(v) is str:
+                if self.has_named_random_segments and (k in self.named_random_segments):
+                    # We have a named random segment.
+                    # We need to make a named random model:
+                    adapter_hmm = LibraryModel._make_named_random_model(name=k)
                 else:
-                    # Verify this probability is the notional equivalent:
-                    self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+                    # This must be a normal string of bases to model:
+                    adapter_hmm = LibraryModel._make_global_alignment_model(v, k)
+            elif type(v) is dict:
+                segment_type = list(v.keys())[0]
 
-        # link up all adapters to model end state
-        for s in self.hmm.states:
-            m = re.match(r"^(\w+):([MID])(\d+)", s.name)
+                # NOTE: Must add in new model types here when we add them:
+                if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                    # Fixed length random segments for barcodes (and similar):
+                    adapter_hmm = LibraryModel._make_fixed_length_random_segment(k, list(v.values())[0])
+                elif segment_type == HPR_SEGMENT_TYPE_NAME:
+                    # Homopolymer repeat region:
+                    base, hpr_length = list(v.values())[0]
+                    adapter_hmm = LibraryModel._make_homopolymer_repeat_model(k, base, hpr_length)
+                else:
+                    logger.critical(f"Unknown special model type: {segment_type}")
+                    raise RuntimeError(f"Unknown special model type: {segment_type}")
+            self.hmm.add_model(adapter_hmm)
+        # Finalize all models that we have for now:
+        self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
 
-            # Get the last state in each adapter:
-            if m is not None and int(m.group(3)) == len(self.adapter_dict[m.group(1)]):
-                self.hmm.add_transition(s, self.hmm.end, LibraryModel.SUDDEN_END_PROB)
+    def _is_state_last_in_section(self, s):
+        """Returns True if the given state is considered to be the last state in its segment."""
 
-        self.hmm.bake()
+        # This is the old logic for determining if a state is the last one in a segment:
+        if s.name == self.hmm.end.name:
+            return False
+
+        # Get the base name of the node:
+        base_name = LibraryModel._get_state_base_name(s.name)
+
+        # Decode the segment number from the name:
+        m = re.match(r"^(\w+):([MID])(\d+)", s.name)
+        if m is None and (base_name == RANDOM_SEGMENT_NAME or
+                          (self.has_named_random_segments and base_name not in self.named_random_segments)):
+            return False
+        # Allow for the state number to be 0 in the case of a named random segment (e.g. cDNA):
+        segment_state_num = int(m.group(3)) if m is not None else 0
+
+        # Case for normal segments:
+        if type(self.adapter_dict[base_name]) == str:
+            if self.adapter_dict[base_name] == RANDOM_SEGMENT_NAME \
+                    and self.has_named_random_segments \
+                    and base_name in self.named_random_segments:
+
+                state_end_name = f"{base_name}{END_STATE_INDICATOR}"
+
+                # The final state for the named random segment types is the end state:
+                return s.name == state_end_name
+            else:
+                # Check to see if it's the last state in the segment:
+                return (m is not None) and (segment_state_num == len(self.adapter_dict[base_name]))
+        # case for special segment types (all of which are dictionaries):
+        else:
+            segment_type = list(self.adapter_dict[base_name].keys())[0]
+            if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                # For fixed length random segments, the value for the type dict is the length:
+                segment_length = self.adapter_dict[base_name][segment_type]
+            elif segment_type == HPR_SEGMENT_TYPE_NAME:
+                # For homopolymer repeat segments, the value for the type dict is a tuple of (NUCLEOTIDE, LENGTH):
+                segment_length = self.adapter_dict[base_name][segment_type][1]
+            else:
+                logger.error(f"UNKNOWN TYPE OF SEGMENT: {segment_type}")
+                return False
+
+            return segment_state_num == segment_length
+
+        # # New logic for determining the above:
+        # # The only restriction on reporting an end state is that we don't allow the final state of the model to
+        # # be an end state.
+        # return s.name.endswith(END_STATE_INDICATOR) and (s.name != self.hmm.end.name)
+
+    def dump_as_dotfile_simple(self, out_file_name=None):
+        """Dump this LibraryModel to disk as a simple dot file for visualization."""
+
+        if out_file_name is None:
+            out_file_name = f"longbow_model_{self.name}.v{self.version}.simple.dot"
+
+        # Get the model as a dictionary so we can handle it
+        model_dict = self.hmm.to_dict()
+
+        # Save a map here of node names so we can make some subgraphs:
+        named_node_state_maps = {n: [] for n in self.get_all_node_names()}
+        named_node_state_maps[RANDOM_SEGMENT_NAME] = []
+
+        with open(out_file_name, 'w') as f:
+            f.write(f"digraph ")
+            f.write(f"{self.name}")
+            f.write(" {\n")
+
+            f.write("\n")
+
+            # Write out the nodes:
+            f.write("    // States:\n")
+            states = set()
+            for node in model_dict['states']:
+                name = LibraryModel._get_state_base_name(node['name'])
+                states.add(name)
+            for state in states:
+                f.write(f"    \"{state}\";\n")
+            f.write("\n")
+
+            # Write out the edges:
+            f.write("    // Transitions:\n")
+            transitions = dict()
+            for edge in model_dict['edges']:
+                source = model_dict['states'][edge[0]]
+                dest = model_dict['states'][edge[1]]
+                weight = edge[2]
+
+                source_name = LibraryModel._get_state_base_name(source['name'])
+                dest_name = LibraryModel._get_state_base_name(dest['name'])
+
+                # TODO: This may be too aggressive a filtering criterion.
+                if source_name == dest_name:
+                    continue
+
+                transition_descriptor = f"\"{source_name}\" -> \"{dest_name}\""
+
+                transitions[transition_descriptor] =weight
+            for t, w in transitions.items():
+                f.write(f"    {t} [weight={w:.3f}];\n")
+
+            f.write("}\n")
+
+    def dump_as_dotfile(self, out_file_name=None, do_subgraphs=True):
+        """Dump this LibraryModel to disk as a dot file for visualization."""
+
+        if out_file_name is None:
+            out_file_name = f"longbow_model_{self.name}.v{self.version}.dot"
+
+        # Get the model as a dictionary so we can handle it
+        model_dict = self.hmm.to_dict()
+
+        # Save a map here of node names so we can make some subgraphs:
+        named_node_state_maps = {n: [] for n in self.get_all_node_names()}
+        named_node_state_maps[RANDOM_SEGMENT_NAME] = []
+
+        with open(out_file_name, 'w') as f:
+            f.write(f"digraph ")
+            f.write(f"{self.name}")
+            f.write(" {\n")
+
+            f.write("\n")
+
+            # Write out the nodes:
+            f.write("    // States:\n")
+            if do_subgraphs:
+                # Collect our subgraphs:
+                for node in model_dict['states']:
+                    name = LibraryModel._get_state_base_name(node['name'])
+                    named_node_state_maps[name].append(node['name'])
+
+                # Write out the subgraphs we have found:
+                for subgraph_name, node_names in named_node_state_maps.items():
+                    f.write(f"    subgraph \"{subgraph_name}\"")
+                    f.write(" {\n")
+                    for node_name in node_names:
+                        f.write(f"        \"{node_name}\";\n")
+                    f.write("    }\n")
+            else:
+                for node in model_dict['states']:
+                    f.write(f"    \"{node['name']}\";\n")
+
+            f.write("\n")
+
+            # Write out the edges:
+            f.write("    // Transitions:\n")
+            for edge in model_dict['edges']:
+                source = model_dict['states'][edge[0]]
+                dest = model_dict['states'][edge[1]]
+                weight = edge[2]
+
+                f.write(f"    \"{source['name']}\" -> \"{dest['name']}\" [weight={weight:.3f}];\n")
+
+            f.write("}\n")
+
+    def validate_model(self):
+        """Ensure that the configuration of this model is well-formed and conforms to the semantics that we require."""
+
+        # Ensure that our model does not start with a named random segment:
+        for name in self.start_element_names:
+            if self.has_named_random_segments and (name in self.named_random_segments):
+                message = f"ERROR: start segment name is a named random segment: {name}.  " \
+                          f"Start segments cannot be named random segments."
+                logger.critical(message)
+                raise RuntimeError(message)
+
+        # Ensure that our model does not end with a named random segment:
+        for name in self.end_element_names:
+            if self.has_named_random_segments and (name in self.named_random_segments):
+                message = f"ERROR: end segment name is a named random segment: {name}.  " \
+                          f"End segments cannot be named random segments."
+                logger.critical(message)
+                raise RuntimeError(message)
+
+        # Ensure all named random segments have direct connections:
+        if self.has_named_random_segments:
+            for name in self.named_random_segments:
+                if name not in self.direct_connections_dict:
+                    message = f"ERROR: Named random segment has no direct connections: {name}.  " \
+                              f"All named random segments must be directly connected to another segment."
+                    logger.critical(message)
+                    raise RuntimeError(message)
+
+        # Ensure that the coding region is specified somewhere in the model as a string:
+        if self.coding_region is not None:
+            if type(self.coding_region) is not str:
+                message = f"ERROR: coding_region must be a string."
+                logger.critical(message)
+                raise RuntimeError(message)
+            elif self.coding_region not in self.adapter_dict:
+                message = f"ERROR: coding_region name does not appear in adapter dictionary: " \
+                          f"{self.coding_region} not in ({self.adapter_dict.keys()})."
+                logger.critical(message)
+                raise RuntimeError(message)
+
+        # Ensure that all segments in the array element structure show up in the adapter dictionary:
+        for array_element in self.array_element_structure:
+            for adapter in array_element:
+                # `random` nodes are OK in the array element structure:
+                if adapter not in self.adapter_dict and adapter != RANDOM_SEGMENT_NAME:
+                    message = f"ERROR: adapter from array element structure does not appear in adapter dictionary: " \
+                              f"{adapter} not in ({self.adapter_dict.keys()})."
+                    logger.critical(message)
+                    raise RuntimeError(message)
+
+        # Ensure that all segments in the direct connections dict exist in the adapter dictionary:
+        for source, destination_nodes in self.direct_connections_dict.items():
+            if source not in self.adapter_dict:
+                message = f"ERROR: source adapter from direct connections does not appear in adapter dictionary: " \
+                          f"{source} not in ({self.adapter_dict.keys()})."
+                logger.critical(message)
+                raise RuntimeError(message)
+            for dest in destination_nodes:
+                if dest not in self.adapter_dict:
+                    message = f"ERROR: dest adapter from direct connections does not appear in adapter dictionary: " \
+                              f"{dest} not in ({self.adapter_dict.keys()})."
+                    logger.critical(message)
+                    raise RuntimeError(message)
+
+    @staticmethod
+    def _get_state_base_name(state):
+        if type(state) is str:
+            state_name = state
+        else:
+            state_name = state.name
+
+        i = state_name.find(":")
+        if i != -1:
+            state_name = state_name[:i]
+
+        i = state_name.find(START_STATE_INDICATOR)
+        if i != -1:
+            state_name = state_name[:i]
+
+        i = state_name.find(END_STATE_INDICATOR)
+        if i != -1:
+            state_name = state_name[:i]
+
+        return state_name
 
     @staticmethod
     def create_model(model_name):
@@ -239,7 +751,229 @@ class LibraryModel:
         return ordered_key_adapters
 
     @staticmethod
+    def _make_homopolymer_repeat_model(name, nucleotide, expected_length):
+        # TODO: Do a better bake-off for the HPR models.
+        #  Currently v1 works very well, but you should still verify it's the best.
+        #  Actually, it should be refined to "center" on the specified length and have "extra"
+        #  transitions at the 90% and 110% marks.  This is similar to what you're doing now,
+        #  but a little different.
+
+        # return LibraryModel._make_homopolymer_repeat_model_v0(name, nucleotide, expected_length)
+        return LibraryModel._make_homopolymer_repeat_model_v1(name, nucleotide, expected_length)
+        # return LibraryModel._make_homopolymer_repeat_model_v2(name, nucleotide, expected_length)
+
+    @staticmethod
+    def _make_homopolymer_repeat_model_v0(name, nucleotide, expected_length):
+        logger.debug("Making Model: HOMOPOLYMER_REPEAT (%s:%s x %d)", name, nucleotide, expected_length)
+
+        # The homopolymer repeat model begins its life as a global alignment model consisting
+        # of one base repeated for the expected length of the HPR:
+        model = LibraryModel._make_global_alignment_model(nucleotide * expected_length, name)
+
+        # Now we add extra transitions to help with HPR detection:
+        for s in model.states:
+            # Add a transition from each match state to the silent end state to allow for a
+            # faster short-circuit end to the HPR that's less than the expected length:
+            if s.name.startswith(f"{name}:M"):
+                # We don't need an extra transition to the end here:
+                if s.name != f"{name}:M{expected_length}":
+                    model.add_transition(s, model.end, LibraryModel.HPR_SUDDEN_END_PROB)
+
+                # Add a transition from each match state back to the first Match state to more easily allow for
+                # longer than expected HPRs:
+                model.add_transition(s, model.start, LibraryModel.HPR_MODEL_RECURRENCE_PROB)
+
+            # Add a transition from each insert state back to the first Match state to more easily allow for
+            # longer than expected HPRs:
+            elif s.name.startswith(f"{name}:I"):
+                # We don't need a recurrence transition at insert state 0
+                # (arbitrary, but it makes sense intuitively to me).
+                if s.name != f"{name}:I0":
+                    model.add_transition(s, model.start, LibraryModel.HPR_MODEL_RECURRENCE_PROB)
+                if s.name != f"{name}:I{expected_length}":
+                    model.add_transition(s, model.end, LibraryModel.HPR_SUDDEN_END_PROB)
+
+        # Finalize and return the model:
+        model.bake(merge=BAKE_MERGE_STRATEGY)
+        return model
+
+    @staticmethod
+    def _make_homopolymer_repeat_model_v1(name, nucleotide, expected_length):
+        logger.debug("Making Model: HOMOPOLYMER_REPEAT (%s:%s x %d)", name, nucleotide, expected_length)
+
+        model = HiddenMarkovModel(name=name)
+        s = {}
+
+        # Define our distributions here so we can use them later:
+        random_distribution = DiscreteDistribution({
+                "A": LibraryModel.RANDOM_BASE_PROB,
+                "C": LibraryModel.RANDOM_BASE_PROB,
+                "G": LibraryModel.RANDOM_BASE_PROB,
+                "T": LibraryModel.RANDOM_BASE_PROB
+            })
+
+        standard_distribution = DiscreteDistribution(
+                {
+                    "A": LibraryModel.PER_BASE_MATCH_PROB if nucleotide == "A" else LibraryModel.PER_BASE_MISMATCH_PROB,
+                    "C": LibraryModel.PER_BASE_MATCH_PROB if nucleotide == "C" else LibraryModel.PER_BASE_MISMATCH_PROB,
+                    "G": LibraryModel.PER_BASE_MATCH_PROB if nucleotide == "G" else LibraryModel.PER_BASE_MISMATCH_PROB,
+                    "T": LibraryModel.PER_BASE_MATCH_PROB if nucleotide == "T" else LibraryModel.PER_BASE_MISMATCH_PROB,
+                }
+            )
+
+        # Add an extra penalty to the last state for being a base that isn't the one in this HPR:
+        bookend_state_distribution = DiscreteDistribution(
+                {
+                    "A": LibraryModel.HPR_BOOKEND_MATCH_PROB if nucleotide == "A" else LibraryModel.HPR_BOOKEND_MISMATCH_PROB,
+                    "C": LibraryModel.HPR_BOOKEND_MATCH_PROB if nucleotide == "C" else LibraryModel.HPR_BOOKEND_MISMATCH_PROB,
+                    "G": LibraryModel.HPR_BOOKEND_MATCH_PROB if nucleotide == "G" else LibraryModel.HPR_BOOKEND_MISMATCH_PROB,
+                    "T": LibraryModel.HPR_BOOKEND_MATCH_PROB if nucleotide == "T" else LibraryModel.HPR_BOOKEND_MISMATCH_PROB,
+                }
+            )
+
+        # add states
+        i0 = State(random_distribution, name=f"{name}:I0")
+
+        model.add_state(i0)
+        s[i0.name] = i0
+
+        for c in range(expected_length):
+            if c ==0 or c == expected_length-1:
+                # mc = State(standard_distribution, name=f"{name}:M{c + 1}")
+                mc = State(bookend_state_distribution, name=f"{name}:M{c + 1}")
+            else:
+                mc = State(standard_distribution, name=f"{name}:M{c + 1}")
+
+            ic = State(random_distribution, name=f"{name}:I{c + 1}")
+
+            model.add_states([mc, ic])
+
+            s[mc.name] = mc
+            s[ic.name] = ic
+
+        # Add transitions for starting states:
+        model.add_transition(model.start, s[f"{name}:I0"], LibraryModel.MATCH_INDEL_PROB)
+        model.add_transition(model.start, s[f"{name}:M1"], LibraryModel.MATCH_MATCH_PROB)
+        model.add_transition(s[f"{name}:M1"], model.end, LibraryModel.HPR_SUDDEN_END_PROB)
+        model.add_transition(s[f"{name}:M1"], model.start, LibraryModel.HPR_MODEL_RECURRENCE_PROB)
+
+        model.add_transition(s[f"{name}:I0"], s[f"{name}:I0"], LibraryModel.INDEL_CONTINUATION_PROB)
+        model.add_transition(s[f"{name}:I0"], s[f"{name}:M1"], LibraryModel.INDEL_SWITCH_PROB / 2)
+
+        # Add transitions for middle states:
+        for c in range(1, expected_length):
+            model.add_transition(s[f"{name}:I{c}"], s[f"{name}:I{c}"], LibraryModel.INDEL_SWITCH_PROB / 2)
+            model.add_transition(s[f"{name}:I{c}"], s[f"{name}:M{c + 1}"], LibraryModel.INDEL_CONTINUATION_PROB)
+            model.add_transition(s[f"{name}:I{c}"], model.start, LibraryModel.HPR_MODEL_RECURRENCE_PROB)
+            model.add_transition(s[f"{name}:I{c}"], model.end, LibraryModel.HPR_SUDDEN_END_PROB)
+
+            model.add_transition(s[f"{name}:M{c}"], s[f"{name}:I{c}"], LibraryModel.MATCH_INDEL_PROB)
+            model.add_transition(s[f"{name}:M{c}"], s[f"{name}:M{c + 1}"], LibraryModel.MATCH_MATCH_PROB)
+
+        # Add transitions for the last states:
+        model.add_transition(s[f"{name}:I{expected_length}"], s[f"{name}:I{expected_length}"],
+                             LibraryModel.INDEL_SWITCH_PROB / 2)
+        model.add_transition(
+            s[f"{name}:I{expected_length}"],
+            model.end,
+            LibraryModel.INDEL_CONTINUATION_PROB + (LibraryModel.INDEL_SWITCH_PROB / 2)
+        )
+
+        model.add_transition(
+            s[f"{name}:M{expected_length}"], s[f"{name}:I{expected_length}"], LibraryModel.MATCH_TRAIL_INSERT_PROB
+        )
+        model.add_transition(s[f"{name}:M{expected_length}"], model.end, LibraryModel.MATCH_END_PROB)
+        model.add_transition(s[f"{name}:M{expected_length}"], model.start, LibraryModel.MATCH_END_PROB)
+
+        # Finalize and return the model:
+        model.bake(merge=BAKE_MERGE_STRATEGY)
+        return model
+
+    @staticmethod
+    def _make_homopolymer_repeat_model_v2(name, nucleotide, expected_length):
+        logger.debug("Making Model: HOMOPOLYMER_REPEAT (%s:%s x %d)", name, nucleotide, expected_length)
+
+        model = HiddenMarkovModel(name=name)
+        states = dict()
+
+        # Add states and "internal" transitions:
+        for i in range(1, expected_length+1):
+
+            state_name = f"{name}:I{i}"
+
+            s = State(
+                DiscreteDistribution(
+                    {
+                        "A": LibraryModel.HPR_MATCH_PROB if nucleotide == "A" else LibraryModel.HPR_MISMATCH_PROB,
+                        "C": LibraryModel.HPR_MATCH_PROB if nucleotide == "C" else LibraryModel.HPR_MISMATCH_PROB,
+                        "G": LibraryModel.HPR_MATCH_PROB if nucleotide == "G" else LibraryModel.HPR_MISMATCH_PROB,
+                        "T": LibraryModel.HPR_MATCH_PROB if nucleotide == "T" else LibraryModel.HPR_MISMATCH_PROB,
+                    }
+                ),
+                name=f"{name}:I{i}",
+            )
+
+            model.add_state(s)
+            states[state_name] = s
+
+            # Add transitions with probabilities based on whether this is a "short-circuit" end node or not:
+            if i == expected_length:
+                end_transition_prob = 0.1
+            else:
+                end_transition_prob = 0.01
+
+            model.add_transition(s, model.end, end_transition_prob)
+
+            # Add self-transition:
+            model.add_transition(s, s, (1-end_transition_prob)/2)
+
+            # Add transitions between consecutive states:
+            if i > 1:
+                model.add_transition(states[f"{name}:I{i - 1}"], s, (1-end_transition_prob)/2)
+
+        # Add start transition:
+        model.add_transition(model.start, states[f"{name}:I1"], 1)
+
+        # Finalize and return the model:
+        model.bake(merge=BAKE_MERGE_STRATEGY)
+        return model
+
+    @staticmethod
+    def _make_fixed_length_random_segment(name, length):
+        logger.debug("Making Model: FIXED_LENGTH_RANDOM (%s:%d)", name, length)
+        model = HiddenMarkovModel(name=name)
+
+        state_dict = {}
+
+        random_dist = DiscreteDistribution({
+                    "A": LibraryModel.RANDOM_BASE_PROB,
+                    "C": LibraryModel.RANDOM_BASE_PROB,
+                    "G": LibraryModel.RANDOM_BASE_PROB,
+                    "T": LibraryModel.RANDOM_BASE_PROB
+                })
+
+        # Create match states for each base in the fixed length random segment:
+        for i in range(length):
+            match_state = State(random_dist, name=f"{name}:M{i + 1}")
+
+            model.add_state(match_state)
+            state_dict[match_state.name] = match_state
+
+        # Add transitions:
+        # NOTE: All probabilities in the transitions are linear because we specifically want to capture a chain of
+        # fixed-length here, so each state as exactly one transition.
+        model.add_transition(model.start, state_dict[f"{name}:M1"], 1)
+        for i in range(1, length):
+            model.add_transition(state_dict[f"{name}:M{i}"], state_dict[f"{name}:M{i + 1}"], 1)
+        model.add_transition(state_dict[f"{name}:M{length}"], model.end, 1)
+
+        # Finalize and return the model:
+        model.bake(merge=BAKE_MERGE_STRATEGY)
+        return model
+
+    @staticmethod
     def _make_global_alignment_model(target, name=None):
+        logger.debug("Making Model: GLOBAL_ALIGNMENT (%s)", name)
         model = HiddenMarkovModel(name=name)
         s = {}
 
@@ -328,13 +1062,41 @@ class LibraryModel:
         )
         model.add_transition(s[f"{name}:M{len(target)}"], model.end, LibraryModel.MATCH_END_PROB)
 
-        model.bake(merge="None")
-
+        model.bake(merge=BAKE_MERGE_STRATEGY)
         return model
 
     @staticmethod
-    def _make_random_repeat_model(name="random"):
+    def _make_named_random_model(name):
+        logger.debug("Making Model: NAMED RANDOM (%s)", name)
+
         model = HiddenMarkovModel(name=name)
+
+        # This is a VERY simple repeat model.
+        # The idea here is that is a user specifies a named random segment, then we know
+        # there should be at least one random base here.
+        ri = State(
+            DiscreteDistribution({
+                "A": LibraryModel.RANDOM_BASE_PROB,
+                "C": LibraryModel.RANDOM_BASE_PROB,
+                "G": LibraryModel.RANDOM_BASE_PROB,
+                "T": LibraryModel.RANDOM_BASE_PROB
+            }),
+            name=f"{name}:{RANDOM_BASE_STATE}",
+        )
+
+        model.add_state(ri)
+
+        model.add_transition(model.start, ri, 1)
+        model.add_transition(ri, ri, LibraryModel.NAMED_RAND_CONTINUE_PROB)
+        model.add_transition(ri, model.end, LibraryModel.NAMED_RAND_EXIT_PROB)
+
+        model.bake(merge=BAKE_MERGE_STRATEGY)
+        return model
+
+    @staticmethod
+    def _make_random_repeat_model():
+        logger.debug(f"Making Model: RANDOM REPEAT")
+        model = HiddenMarkovModel(name=RANDOM_SEGMENT_NAME)
 
         # add states
         ri = State(
@@ -344,10 +1106,10 @@ class LibraryModel:
                 "G": LibraryModel.RANDOM_BASE_PROB,
                 "T": LibraryModel.RANDOM_BASE_PROB
             }),
-            name=f"{name}:RI",
+            name=f"{RANDOM_SEGMENT_NAME}:{RANDOM_BASE_STATE}",
         )
-        rda = State(None, name=f"{name}:RDA")
-        rdb = State(None, name=f"{name}:RDB")
+        rda = State(None, name=f"{RANDOM_SEGMENT_NAME}:{RANDOM_SILENT_STATE_A}")
+        rdb = State(None, name=f"{RANDOM_SEGMENT_NAME}:{RANDOM_SILENT_STATE_B}")
 
         model.add_states([ri, rda, rdb])
 
@@ -362,40 +1124,9 @@ class LibraryModel:
         model.add_transition(rdb, ri, LibraryModel.RAND_RAND_PROB)
         model.add_transition(rdb, model.end, LibraryModel.START_AND_END_RANDOM_PROB)
 
-        model.bake(merge="None")
+        model.bake(merge=BAKE_MERGE_STRATEGY)
 
         return model
-
-    # @staticmethod
-    # def _make_homopolymer_repeat_model(name="homopolymer_repeat", base="A"):
-    #     model = HiddenMarkovModel(name=name)
-    #
-    #     # add states
-    #     hpr = State(
-    #         DiscreteDistribution({
-    #             base: 1
-    #         }),
-    #         name=f"{name}:RI",
-    #     )
-    #     hpr_a = State(None, name=f"{name}:HPRA")
-    #     hpr_b = State(None, name=f"{name}:HPRB")
-    #
-    #     model.add_states([hpr, hpr_a, hpr_b])
-    #
-    #     # add transitions
-    #     model.add_transition(model.start, hpr_a, LibraryModel.START_AND_END_RANDOM_PROB)
-    #     model.add_transition(model.start, hpr, LibraryModel.START_AND_END_RANDOM_PROB)
-    #
-    #     model.add_transition(hpr, hpr, LibraryModel.RAND_INS_CONTINUATION_PROB)
-    #     model.add_transition(hpr, hpr_a, LibraryModel.RAND_INS_TO_DEL_PROB)
-    #     model.add_transition(hpr, model.end, LibraryModel.RAND_INS_END_PROB)
-    #
-    #     model.add_transition(hpr_b, hpr, LibraryModel.RAND_RAND_PROB)
-    #     model.add_transition(hpr_b, model.end, LibraryModel.START_AND_END_RANDOM_PROB)
-    #
-    #     model.bake(merge="None")
-    #
-    #     return model
 
     def to_json(self, outfile=None, indent=4):
         """Serialize this model to a json object and return that json object.
@@ -409,8 +1140,18 @@ class LibraryModel:
             "adapters": self.adapter_dict,
             "direct_connections": {k: list(v) for k, v in self.direct_connections_dict.items()},
             "start_element_names": list(self.start_element_names),
-            "end_element_names": list(self.end_element_names)
+            "end_element_names": list(self.end_element_names),
         }
+
+        # Set our new "optional" fields here:
+        if self.has_named_random_segments:
+            model_data["named_random_segments"] = list(self.named_random_segments)
+
+        if self.coding_region is not None:
+            model_data["coding_region"] = self.coding_region
+
+        if self.annotation_segments is not None:
+            model_data["annotation_segments"] = {k: list(v) for k, v in self.annotation_segments.items()}
 
         if outfile:
             with open(outfile, 'w') as f:
@@ -420,7 +1161,7 @@ class LibraryModel:
 
     @staticmethod
     def from_json_file(json_file):
-        """Create a LibraryModel instance from the given json data.
+        """Create a LibraryModel instance from the given json file.
         This method will open the file at the given location and use the data in that file to create a LibraryModel."""
 
         try:
@@ -429,6 +1170,29 @@ class LibraryModel:
         except FileNotFoundError:
             logger.error(f"File does not exist: {json_file}")
             sys.exit(1)
+
+        return LibraryModel.from_json_obj(json_data)
+
+    @staticmethod
+    def from_json_obj(json_data):
+        """Create a LibraryModel instance from the given json data.
+        This method will use the data in the JSON object to create a LibraryModel."""
+
+        # Get "optional" new model params:
+        try:
+            named_random_segments = set(json_data["named_random_segments"])
+        except KeyError:
+            named_random_segments = None
+
+        try:
+            coding_region=json_data["coding_region"]
+        except KeyError:
+            coding_region = None
+
+        try:
+            annotation_segments={k: list(v) for k, v in json_data["annotation_segments"].items()}
+        except KeyError:
+            annotation_segments = None
 
         m = LibraryModel(
             name=json_data["name"],
@@ -439,6 +1203,10 @@ class LibraryModel:
             direct_connections={k: set(v) for k, v in json_data["direct_connections"].items()},
             start_element_names=set(json_data["start_element_names"]),
             end_element_names=set(json_data["end_element_names"]),
+            # New "optional" model parameters:
+            named_random_segments=named_random_segments,
+            coding_region=coding_region,
+            annotation_segments=annotation_segments,
         )
 
         return m
@@ -450,6 +1218,19 @@ class LibraryModel:
         if model_name not in LibraryModel.pre_configured_models:
             raise KeyError(f"Model not found in pre-configured models: {model_name}")
 
+        # New "optional" parameters:
+        named_random_segments = None
+        if "named_random_segments" in LibraryModel.pre_configured_models[model_name]:
+            named_random_segments = LibraryModel.pre_configured_models[model_name]["named_random_segments"]
+
+        coding_region = None
+        if "coding_region" in LibraryModel.pre_configured_models[model_name]:
+            coding_region = LibraryModel.pre_configured_models[model_name]["coding_region"]
+
+        annotation_segments = None
+        if "annotation_segments" in LibraryModel.pre_configured_models[model_name]:
+            annotation_segments = LibraryModel.pre_configured_models[model_name]["annotation_segments"]
+
         return LibraryModel(
             name=model_name,
             description=LibraryModel.pre_configured_models[model_name]["description"],
@@ -459,6 +1240,10 @@ class LibraryModel:
             direct_connections=LibraryModel.pre_configured_models[model_name]["direct_connections"],
             start_element_names=LibraryModel.pre_configured_models[model_name]["start_element_names"],
             end_element_names=LibraryModel.pre_configured_models[model_name]["end_element_names"],
+            # New "optional" model parameters:
+            named_random_segments=named_random_segments,
+            coding_region=coding_region,
+            annotation_segments=annotation_segments,
         )
 
     # TODO: Make an enum for this...
@@ -545,32 +1330,38 @@ class LibraryModel:
             },
             "start_element_names": {"A", "10x_Adapter"},
             "end_element_names": {"Poly_A", "P"},
+            "named_random_segments": None,
+            "coding_region": None,
+            "annotation_segments": None,
         },
-        "mas15threeP": {
-            "description": "The 3' kit MAS-seq 15 array element model.",
-            "version": "1.0.0",
+        "mas15v2": {
+            "description": "The standard MAS-seq 15 array element model.",
+            "version": "2.0.0",
             "array_element_structure": (
                 # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
-                ("A", "10x_Adapter", "random", "TSO"),
-                ("B", "10x_Adapter", "random", "TSO"),
-                ("C", "10x_Adapter", "random", "TSO"),
-                ("D", "10x_Adapter", "random", "TSO"),
-                ("E", "10x_Adapter", "random", "TSO"),
-                ("F", "10x_Adapter", "random", "TSO"),
-                ("G", "10x_Adapter", "random", "TSO"),
-                ("H", "10x_Adapter", "random", "TSO"),
-                ("I", "10x_Adapter", "random", "TSO"),
-                ("J", "10x_Adapter", "random", "TSO"),
-                ("K", "10x_Adapter", "random", "TSO"),
-                ("L", "10x_Adapter", "random", "TSO"),
-                ("M", "10x_Adapter", "random", "TSO"),
-                ("N", "10x_Adapter", "random", "TSO"),
+                ("A", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("B", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("C", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("D", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("E", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("F", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("G", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("H", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("I", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("J", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("K", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("L", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("M", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("N", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
                 # The last element doesn't currently have the "P" adapter in this version of the library:
-                ("O", "10x_Adapter", "random", "TSO", "P"),
+                ("O", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS", "P"),
             ),
             "adapters": {
-                "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
-                "TSO": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "VENUS": "TCTACACGACGCTCTTCCGATCT",
+                # "Poly_A": "A" * 30,
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                "MARS": "GTACTCTGCGTTGATACCACTGCTT",
+                "BOREAS": "TTTCTTATATGGG",
                 "A": "AGCTTACTTGTGAAGA",
                 "B": "ACTTGTAAGCTGTCTA",
                 "C": "ACTCTGTCAGGTCCGA",
@@ -587,9 +1378,13 @@ class LibraryModel:
                 "N": "AGGTATGCCGGTTAAG",
                 "O": "AAGTCACCGGCACCTT",
                 "P": "ATGAAGTGGCTCGAGA",
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "cDNA": RANDOM_SEGMENT_NAME,
             },
             "direct_connections": {
-                "TSO": {
+                "Poly_A": {"MARS"},
+                "MARS": {
                     "A",
                     "B",
                     "C",
@@ -607,25 +1402,233 @@ class LibraryModel:
                     "O",
                     "P",
                 },
-                "A": {"10x_Adapter"},
-                "B": {"10x_Adapter"},
-                "C": {"10x_Adapter"},
-                "D": {"10x_Adapter"},
-                "E": {"10x_Adapter"},
-                "F": {"10x_Adapter"},
-                "G": {"10x_Adapter"},
-                "H": {"10x_Adapter"},
-                "I": {"10x_Adapter"},
-                "J": {"10x_Adapter"},
-                "K": {"10x_Adapter"},
-                "L": {"10x_Adapter"},
-                "M": {"10x_Adapter"},
-                "N": {"10x_Adapter"},
-                "O": {"10x_Adapter"},
-                "P": {"10x_Adapter"},
+                "A": {"VENUS"},
+                "B": {"VENUS"},
+                "C": {"VENUS"},
+                "D": {"VENUS"},
+                "E": {"VENUS"},
+                "F": {"VENUS"},
+                "G": {"VENUS"},
+                "H": {"VENUS"},
+                "I": {"VENUS"},
+                "J": {"VENUS"},
+                "K": {"VENUS"},
+                "L": {"VENUS"},
+                "M": {"VENUS"},
+                "N": {"VENUS"},
+                "O": {"VENUS"},
+                "P": {"VENUS"},
+                "VENUS": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"BOREAS"},
+                "BOREAS": {"cDNA"},
+                "cDNA": {"Poly_A"},
             },
-            "start_element_names": {"A", "10x_Adapter"},
+            "start_element_names": {"A", "VENUS"},
+            "end_element_names": {"Poly_A", "P"},
+            "named_random_segments": {"UMI", "cDNA", "CBC"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
+        },
+        "mas15threeP": {
+            "description": "The 3' kit MAS-seq 15 array element model.",
+            "version": "2.0.0",
+            "array_element_structure": (
+                # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
+                ("A", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("B", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("C", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("D", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("E", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("F", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("G", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("H", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("I", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("J", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("K", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("L", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("M", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("N", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                # The last element doesn't currently have the "P" adapter in this version of the library:
+                ("O", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS", "P"),
+            ),
+            "adapters": {
+                "VENUS": "TCTACACGACGCTCTTCCGATCT",
+                "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "A": "AGCTTACTTGTGAAGA",
+                "B": "ACTTGTAAGCTGTCTA",
+                "C": "ACTCTGTCAGGTCCGA",
+                "D": "ACCTCCTCCTCCAGAA",
+                "E": "AACCGGACACACTTAG",
+                "F": "AGAGTCCAATTCGCAG",
+                "G": "AATCAAGGCTTAACGG",
+                "H": "ATGTTGAATCCTAGCG",
+                "I": "AGTGCGTTGCGAATTG",
+                "J": "AATTGCGTAGTTGGCC",
+                "K": "ACACTTGGTCGCAATC",
+                "L": "AGTAAGCCTTCGTGTC",
+                "M": "ACCTAGATCAGAGCCT",
+                "N": "AGGTATGCCGGTTAAG",
+                "O": "AAGTCACCGGCACCTT",
+                "P": "ATGAAGTGGCTCGAGA",
+                "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "cDNA": RANDOM_SEGMENT_NAME,
+            },
+            "direct_connections": {
+                "MARS": {
+                    "A",
+                    "B",
+                    "C",
+                    "D",
+                    "E",
+                    "F",
+                    "G",
+                    "H",
+                    "I",
+                    "J",
+                    "K",
+                    "L",
+                    "M",
+                    "N",
+                    "O",
+                    "P",
+                },
+                "A": {"VENUS"},
+                "B": {"VENUS"},
+                "C": {"VENUS"},
+                "D": {"VENUS"},
+                "E": {"VENUS"},
+                "F": {"VENUS"},
+                "G": {"VENUS"},
+                "H": {"VENUS"},
+                "I": {"VENUS"},
+                "J": {"VENUS"},
+                "K": {"VENUS"},
+                "L": {"VENUS"},
+                "M": {"VENUS"},
+                "N": {"VENUS"},
+                "O": {"VENUS"},
+                "P": {"VENUS"},
+                "VENUS": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"Poly_T"},
+                "Poly_T": {"cDNA"},
+                "cDNA": {"MARS"},
+            },
+            "start_element_names": {"A", "VENUS"},
             "end_element_names": {"P"},
+            "named_random_segments": {"UMI", "cDNA", "CBC"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
+        },
+        "mas15BulkWithIndices": {
+            "description": "A MAS-seq 15 array element model with a 10 base index just before the 3' adapter for bulk "
+                           "sequencing.",
+            "version": "1.0.0",
+            "array_element_structure": (
+                ("A", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("B", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("C", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("D", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("E", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("F", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("G", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("H", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("I", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("J", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("K", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("L", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("M", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("N", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "sample_index", "MARS"),
+                ("O", "VENUS", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS", "sample_index", "P"),
+            ),
+            "adapters": {
+                "VENUS": "TCTACACGACGCTCTTCCGATCT",
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                "MARS": "CTCTGCGTTGATACCACTGCTT",
+                "BOREAS": "TTTCTTATATGGG",
+                "A": "AGCTTACTTGTGAAGA",
+                "B": "ACTTGTAAGCTGTCTA",
+                "C": "ACTCTGTCAGGTCCGA",
+                "D": "ACCTCCTCCTCCAGAA",
+                "E": "AACCGGACACACTTAG",
+                "F": "AGAGTCCAATTCGCAG",
+                "G": "AATCAAGGCTTAACGG",
+                "H": "ATGTTGAATCCTAGCG",
+                "I": "AGTGCGTTGCGAATTG",
+                "J": "AATTGCGTAGTTGGCC",
+                "K": "ACACTTGGTCGCAATC",
+                "L": "AGTAAGCCTTCGTGTC",
+                "M": "ACCTAGATCAGAGCCT",
+                "N": "AGGTATGCCGGTTAAG",
+                "O": "AAGTCACCGGCACCTT",
+                "P": "ATGAAGTGGCTCGAGA",
+                "sample_index": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "cDNA": RANDOM_SEGMENT_NAME,
+            },
+            "direct_connections": {
+                "MARS": {
+                    "A",
+                    "B",
+                    "C",
+                    "D",
+                    "E",
+                    "F",
+                    "G",
+                    "H",
+                    "I",
+                    "J",
+                    "K",
+                    "L",
+                    "M",
+                    "N",
+                    "O",
+                    "P",
+                },
+                "A": {"VENUS"},
+                "B": {"VENUS"},
+                "C": {"VENUS"},
+                "D": {"VENUS"},
+                "E": {"VENUS"},
+                "F": {"VENUS"},
+                "G": {"VENUS"},
+                "H": {"VENUS"},
+                "I": {"VENUS"},
+                "J": {"VENUS"},
+                "K": {"VENUS"},
+                "L": {"VENUS"},
+                "M": {"VENUS"},
+                "N": {"VENUS"},
+                "O": {"VENUS"},
+                "P": {"VENUS"},
+                "VENUS": {"UMI"},
+                "UMI": {"BOREAS"},
+                "BOREAS": {"cDNA"},
+                "cDNA": {"Poly_A"},
+                "Poly_A": {"sample_index"},
+                "sample_index": {"MARS"},
+            },
+            "start_element_names": {"A", "VENUS"},
+            "end_element_names": {"Poly_A", "P"},
+            "named_random_segments": {"UMI", "cDNA", "sample_index"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "sample_index": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
         },
         "mas10": {
             "description": "The MAS-seq 10 array element model.",
@@ -689,25 +1692,27 @@ class LibraryModel:
             "start_element_names": {"Q", "10x_Adapter"},
             "end_element_names": {"Poly_A", "R"},
         },
-        "mas10threeP": {
-            "description": "The 3' kit MAS-seq 10 array element model.",
-            "version": "1.0.0",
+        "mas10v2": {
+            "description": "The MAS-seq 10 array element model.",
+            "version": "2.0.0",
             "array_element_structure": (
-                ("Q", "10x_Adapter", "random", "TSO"),
-                ("C", "10x_Adapter", "random", "TSO"),
-                ("M", "10x_Adapter", "random", "TSO"),
-                ("I", "10x_Adapter", "random", "TSO"),
-                ("O", "10x_Adapter", "random", "TSO"),
-                ("J", "10x_Adapter", "random", "TSO"),
-                ("B", "10x_Adapter", "random", "TSO"),
-                ("D", "10x_Adapter", "random", "TSO"),
-                ("K", "10x_Adapter", "random", "TSO"),
+                ("Q", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("C", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("M", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("I", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("O", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("J", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("B", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("D", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("K", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
                 # The last element may not currently have the "R" adapter in this version of the library:
-                ("H", "10x_Adapter", "random", "TSO", "R"),
+                ("H", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS", "R"),
             ),
             "adapters": {
-                "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
-                "TSO": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "VENUS": "TCTACACGACGCTCTTCCGATCT",
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                "MARS": "GTACTCTGCGTTGATACCACTGCTT",
+                "BOREAS": "TTTCTTATATGGG",
                 "B": "ACTTGTAAGCTGTCTA",
                 "C": "ACTCTGTCAGGTCCGA",
                 "D": "ACCTCCTCCTCCAGAA",
@@ -719,9 +1724,13 @@ class LibraryModel:
                 "O": "AAGTCACCGGCACCTT",
                 "Q": "AAGCACCATAATGTGT",
                 "R": "AACCGGACACACTTAG",
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "cDNA": RANDOM_SEGMENT_NAME,
             },
             "direct_connections": {
-                "TSO": {
+                "Poly_A": {"MARS"},
+                "MARS": {
                     "Q",
                     "C",
                     "M",
@@ -734,20 +1743,110 @@ class LibraryModel:
                     "H",
                     "R",
                 },
-                "B": {"10x_Adapter"},
-                "C": {"10x_Adapter"},
-                "D": {"10x_Adapter"},
-                "H": {"10x_Adapter"},
-                "I": {"10x_Adapter"},
-                "J": {"10x_Adapter"},
-                "K": {"10x_Adapter"},
-                "M": {"10x_Adapter"},
-                "O": {"10x_Adapter"},
-                "Q": {"10x_Adapter"},
-                "R": {"10x_Adapter"},
+                "B": {"VENUS"},
+                "C": {"VENUS"},
+                "D": {"VENUS"},
+                "H": {"VENUS"},
+                "I": {"VENUS"},
+                "J": {"VENUS"},
+                "K": {"VENUS"},
+                "M": {"VENUS"},
+                "O": {"VENUS"},
+                "Q": {"VENUS"},
+                "R": {"VENUS"},
+                "VENUS": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"BOREAS"},
+                "BOREAS": {"cDNA"},
+                "cDNA": {"Poly_A"},
             },
-            "start_element_names": {"Q", "10x_Adapter"},
+            "start_element_names": {"Q", "VENUS"},
+            "end_element_names": {"Poly_A", "R"},
+            "named_random_segments": {"UMI", "cDNA", "CBC"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
+        },
+        "mas10threeP": {
+            "description": "The 3' kit MAS-seq 10 array element model.",
+            "version": "2.0.0",
+            "array_element_structure": (
+                ("Q", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("C", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("M", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("I", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("O", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("J", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("B", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("D", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("K", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                # The last element may not currently have the "R" adapter in this version of the library:
+                ("H", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS", "R"),
+            ),
+            "adapters": {
+                "VENUS": "TCTACACGACGCTCTTCCGATCT",
+                "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "B": "ACTTGTAAGCTGTCTA",
+                "C": "ACTCTGTCAGGTCCGA",
+                "D": "ACCTCCTCCTCCAGAA",
+                "H": "ATGTTGAATCCTAGCG",
+                "I": "AGTGCGTTGCGAATTG",
+                "J": "AATTGCGTAGTTGGCC",
+                "K": "ACACTTGGTCGCAATC",
+                "M": "ACCTAGATCAGAGCCT",
+                "O": "AAGTCACCGGCACCTT",
+                "Q": "AAGCACCATAATGTGT",
+                "R": "AACCGGACACACTTAG",
+                "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "cDNA": RANDOM_SEGMENT_NAME,
+            },
+            "direct_connections": {
+                "MARS": {
+                    "Q",
+                    "C",
+                    "M",
+                    "I",
+                    "O",
+                    "J",
+                    "B",
+                    "D",
+                    "K",
+                    "H",
+                    "R",
+                },
+                "B": {"VENUS"},
+                "C": {"VENUS"},
+                "D": {"VENUS"},
+                "H": {"VENUS"},
+                "I": {"VENUS"},
+                "J": {"VENUS"},
+                "K": {"VENUS"},
+                "M": {"VENUS"},
+                "O": {"VENUS"},
+                "Q": {"VENUS"},
+                "R": {"VENUS"},
+                "VENUS": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"Poly_T"},
+                "Poly_T": {"cDNA"},
+                "cDNA": {"MARS"},
+            },
+            "start_element_names": {"Q", "VENUS"},
             "end_element_names": {"R"},
+            "named_random_segments": {"UMI", "cDNA", "CBC"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
         },
         "slide-seq": {
             # The slide-seq model is:
@@ -839,6 +1938,114 @@ class LibraryModel:
             "start_element_names": {"A", "10x_Adapter"},
             "end_element_names": {"P", "5p_Adapter"},
         },
+        "slide-seqV2": {
+            # The slide-seq model is:
+            #
+            #                 |-----VENUS---->        |--splitter------>               |------Poly_T---------------->                  |--------5p_Adapter----------|                         # noqa
+            # AGCTTACTTGTGAAGACTACACGACGCTCTTCCGATCTNNNNNNNNTCTTCAGCGTTCCCGAGANNNNNNNNNNNNNVVTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTVNNNNNNNNNNNNNNNNNCCCATGTACTCTGCGTTGATACCACTGCTTACTTGTAAGCTGTCTA...      # noqa
+            # |------A------->                      <------|                  <-----------|                                 <----cDNA-------|                              |-------B------>         # noqa
+            #                                          V                           V
+            #                                    Spatial Barcode 2         Spatial Barcode 1
+            "description": "The Slide-seq 15 array element model.",
+            "version": "2.0.0",
+            "array_element_structure": (
+                ("A", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("B", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("C", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("D", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("E", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("F", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("G", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("H", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("I", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("J", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("K", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("L", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("M", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("N", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("O", "VENUS", "SBC2", "AUSTER", "SBC1", "UMI", "Poly_T", "cDNA", "MARS", "P"),
+            ),
+            "adapters": {
+                "VENUS": "TCTACACGACGCTCTTCCGATCT",
+                "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "AUSTER": "TCTTCAGCGTTCCCGAGA",
+                "A": "AGCTTACTTGTGAAGA",
+                "B": "ACTTGTAAGCTGTCTA",
+                "C": "ACTCTGTCAGGTCCGA",
+                "D": "ACCTCCTCCTCCAGAA",
+                "E": "AACCGGACACACTTAG",
+                "F": "AGAGTCCAATTCGCAG",
+                "G": "AATCAAGGCTTAACGG",
+                "H": "ATGTTGAATCCTAGCG",
+                "I": "AGTGCGTTGCGAATTG",
+                "J": "AATTGCGTAGTTGGCC",
+                "K": "ACACTTGGTCGCAATC",
+                "L": "AGTAAGCCTTCGTGTC",
+                "M": "ACCTAGATCAGAGCCT",
+                "N": "AGGTATGCCGGTTAAG",
+                "O": "AAGTCACCGGCACCTT",
+                "P": "ATGAAGTGGCTCGAGA",
+                "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
+                "SBC1": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 6},
+                "SBC2": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 8},
+                # The UMI might be 7, rather than 9 elements long - not clear from the geneious file.
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 9},
+                "cDNA": RANDOM_SEGMENT_NAME,
+            },
+            "direct_connections": {
+                "MARS": {
+                    "A",
+                    "B",
+                    "C",
+                    "D",
+                    "E",
+                    "F",
+                    "G",
+                    "H",
+                    "I",
+                    "J",
+                    "K",
+                    "L",
+                    "M",
+                    "N",
+                    "O",
+                    "P",
+                },
+                "A": {"VENUS"},
+                "B": {"VENUS"},
+                "C": {"VENUS"},
+                "D": {"VENUS"},
+                "E": {"VENUS"},
+                "F": {"VENUS"},
+                "G": {"VENUS"},
+                "H": {"VENUS"},
+                "I": {"VENUS"},
+                "J": {"VENUS"},
+                "K": {"VENUS"},
+                "L": {"VENUS"},
+                "M": {"VENUS"},
+                "N": {"VENUS"},
+                "O": {"VENUS"},
+                "VENUS": {"SBC2"},
+                "SBC2": {"AUSTER"},
+                "AUSTER": {"SBC1"},
+                "SBC1": {"UMI"},
+                "UMI": {"Poly_T"},
+                "Poly_T": {"cDNA"},
+                "cDNA": {"MARS"},
+            },
+            "start_element_names": {"A", "VENUS"},
+            "end_element_names": {"P", "MARS"},
+            "named_random_segments": {"UMI", "SBC2", "SBC1", "cDNA"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "SBC1": [(longbow.utils.constants.READ_SPATIAL_BARCODE1_TAG,
+                         longbow.utils.constants.READ_SPATIAL_BARCODE1_POS_TAG)],
+                "SBC2": [(longbow.utils.constants.READ_SPATIAL_BARCODE2_TAG,
+                         longbow.utils.constants.READ_SPATIAL_BARCODE2_POS_TAG)],
+            },
+        },
         "mas8prototype": {
             "description": "The prototype MAS-seq 8 array element model.",
             "version": "1.0.0",
@@ -888,51 +2095,72 @@ class LibraryModel:
             },
             "start_element_names": {"A", "10x_Adapter"},
             "end_element_names": {"TSO", "A"},
+        },
+        "mas8prototypeV2": {
+            "description": "The prototype MAS-seq 8 array element model.",
+            "version": "2.0.0",
+            "array_element_structure": (
+                # NOTE: the first element may not have the "A" adapter in this version of the library.
+                ("A", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("B", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("C", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("D", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("E", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("F", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("G", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS"),
+                ("H", "VENUS", "CBC", "UMI", "Poly_T", "cDNA", "MARS", "A"),
+            ),
+            "adapters": {
+                "VENUS": "CTACACGACGCTCTTCCGATCT",
+                "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
+                "ZEPHYR": "CCCATGTA",
+                "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                "A": "ACGTACAGT",
+                "B": "AAACTGCAT",
+                "C": "AGAGTCACT",
+                "D": "AGCAAGTTT",
+                "E": "AAGTGGTGT",
+                "F": "AGTGGACTT",
+                "G": "ACAGGTTAT",
+                "H": "ATCTCACAT",
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 12},
+                "cDNA": RANDOM_SEGMENT_NAME,
+            },
+            "direct_connections": {
+                "MARS": {
+                    "A",
+                    "B",
+                    "C",
+                    "D",
+                    "E",
+                    "F",
+                    "G",
+                    "H",
+                },
+                "A": {"VENUS"},
+                "B": {"VENUS"},
+                "C": {"VENUS"},
+                "D": {"VENUS"},
+                "E": {"VENUS"},
+                "F": {"VENUS"},
+                "G": {"VENUS"},
+                "H": {"VENUS"},
+                "VENUS": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"Poly_T"},
+                "Poly_T": {"cDNA"},
+                "cDNA": {"MARS"},
+            },
+            "start_element_names": {"A", "VENUS"},
+            "end_element_names": {"MARS", "A"},
+            "named_random_segments": {"UMI", "CBC", "cDNA"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
         }
     }
-
-
-# IUPAC RC's from: http://arep.med.harvard.edu/labgc/adnan/projects/Utilities/revcomp.html
-# and https://www.dnabaser.com/articles/IUPAC%20ambiguity%20codes.html
-RC_BASE_MAP = {
-    "N": "N",
-    "A": "T",
-    "T": "A",
-    "G": "C",
-    "C": "G",
-    "Y": "R",
-    "R": "Y",
-    "S": "S",
-    "W": "W",
-    "K": "M",
-    "M": "K",
-    "B": "V",
-    "V": "B",
-    "D": "H",
-    "H": "D",
-    "n": "n",
-    "a": "t",
-    "t": "a",
-    "g": "c",
-    "c": "g",
-    "y": "r",
-    "r": "y",
-    "s": "s",
-    "w": "w",
-    "k": "m",
-    "m": "k",
-    "b": "v",
-    "v": "b",
-    "d": "h",
-    "h": "d",
-}
-
-
-def reverse_complement(base_string):
-    """
-    Reverse complements the given base_string.
-    :param base_string: String of bases to be reverse-complemented.
-    :return: The reverse complement of the given base string.
-    """
-
-    return "".join(map(lambda b: RC_BASE_MAP[b], base_string[::-1]))

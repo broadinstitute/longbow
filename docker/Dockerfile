@@ -23,7 +23,7 @@ RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 RUN --mount=type=ssh git clone git@github.com:broadinstitute/longbow.git 
 RUN cd longbow && \
-    git checkout v0.4.7 && \ && \ && \
+    git checkout v0.4.7 && \
     python3 -mvenv venv && \
     . venv/bin/activate && \
     pip install -r dev-requirements.txt && \

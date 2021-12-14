@@ -25,6 +25,7 @@ Commands:
   extract      Extract coding segments from the reads in the given bam.
   filter       Filter reads by whether they conform to expected segment order.
   inspect      Inspect the classification results on specified reads.
+  model        Get information about built-in Longbow models.
   scsplit      Create files for use in `alevin` for single-cell analysis.
   segment      Segment pre-annotated reads from an input BAM file.
   stats        Calculate and produce stats on the given input bam file.
