@@ -44,16 +44,6 @@ click_log.basic_config(logger)
     help="segment-annotated bam output  [default: stdout]",
 )
 @click.option(
-    "-s",
-    "--do-simple-splitting",
-    required=False,
-    is_flag=True,
-    default=False,
-    help="DEPRECATED.  Do splitting of reads based on splitter delimiters, rather than whole array structure. "
-    "This splitting will cause delimiter sequences to be repeated in each read they bound.  "
-    "This is now the default setting, and this flag has been DEPRECATED.",
-)
-@click.option(
     "-b",
     "--create-barcode-conf-file",
     required=False,
@@ -90,7 +80,7 @@ click_log.basic_config(logger)
     help="Force overwrite of the output files if they exist."
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, model, ignore_cbc_and_umi, force, input_bam):
+def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_umi, force, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
@@ -103,8 +93,6 @@ def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, mod
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
-    if do_simple_splitting:
-        logger.warning("Simple splitting is now the default.  \"-s\" / \"--do-simple-splitting\" is now DEPRECATED.")
     do_simple_splitting = True
     logger.info("Using simple splitting mode.")
 
@@ -156,7 +144,6 @@ def main(threads, output_bam, do_simple_splitting, create_barcode_conf_file, mod
                 out_header,
                 output_bam,
                 pbar,
-                do_simple_splitting,
                 create_barcode_conf_file,
                 lb_model,
                 res,
@@ -220,7 +207,6 @@ def _sub_process_write_fn(
     out_bam_header,
     out_bam_file_name,
     pbar,
-    do_simple_splitting,
     create_barcode_conf_file,
     model,
     res,
@@ -228,11 +214,8 @@ def _sub_process_write_fn(
 ):
     """Thread / process fn to write out all our data."""
 
-    # Create our delimiter sequences for simple splitting if we have to:
-    delimiters = create_simple_delimiters(model) if do_simple_splitting else None
-
-    if do_simple_splitting:
-        logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
+    delimiters = create_simple_delimiters(model)
+    logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
 
     barcode_conf_file = None
     if create_barcode_conf_file:
@@ -271,7 +254,6 @@ def _sub_process_write_fn(
                 model,
                 read,
                 segments,
-                do_simple_splitting,
                 delimiters,
                 out_bam_file,
                 barcode_conf_file,
@@ -510,7 +492,7 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
 
 
 def _write_segmented_read(
-    model, read, segments, do_simple_splitting, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi
+    model, read, segments, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -519,73 +501,30 @@ def _write_segmented_read(
     :param model: The model to use for the array segment information.
     :param read: A pysam.AlignedSegment object containing a read that has been segmented.
     :param segments: A list of SegmentInfo objects representing the segments of the given reads.
-    :param do_simple_splitting: Flag to control how reads should be split.
-                                If True, will use simple delimiters.
-                                If False, will require reads to appear as expected in model.array_element_structure.
     :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
     :param barcode_conf_file: An open file ready to write out the barcodes and confidence scores.
     :return: the number of segments written.
     """
 
-    if do_simple_splitting:
+    segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segments)
 
-        segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segments)
+    for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
+        # Write our segment here:
+        _write_split_array_element(
+            model,
+            bam_out,
+            barcode_conf_file,
+            start_coord,
+            end_coord,
+            read,
+            segments,
+            delim_name,
+            prev_delim_name,
+            ignore_cbc_and_umi
+        )
 
-        for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
-            # Write our segment here:
-            _write_split_array_element(
-                model,
-                bam_out,
-                barcode_conf_file,
-                start_coord,
-                end_coord,
-                read,
-                segments,
-                delim_name,
-                prev_delim_name,
-                ignore_cbc_and_umi
-            )
-
-        return len(segment_bounds_tuples)
-
-    else:
-        # Here we're doing bounded region splitting.
-        # This requires each read to conform to the expected read structure as defined in the model.
-        # The process is similar to what is done above for simple splitting.
-
-        delimiter_found, delimiter_segments = segment_read_with_bounded_region_algorithm(read, model, segments)
-
-        # Now we have our segments as described by our model.
-        # We assume they don't overlap and we write them out:
-        for i, seg_list in enumerate(delimiter_segments):
-            if delimiter_found[i]:
-
-                start_seg = seg_list[0]
-                end_seg = seg_list[-1]
-                start_coord = start_seg.start
-                end_coord = end_seg.end
-
-                start_delim_name = seg_list[0].name
-                end_delim_name = seg_list[-1].name
-
-                # Write our segment here:
-                _write_split_array_element(
-                    model,
-                    bam_out,
-                    barcode_conf_file,
-                    start_coord,
-                    end_coord,
-                    read,
-                    seg_list,
-                    end_delim_name,
-                    start_delim_name,
-                    ignore_cbc_and_umi
-                )
-
-        # Return the number of array elements.
-        # NOTE: this works because booleans are a subset of integers in python.
-        return sum(delimiter_found)
+    return len(segment_bounds_tuples)
 
 
 def _transform_to_rc_coords(start, end, read_length):
@@ -648,6 +587,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
             # If we have to annotate this segment, store it here for annotation later:
             if (model.annotation_segments is not None) and (s.name in model.annotation_segments.keys()):
                 segments_to_annotate.append(seg_info)
+
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         longbow.utils.constants.SEGMENTS_TAG,
