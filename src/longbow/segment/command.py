@@ -600,7 +600,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
         for t in model.annotation_segments[s.name]:
             field_tag_name, pos_tag_name = t
             # First annotate the segment itself:
-            seq = read.query_sequence[s.start:s.end + 1]
+            seq = a.query_sequence[s.start:s.end + 1]
             a.set_tag(field_tag_name, seq)
             clipped_tags.add(seq)
 
@@ -612,7 +612,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
         if field_tag_name == longbow.utils.constants.READ_RAW_BARCODE_TAG:
             # Get the length from the model:
             barcode_length = list(model.adapter_dict[s.name].values())[0]
-            qual_bases = read.query_qualities[s.start:s.end + 1]
+            qual_bases = a.query_qualities[s.start:s.end + 1]
             conf_factor = int(np.round(bam_utils.get_confidence_factor_raw_quals(qual_bases)))
 
             a.set_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
