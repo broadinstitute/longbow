@@ -93,7 +93,6 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
-    do_simple_splitting = True
     logger.info("Using simple splitting mode.")
 
     # Configure process manager:
@@ -132,6 +131,28 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
             lb_model = LibraryModel.from_json_file(model)
 
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
+        if ignore_cbc_and_umi:
+            logger.info("Ignoring CBC / UMI - all split elements will be written.")
+        else:
+            # Check to see if the model has a CBC / UMI.  If not, we should turn on this flag
+            # and warn the user:
+            has_cbc_or_umi_annotation = False
+            if lb_model.annotation_segments:
+                for seg_tag_list in lb_model.annotation_segments.values():
+                    for seg_tag, seg_pos_tag in seg_tag_list:
+                        if seg_tag == longbow.utils.constants.READ_UMI_TAG or \
+                                seg_tag == longbow.utils.constants.READ_BARCODE_TAG or \
+                                seg_tag == longbow.utils.constants.READ_RAW_UMI_TAG or \
+                                seg_tag == longbow.utils.constants.READ_RAW_BARCODE_TAG:
+                            has_cbc_or_umi_annotation = True
+                            break
+                    if has_cbc_or_umi_annotation:
+                        break
+
+            if not has_cbc_or_umi_annotation:
+                logger.warning("Model does not have CBC or UMI tags.  All segments will be emitted.")
+                ignore_cbc_and_umi = True
 
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
@@ -607,22 +628,23 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
             # Next annotate the starting position:
             a.set_tag(pos_tag_name, s.start)
 
-        # Next check if the annotation is our READ_RAW_BARCODE_TAG.
-        # If so, we should annotate the confidence score as well:
-        if field_tag_name == longbow.utils.constants.READ_RAW_BARCODE_TAG:
-            # Get the length from the model:
-            barcode_length = list(model.adapter_dict[s.name].values())[0]
-            qual_bases = a.query_qualities[s.start:s.end + 1]
-            conf_factor = int(np.round(bam_utils.get_confidence_factor_raw_quals(qual_bases)))
+            # Next check if the annotation is our READ_RAW_BARCODE_TAG.
+            # If so, we should annotate the confidence score as well:
+            if field_tag_name == longbow.utils.constants.READ_RAW_BARCODE_TAG:
+                # Get the length from the model:
+                # barcode_length = list(model.adapter_dict[s.name].values())[0]
+                qual_bases = a.query_qualities[s.start:s.end + 1]
+                conf_factor = int(np.round(bam_utils.get_confidence_factor_raw_quals(qual_bases)))
 
-            a.set_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
+                a.set_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
 
     # Set IsoSeq3-compatible tags:
     a.set_tag(longbow.utils.constants.READ_CLIPPED_SEQS_LIST_TAG, ','.join(clipped_tags))
     a.set_tag(longbow.utils.constants.READ_NUM_CONSENSUS_PASSES_TAG, 1)
     a.set_tag(longbow.utils.constants.READ_ZMW_NAMES_TAG, read.query_name)
     a.set_tag(longbow.utils.constants.READ_NUM_ZMWS_TAG, 1)
-    a.set_tag(longbow.utils.constants.READ_TAGS_ORDER_TAG, f'{longbow.utils.constants.READ_RAW_BARCODE_TAG}-{longbow.utils.constants.READ_RAW_UMI_TAG}')
+    a.set_tag(longbow.utils.constants.READ_TAGS_ORDER_TAG,
+              f'{longbow.utils.constants.READ_RAW_BARCODE_TAG}-{longbow.utils.constants.READ_RAW_UMI_TAG}')
 
     # Set our tag indicating that this read is now segmented:
     a.set_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG, True)
