@@ -13,7 +13,7 @@ Longbow adds several tags to output reads to indicate various metadata features.
 the read tags added by each tool and what data they contain:
 
 | Read Tag | Type | Tool(s) | Description |
-|---|---|---|---|
+|:---|:---|:---|:---|
 | YS | f | Annotate, Demultiplex | Longbow HMM model score (log probability) |
 | SG | Z | Annotate, Demultiplex | Read segment information indicating the boundaries and labels of each segment in the read.   For example:   ```  SG:Z:random:0-53,Poly_T:54-85,cDNA:86-823,MARS:824-853,N:854-869,VENUS:870-894,CBC:895-910,UMI:911-920,Poly_T:921-951,cDNA:952-2030,MARS:2031-2060,O:2061-2076,VENUS:2077-2100,CBC:2101-2116,UMI:2117-2126,Poly_T:2127-2157,cDNA:2158-3747,MARS:3748-3777,P:3778-3794 ``` |
 | YN | Z | Annotate, Demultiplex | Name of the model used to annotate the reads |
@@ -46,7 +46,7 @@ the read tags added by each tool and what data they contain:
 The SAM spec defines the following as types for read tags:
 
 | Type | Description |
-|------|-------------|
+|:------|:-------------|
 | A | printable char |
 | i | signed int |
 | f | float |
