@@ -237,14 +237,15 @@ class LibraryModel:
         self._initialize_hmm_transitions_new()
 
         # DEBUGGING:
-        self.dump_as_dotfile(do_subgraphs=False)
-        self.dump_as_dotfile_simple()
-        self.to_json(f"longbow_model_{self.name}.v{self.version}.json")
+        if logger.isEnabledFor(logging.DEBUG):
+            self.dump_as_dotfile(do_subgraphs=False)
+            self.dump_as_dotfile_simple()
+            self.to_json(f"longbow_model_{self.name}.v{self.version}.json")
 
-        with open(f"longbow_model_{self.name}.v{self.version}.dense_transition_matrix.pickle", 'wb') as f:
-            pickle.dump(self.hmm.dense_transition_matrix(), f)
-        with open(f"longbow_model_{self.name}.v{self.version}.emission_distributions.txt", 'w') as f:
-            print(self.hmm, file=f, flush=True)
+            with open(f"longbow_model_{self.name}.v{self.version}.dense_transition_matrix.pickle", 'wb') as f:
+                pickle.dump(self.hmm.dense_transition_matrix(), f)
+            with open(f"longbow_model_{self.name}.v{self.version}.emission_distributions.txt", 'w') as f:
+                print(self.hmm, file=f, flush=True)
 
         # Finalze our HMM:
         self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
@@ -1333,6 +1334,7 @@ class LibraryModel:
             "named_random_segments": None,
             "coding_region": None,
             "annotation_segments": None,
+            "deprecated": True,
         },
         "mas15v2": {
             "description": "The standard MAS-seq 15 array element model.",
@@ -1434,6 +1436,7 @@ class LibraryModel:
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                 longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
+            "deprecated": False,
         },
         "mas15threeP": {
             "description": "The 3' kit MAS-seq 15 array element model.",
@@ -1532,6 +1535,7 @@ class LibraryModel:
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                 longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
+            "deprecated": False,
         },
         "mas15BulkWithIndices": {
             "description": "A MAS-seq 15 array element model with a 10 base index just before the 3' adapter for bulk "
@@ -1629,6 +1633,7 @@ class LibraryModel:
                 "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
                 "sample_index": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
+            "deprecated": False,
         },
         "mas10": {
             "description": "The MAS-seq 10 array element model.",
@@ -1691,6 +1696,7 @@ class LibraryModel:
             },
             "start_element_names": {"Q", "10x_Adapter"},
             "end_element_names": {"Poly_A", "R"},
+            "deprecated": True,
         },
         "mas10v2": {
             "description": "The MAS-seq 10 array element model.",
@@ -1770,6 +1776,7 @@ class LibraryModel:
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                 longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
+            "deprecated": False,
         },
         "mas10threeP": {
             "description": "The 3' kit MAS-seq 10 array element model.",
@@ -1847,6 +1854,7 @@ class LibraryModel:
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                 longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
+            "deprecated": False,
         },
         "slide-seq": {
             # The slide-seq model is:
@@ -1937,6 +1945,7 @@ class LibraryModel:
             # 5pAdapter being ends.
             "start_element_names": {"A", "10x_Adapter"},
             "end_element_names": {"P", "5p_Adapter"},
+            "deprecated": True,
         },
         "slide-seqV2": {
             # The slide-seq model is:
@@ -2045,6 +2054,7 @@ class LibraryModel:
                 "SBC2": [(longbow.utils.constants.READ_SPATIAL_BARCODE2_TAG,
                          longbow.utils.constants.READ_SPATIAL_BARCODE2_POS_TAG)],
             },
+            "deprecated": False,
         },
         "mas8prototype": {
             "description": "The prototype MAS-seq 8 array element model.",
@@ -2095,6 +2105,7 @@ class LibraryModel:
             },
             "start_element_names": {"A", "10x_Adapter"},
             "end_element_names": {"TSO", "A"},
+            "deprecated": True,
         },
         "mas8prototypeV2": {
             "description": "The prototype MAS-seq 8 array element model.",
@@ -2162,5 +2173,6 @@ class LibraryModel:
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                 longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
+            "deprecated": True,
         }
     }
