@@ -12,11 +12,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+    - uses: 'actions/checkout@v2'
+
+    - id: 'auth'
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v0'
       with:
-        service_account_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
-        project_id: broad-dsp-lrma
-        export_default_credentials: true
+        credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
 
     - name: Image
       run: |-
