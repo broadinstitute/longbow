@@ -1,0 +1,29 @@
+# Continuous integration test of any branch.
+
+name: CI
+on:
+  push:
+    branches-ignore:
+    - main
+
+jobs:
+  # Build Docker image
+  build_docker:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Setup gcloud
+      uses: google-github-actions/setup-gcloud@master
+
+    - name: Build Docker image and push to us.gcr.io
+      uses: RafikFarhad/push-to-gcr-github-action@v4
+      with:
+        gcloud_service_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
+        registry: us.gcr.io
+        project_id: broad-dsp-lrma
+        dockerfile: "docker/Dockerfile"
+        image_name: lr-longbow
+        image_tag: kvgtest
