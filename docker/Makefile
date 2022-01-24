@@ -7,16 +7,10 @@ TAG2 = us.gcr.io/broad-dsp-lrma/$(IMAGE_NAME):latest
 all: | build push
 
 build:
-	eval `ssh-agent`; \
-	ssh-add ~/.ssh/id_rsa;\
-	docker build --ssh default --squash -t $(TAG1) -t $(TAG2) . ;\
-	kill $${SSH_AGENT_PID} 
+	docker build -t $(TAG1) -t $(TAG2) .
 
 build_no_cache:
-	eval `ssh-agent`; \
-	ssh-add ~/.ssh/id_rsa;\
-	docker build --ssh default --squash --no-cache -t $(TAG1) -t $(TAG2) . ;\
-	kill $${SSH_AGENT_PID} 
+	docker build --no-cache -t $(TAG1) -t $(TAG2) .
 
 push:
 	docker push $(TAG1)

@@ -21,7 +21,7 @@ RUN echo 'export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
 RUN mkdir -p ~/.ssh && touch ~/.ssh/known_hosts
 RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-RUN --mount=type=ssh git clone git@github.com:broadinstitute/longbow.git 
+RUN git clone https://github.com/broadinstitute/longbow.git
 RUN cd longbow && \
     git checkout v0.5.1 && \
     python3 -mvenv venv && \
