@@ -22,8 +22,20 @@ jobs:
 
     - name: Image
       run: |-
+<<<<<<< HEAD
         TAG=$(git rev-parse --abbrev-ref HEAD)
         cd docker
         docker build -q -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
         gcloud auth configure-docker -q
         docker push -q us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG
+=======
+        export TAG=$(git rev-parse --abbrev-ref HEAD)
+        cd docker && docker build -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
+
+    - run: |
+        gcloud auth configure-docker -q
+
+    - name: Build
+      run: |-
+        docker push us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG
+>>>>>>> 53c049c (More fiddling)
