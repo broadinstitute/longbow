@@ -12,18 +12,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-
-    - name: Setup gcloud
-      uses: google-github-actions/setup-gcloud@master
-
-    - name: Build Docker image and push to us.gcr.io
-      uses: RafikFarhad/push-to-gcr-github-action@v4
+    - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
       with:
-        gcloud_service_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
-        registry: us.gcr.io
+        service_account_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
         project_id: broad-dsp-lrma
-        dockerfile: "docker/Dockerfile"
-        image_name: lr-longbow
-        image_tag: kvgtest
+        export_default_credentials: true
+
+    - name: Image
+      run: |-
+        cd docker && docker build -t us.gcr.io/broad-dsp-lrma/lr-longbow:kvgtest .
+
+    - run: |
+        gcloud auth configure-docker -q
+
+    - name: Build
+      run: |-
+        docker push us.gcr.io/broad-dsp-lrma/lr-longbow:kvgtest
