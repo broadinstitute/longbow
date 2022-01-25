@@ -2262,7 +2262,7 @@ class LibraryModel:
             "named_random_segments": {"idx", "cDNA"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "idx": [(longbow.utils.constants.READ_INDEX_TAG)],
+                "idx": [(longbow.utils.constants.READ_INDEX_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
             "deprecated": False,
         },
