@@ -66,7 +66,7 @@ click_log.basic_config(logger)
     "-n",
     "--num-reads",
     type=int,
-    default="",
+    default=100,
     required=False,
     help="Number of reads to examine when trying to guess the array model"
 )
