@@ -1,3 +1,4 @@
+from cmath import inf
 import logging
 import math
 import sys
@@ -104,8 +105,16 @@ click_log.basic_config(logger)
     show_default=True,
     help="Force overwrite of the output files if they exist."
 )
+@click.option(
+    "-d",
+    "--include-deprecated-models",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Examine the deprecated built-in models as well",
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, min_rq, force, input_bam):
+def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, min_rq, force, include_deprecated_models, input_bam):
     """Peeks at MAS-ISO-seq reads to guess the most appropriate pre-built array model to use."""
 
     t_start = time.time()
@@ -121,7 +130,7 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
     # Make all prebuilt models
     models = {}
     for model_name in LibraryModel.pre_configured_models:
-        if not LibraryModel.pre_configured_models[model_name]['deprecated']:
+        if not LibraryModel.pre_configured_models[model_name]['deprecated'] or include_deprecated_models:
             m = LibraryModel.build_pre_configured_model(model_name)
             models[model_name] = m
 
@@ -226,10 +235,10 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
     logger.info("Histogram of most likely model counts:")
 
     res = dict(sorted(res.items(), key=lambda item: item[1], reverse=True))
-    plot_model_counts(res)
-    best_model = next(iter(res.keys()))
+    plot_model_counts(res, models)
+    best_model, best_model_count = next(iter(res.items()))
 
-    logger.info(f"Overall most likely model: {best_model}")
+    logger.info(f"Overall most likely model: {best_model} (seen in {best_model_count} reads, {100.0*best_model_count/np.sum(list(res.values())):.1f}%)")
 
     with open(output_model if output_model != "-" else "/dev/stdout", "w") as wm:
         wm.write(f'{best_model}\n')
@@ -239,16 +248,21 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
                 f"Overall processing rate: {reads_seen/(et - t_start):2.2f} reads/s.")
 
 
-def plot_model_counts(res, max_width=50.0):
-    block_char = u"\u2588"
+def plot_model_counts(res, models, max_width=50.0):
+    big_block_char = u"\u2588"
+    small_block_char = u"\u258F"
 
     model_tot = np.sum(list(res.values()))
-    max_label_width = np.max(list(map(lambda x: len(x), res.keys())))
+    max_label_width = np.max(list(map(lambda x: len(x), models.keys())))
     for model_name in res:
         pct = 100.0 * res[model_name] / model_tot
         num_blocks = int(res[model_name] * max_width / model_tot)
 
-        logger.info(f"  {model_name:>{max_label_width}} {block_char*(num_blocks+1)} {res[model_name]} ({pct:.1f}%)")
+        logger.info(f"  {model_name:>{max_label_width}} {big_block_char*(num_blocks+1)} {res[model_name]} ({pct:.1f}%)")
+
+    for model_name in models:
+        if model_name not in res:
+            logger.info(f"  {model_name:>{max_label_width}} {small_block_char} 0 (0.0%)")
 
 
 def get_segments(read):
