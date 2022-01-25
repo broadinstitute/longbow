@@ -23,6 +23,7 @@ jobs:
     - name: Image
       run: |-
         TAG=$(git rev-parse --abbrev-ref HEAD)
-        cd docker && docker build -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
+        cd docker
+        docker build -q -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
         gcloud auth configure-docker -q
         docker push us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG
