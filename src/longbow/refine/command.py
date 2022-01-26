@@ -115,7 +115,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
     worker_process_pool = []
     for _ in range(threads):
         p = mp.Process(
-            target=_sub_process_work_fn, args=(process_input_data_queue, results, barcode_tag, barcodes, same_barcode_within_read)
+            target=_refine_barcode_fn, args=(process_input_data_queue, results, barcode_tag, barcodes, same_barcode_within_read)
         )
         p.start()
         worker_process_pool.append(p)
@@ -145,18 +145,15 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Start output worker:
-        res = manager.dict({"num_reads_refined": 0, "num_reads": 0})
+        res = manager.dict({"num_reads_refined": 0, "num_reads": 0, "num_segments_refined": 0, "num_segments": 0})
         output_worker = mp.Process(
-            target=_refine_and_write_thread_fn,
+            target=_write_thread_fn,
             args=(
                 results,
                 out_header,
                 output_bam,
                 pbar,
-                res,
-                lb_model,
-                barcode_tag,
-                barcodes
+                res
             ),
         )
         output_worker.start()
@@ -179,9 +176,10 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
         results.put(None)
         output_worker.join()
 
-    logger.info(
-        f"Refined {res['num_reads_refined']} reads of {res['num_reads']} total."
-    )
+    
+    logger.info( f"Refined {res['num_reads_refined']} reads of {res['num_reads']} total.")
+    logger.info( f"Refined {res['num_segments_refined']} segments of {res['num_segments']} total.")
+    
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
                 f"Overall processing rate: {res['num_reads']/(et - t_start):2.2f} reads/s.")
@@ -195,14 +193,12 @@ def get_segments(read):
     ]
 
 
-def _refine_and_write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, model, barcode_tag, barcodes):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res):
     """Thread / process fn to write out all our data."""
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
     ) as out_bam_file:
-        ssw_aligner = ssw.Aligner()
-
         while True:
             # Wait for some output data:
             raw_data = out_queue.get()
@@ -215,11 +211,7 @@ def _refine_and_write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pb
                 continue
 
             # Unpack data:
-            read = raw_data
-
-            # Condense the output annotations so we can write them out with indices:
-            # segments = bam_utils.collapse_annotations(ppath)
-
+            read, refined_segments, total_segments = raw_data
             read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
             # Obligatory log message:
@@ -232,16 +224,20 @@ def _refine_and_write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pb
             # )
 
             # Write our our read:
-            # bam_utils.write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_bam_file)
+            out_bam_file.write(read)
 
             # Increment our counters:
-            res["num_reads_refined"] += 1
             res["num_reads"] += 1
+            if refined_segments > 0:
+                res["num_reads_refined"] += 1
+
+            res["num_segments"] += total_segments
+            res["num_segments_refined"] += refined_segments
 
             pbar.update(1)
 
 
-def _sub_process_work_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_within_read):
+def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_within_read):
     """Function to run in each subprocess.
     Extracts and returns all segments from an input read."""
 
@@ -263,10 +259,15 @@ def _sub_process_work_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcod
             raw_data, pysam.AlignmentHeader.from_dict(dict())
         )
 
+        refined_segments = 0
+        num_segments = 0
+
         if read.has_tag(longbow.utils.constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(longbow.utils.constants.SEGMENTS_TAG):
             called_barcodes = defaultdict(int)
 
             segments = re.split(",", read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
+            num_segments = len(segments)
+
             for i, segment in enumerate(segments):
                 if barcode_tag in segment:
                     tag, start, stop = re.split("[:-]", segment)
@@ -274,46 +275,58 @@ def _sub_process_work_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcod
                     stop = int(stop)
 
                     pad = 2 if read.get_tag("rq") > 0.0 else 4
-
                     bc = read.query_sequence[start - pad:stop + pad]
 
                     best_score = 0
-                    best_alignment = None
                     best_barcode = None
                     for barcode in barcodes:
                         a = ssw_aligner.align(query=bc, reference=barcode, revcomp=False)
 
-                        if a.score > best_score:
+                        if a.score > best_score and a.score > len(barcode)/2:
                             best_score = a.score
-                            best_alignment = a
                             best_barcode = barcode
 
-                    print(f"{i} {start} {stop} {barcode_tag} {segment} {read.get_tag('rq')} {best_barcode}")
-                    print(best_alignment.alignment_report())
-                    print("")
+                    if best_barcode is not None:
+                        called_barcodes[best_barcode] += 1
 
-                    called_barcodes[best_barcode] += 1
+                    if not same_barcode_within_read:
+                        # TODO: placeholder for future development
+                        pass
 
-            print(f"{read.query_name} {called_barcodes}")
-            logger.info("")
+            if same_barcode_within_read:
+                # adjust all barcode boundaries
+                called_barcodes = {k: v for k, v in sorted(called_barcodes.items(), key=lambda item: item[1], reverse=True)}
+                best_barcode, best_count = next(iter(called_barcodes.items()))
+
+                for i, segment in enumerate(segments):
+                    if barcode_tag in segment:
+                        tag, start, stop = re.split("[:-]", segment)
+                        start = int(start)
+                        stop = int(stop)
+
+                        pad = 2 if read.get_tag("rq") > 0.0 else 4
+                        bc = read.query_sequence[start - pad:stop + pad]
+
+                        a = ssw_aligner.align(query=bc, reference=best_barcode, revcomp=False)
+
+                        new_start = start - pad + a.query_begin
+                        new_stop = start - pad + a.query_end + 1
+
+                        if new_start != start or new_stop != stop:
+                            segments[i] = f'{tag}:{new_start}-{new_stop}'
+                            refined_segments += 1
+
+                            if i - 1 >= 0:
+                                prev_tag, prev_start, _ = re.split("[:-]", segments[i-1])
+                                segments[i-1] = f'{prev_tag}:{prev_start}-{new_start-1}'
+                                refined_segments += 1
+
+                            if i + 1 < len(segments):
+                                next_tag, _, next_stop = re.split("[:-]", segments[i+1])
+                                segments[i+1] = f'{next_tag}:{new_stop+1}-{next_stop}'
+                                refined_segments += 1
+
+                read.set_tag(longbow.utils.constants.SEGMENTS_TAG, ",".join(segments))
 
         # Process and place our data on the output queue:
-        out_queue.put(read.to_string())
-
-
-def _refine_read(read, model):
-    is_rc = False
-    logp, ppath = model.annotate(read.query_sequence)
-
-    rc_logp, rc_ppath = model.annotate(bam_utils.reverse_complement(read.query_sequence))
-
-    # print(f"Forward Path: {logp}: {ppath}")
-    # print(f"Reverse Path: {rc_logp}: {rc_ppath}")
-
-    if rc_logp > logp:
-        logp = rc_logp
-        ppath = rc_ppath
-        is_rc = True
-        logger.debug("Sequence scored better in RC: %s", read.query_name)
-
-    return read.to_string(), ppath, logp, is_rc
+        out_queue.put((read.to_string(), refined_segments, num_segments))
