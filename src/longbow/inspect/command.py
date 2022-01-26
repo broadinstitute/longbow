@@ -162,6 +162,7 @@ def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_len
         logger.info("Drawing read '%s' to '%s'", read.query_name, out)
         draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, size=13, family="monospace")
 
+
 def load_read_names(read_name_args):
     read_names = []
 
@@ -438,7 +439,7 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
 
     qual_string = f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    " if read.has_tag("rq") else ""
     np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
-    is_rc_string = "[Direction: RC]" if read.get_tag("RC") == 1 else "[Direction: Forward]"
+    is_rc_string = "[Direction: RC]" if read.has_tag("RC") and read.get_tag("RC") == 1 else "[Direction: Forward]"
 
     # Calculate whether the read has the correct array structure:
     collapsed_annotations = bam_utils.collapse_annotations(path)
