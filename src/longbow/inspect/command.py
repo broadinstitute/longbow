@@ -70,8 +70,6 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
 @click.option(
     "-m",
     "--model",
-    default=longbow.utils.constants.DEFAULT_MODEL,
-    show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
          "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
@@ -129,22 +127,26 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
             pbi = f"{input_bam}.pbi" if pbi is None else pbi
             if not os.path.exists(pbi):
-                raise FileNotFoundError(f"Missing .pbi file for {input_bam}")
+                # raise FileNotFoundError(f"Missing .pbi file for {input_bam}")
+                logger.info("No .pbi file available. Inspecting whole input bam file until we find specified reads.")
+                for read in bam_file:
+                    if read.query_name in read_names:
+                        __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
+            else:
+                file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
-            file_offsets = load_read_offsets(pbi, load_read_names(read_names))
+                for i, z in enumerate(file_offsets):
 
-            for i, z in enumerate(file_offsets):
+                    if not file_offsets[z]["offset"]:
+                        logger.error("Read not in index file: %s", read_names[i])
+                        sys.exit(1)
 
-                if not file_offsets[z]["offset"]:
-                    logger.error("Read not in index file: %s", read_names[i])
-                    sys.exit(1)
-
-                bam_file.seek(file_offsets[z]["offset"])
-                read = bam_file.__next__()
-                __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
+                    bam_file.seek(file_offsets[z]["offset"])
+                    read = bam_file.__next__()
+                    __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
         else:
             # Without read names we just inspect every read in the file:
-            logger.info("No read names given.  Inspecting every read in the input bam file.")
+            logger.info("No read names given. Inspecting every read in the input bam file.")
             for read in bam_file:
                 __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
 
