@@ -235,6 +235,7 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
     logger.info("Histogram of most likely model counts:")
 
     res = dict(sorted(res.items(), key=lambda item: item[1], reverse=True))
+
     plot_model_counts(res, models)
     best_model, best_model_count = next(iter(res.items()))
 
@@ -254,6 +255,7 @@ def plot_model_counts(res, models, max_width=50.0):
 
     model_tot = np.sum(list(res.values()))
     max_label_width = np.max(list(map(lambda x: len(x), models.keys())))
+
     for model_name in res:
         pct = 100.0 * res[model_name] / model_tot
         num_blocks = int(res[model_name] * max_width / model_tot)
