@@ -235,7 +235,6 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
     logger.info("Histogram of most likely model counts:")
 
     res = dict(sorted(res.items(), key=lambda item: item[1], reverse=True))
-
     plot_model_counts(res, models)
     best_model, best_model_count = next(iter(res.items()))
 
@@ -255,12 +254,15 @@ def plot_model_counts(res, models, max_width=50.0):
 
     model_tot = np.sum(list(res.values()))
     max_label_width = np.max(list(map(lambda x: len(x), models.keys())))
-
     for model_name in res:
         pct = 100.0 * res[model_name] / model_tot
         num_blocks = int(res[model_name] * max_width / model_tot)
 
-        logger.info(f"  {model_name:>{max_label_width}} {block_char*(num_blocks+1)} {res[model_name]} ({pct:.1f}%)")
+        logger.info(f"  {model_name:>{max_label_width}} {big_block_char*(num_blocks+1)} {res[model_name]} ({pct:.1f}%)")
+
+    for model_name in models:
+        if model_name not in res:
+            logger.info(f"  {model_name:>{max_label_width}} {small_block_char} 0 (0.0%)")
 
 
 def get_segments(read):
