@@ -71,13 +71,17 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Automated version bump
+    - name: Github Bumpversion Action
       id: version-bump
-      uses: 'phips28/gh-action-bump-version@master'
-      with:
-        default: prerelease
+      uses: jaumann/github-bumpversion-action@v0.0.6
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DEFAULT_BUMP: "patch"
+    - name: Push changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        tags: true
 
     - name: Create Github release
       id: create_release
@@ -86,7 +90,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.version-bump.outputs.newTag }}
-        release_name: 'longbow_${{ steps.version-bump.outputs.newTag }}'
+        release_name: 'longbow_${{ steps.version-bump.outputs.new_tag }}'
         body_path: "release_notes.txt"
         draft: false
         prerelease: false
@@ -99,7 +103,7 @@ jobs:
 
     - name: Create Docker image
       run: |-
-        TAG=${{ steps.version-bump.outputs.newTag }}
+        TAG=${{ steps.version-bump.outputs.new_tag }}
         cd docker
         docker build --build-arg branch=longbow_$TAG -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
         gcloud auth configure-docker -q
