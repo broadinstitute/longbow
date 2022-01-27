@@ -372,4 +372,3 @@ def _get_best_model(read, models):
     best_model = re.sub(':.*$', '', best_model_full)
 
     return best_model
-
