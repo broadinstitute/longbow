@@ -1,6 +1,7 @@
 import logging
 import sys
 import itertools
+import re
 
 import time
 
@@ -609,11 +610,23 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
             if (model.annotation_segments is not None) and (s.name in model.annotation_segments.keys()):
                 segments_to_annotate.append(seg_info)
 
+
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         longbow.utils.constants.SEGMENTS_TAG,
         longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
     )
+
+    # Store tags where we'll record a refined tag instead of extracting query subsequence
+    ba_tags = {}
+    if a.has_tag(longbow.utils.constants.READ_INDEX_ARRAY_TAG):
+        for index_tag in a.get_tag(longbow.utils.constants.READ_INDEX_ARRAY_TAG).split(","):
+            tag, tag_start, tag_stop, bc = re.split("[:-]", index_tag)
+            tag_start = int(tag_start) - start_coord
+            tag_stop = int(tag_stop) - start_coord
+            ba_tags[f'{tag}:{tag_start}-{tag_stop}'] = bc
+
+        a.set_tag(longbow.utils.constants.READ_INDEX_ARRAY_TAG, None)
 
     # Annotate any segments in this array element that we have to:
     clipped_tags = set()
@@ -621,7 +634,10 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
         for t in model.annotation_segments[s.name]:
             field_tag_name, pos_tag_name = t
             # First annotate the segment itself:
+            ba_tag = f'{s.name}:{s.start}-{s.end}'
             seq = a.query_sequence[s.start:s.end + 1]
+            if len(ba_tags) > 0:
+                seq = '-' if ba_tag not in ba_tags else ba_tags[ba_tag]
             a.set_tag(field_tag_name, seq)
             clipped_tags.add(seq)
 
