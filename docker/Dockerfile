@@ -30,6 +30,7 @@ RUN cd longbow && \
     pip install -e .
 
 # activate conda environment
+ENV PATH="/longbow/venv/bin:$PATH"
 RUN echo "source /longbow/venv/bin/activate" >> ~/.bashrc
 
 # We want this to be interactive:
