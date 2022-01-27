@@ -24,3 +24,4 @@ ssw==0.4.1
 pydoc-markdown
 lxml
 editdistance
+ordered-set

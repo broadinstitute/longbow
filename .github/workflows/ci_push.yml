@@ -24,6 +24,6 @@ jobs:
       run: |-
         TAG=$(git rev-parse --abbrev-ref HEAD)
         cd docker
-        docker build -q -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
+        docker build --build-arg branch=$TAG -q -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
         gcloud auth configure-docker -q
         docker push -q us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG

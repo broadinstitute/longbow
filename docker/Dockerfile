@@ -2,6 +2,8 @@ FROM python:3.7.9-slim-buster
 
 MAINTAINER Kiran V Garimella
 
+ARG branch="v0.5.1"
+
 # install gsutil
 RUN apt-get update
 RUN apt-get install -y curl git-lfs time datamash
@@ -23,7 +25,7 @@ RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 RUN git clone https://github.com/broadinstitute/longbow.git
 RUN cd longbow && \
-    git checkout v0.5.1 && \
+    git checkout $branch && \
     python3 -mvenv venv && \
     . venv/bin/activate && \
     pip install -r dev-requirements.txt && \
