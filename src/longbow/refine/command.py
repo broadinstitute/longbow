@@ -185,14 +185,6 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
                 f"Overall processing rate: {res['num_reads']/(et - t_start):2.2f} reads/s.")
 
 
-def get_segments(read):
-    """Get the segments corresponding to a particular read by reading the segments tag information."""
-    return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
-            longbow.utils.constants.SEGMENT_TAG_DELIMITER)
-    ]
-
-
 def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res):
     """Thread / process fn to write out all our data."""
 
@@ -261,11 +253,12 @@ def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_
 
         refined_segments = 0
         num_segments = 0
+        barcode_array = {}
 
         if read.has_tag(longbow.utils.constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(longbow.utils.constants.SEGMENTS_TAG):
             called_barcodes = defaultdict(int)
 
-            segments = re.split(",", read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
+            segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(",")
             num_segments = len(segments)
 
             for i, segment in enumerate(segments):
@@ -282,7 +275,7 @@ def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_
                     for barcode in barcodes:
                         a = ssw_aligner.align(query=bc, reference=barcode, revcomp=False)
 
-                        if a.score > best_score and a.score > len(barcode)/2:
+                        if a.score > best_score and a.score >= len(barcode):
                             best_score = a.score
                             best_barcode = barcode
 
@@ -293,7 +286,7 @@ def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_
                         # TODO: placeholder for future development
                         pass
 
-            if same_barcode_within_read:
+            if same_barcode_within_read and len(called_barcodes) > 0:
                 # adjust all barcode boundaries
                 called_barcodes = {k: v for k, v in sorted(called_barcodes.items(), key=lambda item: item[1], reverse=True)}
                 best_barcode, best_count = next(iter(called_barcodes.items()))
@@ -326,7 +319,12 @@ def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_
                                 segments[i+1] = f'{next_tag}:{new_stop+1}-{next_stop}'
                                 refined_segments += 1
 
+                        barcode_array[segments[i]] = best_barcode
+
+                ba_tag = ",".join([f'{k}:{v}' for k, v in barcode_array.items()])
+
                 read.set_tag(longbow.utils.constants.SEGMENTS_TAG, ",".join(segments))
+                read.set_tag(longbow.utils.constants.READ_INDEX_ARRAY_TAG, ba_tag)
 
         # Process and place our data on the output queue:
         out_queue.put((read.to_string(), refined_segments, num_segments))
