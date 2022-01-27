@@ -161,6 +161,8 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
         else:
             read_count = bam_utils.load_read_count(pbi)
             logger.info("Detecting best model in %d reads", min(read_count, num_reads))
+    else:
+        logger.info("Detecting best model in %d reads", num_reads)
 
     # Create queues for data:
     queue_size = threads * 2 if threads < 10 else 20
@@ -191,7 +193,7 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
         res = manager.dict()
         output_worker = mp.Process(
             target=_collect_thread_fn,
-            args=(results, output_model, not sys.stdin.isatty(), res, min(read_count, num_reads))
+            args=(results, output_model, not sys.stdin.isatty(), res, num_reads if read_count is None else min(read_count, num_reads))
         )
         output_worker.start()
 
