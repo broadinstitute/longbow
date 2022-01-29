@@ -75,7 +75,7 @@ Versions will always be bumped from the *main branch* _after_ merging in any PRs
 
 ### Docker image
 
-This repository includes a Docker folder that contains a `Dockerfile` and a `Makefile`. New images will be built automatically and pushed to us.gcr.io/broad-dsp-lrma/lr-longbow . 
+This repository includes a Docker folder that contains a `Dockerfile`. New images will be built automatically and pushed to [Google's Docker registry](https://console.cloud.google.com/gcr/images/broad-dsp-lrma/US/lr-longbow) . 
 
 *DO NOT manually modify the Makefile or the Dockerfile* (unless you have to add dependencies).  The version is automatically updated by `bumpversion`. 
 
