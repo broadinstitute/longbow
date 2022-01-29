@@ -3,18 +3,6 @@ Annotation and segmentation of MAS-seq data
 
 Current version: 0.5.8
 
-## Documentation
-
-[Longbow documentation.](https://broadinstitute.github.io/longbow/)
-
-## Installation
-
-    pip install .
-
-## Usage
-
-TBW
-
 ## Development
 
 To do development in this codebase, the python3 development package must
