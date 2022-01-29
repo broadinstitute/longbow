@@ -7,7 +7,7 @@ TAG2 = us.gcr.io/broad-dsp-lrma/$(IMAGE_NAME):latest
 all: | build push
 
 build:
-	docker build -t $(TAG1) -t $(TAG2) .
+	docker build --build-arg -t $(TAG1) -t $(TAG2) .
 
 build_no_cache:
 	docker build --no-cache -t $(TAG1) -t $(TAG2) .

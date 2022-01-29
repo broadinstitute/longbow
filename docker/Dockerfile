@@ -2,7 +2,7 @@ FROM python:3.7.9-slim-buster
 
 MAINTAINER Kiran V Garimella
 
-ARG branch="v0.5.1"
+ARG branch
 
 # install gsutil
 RUN apt-get update
