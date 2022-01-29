@@ -6,7 +6,7 @@ ARG branch
 
 # install gsutil
 RUN apt-get update
-RUN apt-get install -y curl git-lfs time datamash
+RUN apt-get install -y curl git-lfs time datamash wget
 RUN curl https://sdk.cloud.google.com | bash
 
 # Setup crcmodc for gsutil:
