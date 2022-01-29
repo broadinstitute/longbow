@@ -1,5 +1,5 @@
 IMAGE_NAME = lr-longbow
-VERSION = 0.5.5
+VERSION = 0.5.6
 
 TAG1 = us.gcr.io/broad-dsp-lrma/$(IMAGE_NAME):$(VERSION)
 TAG2 = us.gcr.io/broad-dsp-lrma/$(IMAGE_NAME):latest
