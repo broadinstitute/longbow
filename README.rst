@@ -1,10 +1,12 @@
 Longbow
 """""""
 
+|GitHub release||PyPI version maslongbow||Generic badge|
+
 .. |GitHub release| image:: https://img.shields.io/github/release/broadinstitute/longbow.svg
    :target: https://github.com/broadinstitute/longbow/releases/
 
-.. |PyPI version shields.io| image:: https://img.shields.io/pypi/v/maslongbow.svg
+.. |PyPI version maslongbow| image:: https://img.shields.io/pypi/v/maslongbow.svg
    :target: https://pypi.python.org/pypi/maslongbow/
 
 .. |Generic badge| image:: https://img.shields.io/badge/Docker-v0.5.8-blue.svg
