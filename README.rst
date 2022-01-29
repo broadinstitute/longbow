@@ -6,7 +6,7 @@ Longbow
 .. |GitHub release| image:: https://img.shields.io/github/release/broadinstitute/longbow.svg
    :target: https://github.com/broadinstitute/longbow/releases/
 
-.. |Generic badge| image:: https://img.shields.io/badge/Docker-v0.5.8-blue.svg
+.. |Generic badge| image:: https://img.shields.io/badge/Docker-v0.5.9-blue.svg
    :target: us.gcr.io/broad-dsp-lrma/lr-longbow
 
 .. |PyPI version maslongbow| image:: https://img.shields.io/pypi/v/maslongbow.svg
