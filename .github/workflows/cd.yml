@@ -113,6 +113,12 @@ jobs:
         gcloud auth configure-docker -q
         docker push -q us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG
 
+    - name: Build distribution
+      run: |-
+        python setup.py check
+        python setup.py sdist
+        python setup.py bdist_wheel --universal
+
     - name: Create PyPy package
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
