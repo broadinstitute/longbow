@@ -7,7 +7,7 @@ Longbow
 .. |PyPI version shields.io| image:: https://img.shields.io/pypi/v/maslongbow.svg
    :target: https://pypi.python.org/pypi/maslongbow/
 
-.. |Generic badge| image:: https://img.shields.io/badge/Docker-v0.5.7-blue.svg
+.. |Generic badge| image:: https://img.shields.io/badge/Docker-v0.5.8-blue.svg
    :target: us.gcr.io/broad-dsp-lrma/lr-longbow
 
 Longbow is a command line tool to process MAS-ISO-seq data. Longbow employs a generative modelling approach to accurately annotate and segment MAS-ISO-seq's concatenated full-length transcript isoforms from single-cell or bulk long read RNA sequencing libraries.
