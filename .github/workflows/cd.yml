@@ -63,7 +63,7 @@ jobs:
         SLACK_ICON: https://github.com/broadinstitute/longbow/blob/main/.github/workflows/dnabad.png?raw=true
         SLACK_USERNAME: longbow
 
-  # Release on Github, Docker, and PyPy
+  # Release on Github, Docker, and PyPI
   release:
     # Automatic delivery will run on a Github-hosted machine
     needs: main_test
@@ -119,7 +119,7 @@ jobs:
         python setup.py sdist
         python setup.py bdist_wheel --universal
 
-    - name: Create PyPy package
+    - name: Create PyPI package
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__

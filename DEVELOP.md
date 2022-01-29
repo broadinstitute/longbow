@@ -62,48 +62,35 @@ the following commands:
 
 Note: If you run into "module not found" errors when running tox for testing, verify the modules are listed in test-requirements.txt and delete the .tox folder to force tox to refresh dependencies.
 
-## Versioning
+## Releasing
 
-We use `bumpversion` to maintain version numbers.  It will automatically create a new tag every time you run it.
+Longbow is released automatically upon pushes to the main branch (generally by merging branches into main).  Automatic releases of Longbow consist of the following steps:
+
+### Versioning
+
+We use `bumpversion` to maintain version numbers.  It will automatically create a new tag each time it is run.
 *DO NOT MANUALLY EDIT ANY VERSION NUMBERS.*
 
 Our versions are specified by a 3 number semantic version system (https://semver.org/):
 
 	major.minor.patch
 
-To update the version with bumpversion do the following:
+By default, pushes to main will increment the patch number.  Major and minor version numbers can be incremented through special keywords in commit messages.  From the [automated-version-bump](https://github.com/marketplace/actions/automated-version-bump) Github action documentation:
 
-`bumpversion PART` where PART is one of:
-- major
-- minor
-- patch
+> Based on the commit messages, increment the version from the latest release.
+> * If the string "BREAKING CHANGE", "major" or the Attention pattern refactor!: drop support for Node 6 is found anywhere in any of the commit messages or descriptions the major version will be incremented.
+> * If a commit message begins with the string "feat" or includes "minor" then the minor version will be increased. This works for most common commit metadata for feature additions: "feat: new API" and "feature: new API".
+> * If a commit message contains the word "pre-alpha" or "pre-beta" or "pre-rc" then the pre-release version will be increased (for example specifying pre-alpha: 1.6.0-alpha.1 -> 1.6.0-alpha.2 or, specifying pre-beta: 1.6.0-alpha.1 -> 1.6.0-beta.0)
+All other changes will increment the patch version.
 
-This will increase the corresponding version number by 1.
+Versions will always be bumped from the *main branch* _after_ merging in any PRs for that version.
 
-You should always bump the version from the *main branch* _after_ merging in any PRs for that version.  Then you will have to push both the bumpversion code update *AND* the tag that was created:
+### Docker image
 
-```
-git push && git push --tags
-```
+This repository includes a Docker folder that contains a `Dockerfile` and a `Makefile`. New images will be built automatically and pushed to us.gcr.io/broad-dsp-lrma/lr-longbow . 
 
-## Releasing
-
-The release process is as follows:
-
-1. Bump the version by the appropriate PART (see *Versioning* for details).
-2. Build and push the docker container (See *Docker*).  NOTE: The version will have already been updated by using `bumpversion` in step 1.
-
-## Docker 
-
-This repository includes a docker folder that contains a `Dockerfile` and a `Makefile`.  
 *DO NOT manually modify the Makefile or the Dockerfile* (unless you have to add dependencies).  The version is automatically updated by `bumpversion`. 
 
-### Building
+### PyPI
 
-To build the docker image and push it to the release location do the following from the root of this repository:
-
-```
-cd docker
-make build && make push
-```
-
+A PyPI distribution will be built automatically and uploaded to https://pypi.org/project/maslongbow .
