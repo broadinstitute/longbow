@@ -89,8 +89,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.version-bump.outputs.new_tag }}
-        release_name: 'longbow_${{ steps.version-bump.outputs.new_tag }}'
+        tag_name: ${{ steps.version-bump.outputs.new_ver }}
+        release_name: 'longbow_${{ steps.version-bump.outputs.new_ver }}'
         body_path: "release_notes.txt"
         draft: false
         prerelease: false
@@ -103,7 +103,7 @@ jobs:
 
     - name: Create Docker image
       run: |-
-        TAG=${{ steps.version-bump.outputs.new_tag }}
+        TAG=${{ steps.version-bump.outputs.new_ver }}
         cd docker
         docker build --build-arg branch=longbow_$TAG -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
         gcloud auth configure-docker -q
@@ -119,7 +119,7 @@ jobs:
       if: failure()
       uses: rtCamp/action-slack-notify@v2.0.2
       env:
-        SLACK_MESSAGE: 'Failed to release version longbow_${{ steps.version-bump.outputs.new_tag }}'
+        SLACK_MESSAGE: 'Failed to release version longbow_${{ steps.version-bump.outputs.new_ver }}'
         SLACK_COLOR: '#DF5A49'
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         SLACK_ICON: https://github.com/broadinstitute/longbow/blob/main/.github/workflows/dnabad.png?raw=true
@@ -129,7 +129,7 @@ jobs:
       if: success()
       uses: rtCamp/action-slack-notify@v2.0.2
       env:
-        SLACK_MESSAGE: 'Successfully released version longbow_${{ steps.version-bump.outputs.new_tag }}'
+        SLACK_MESSAGE: 'Successfully released version longbow_${{ steps.version-bump.outputs.new_ver }}'
         SLACK_COLOR: '#50D9C9'
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         SLACK_ICON: https://github.com/broadinstitute/longbow/blob/main/.github/workflows/dnagood.png?raw=true
