@@ -71,12 +71,16 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Write commit message
+      run: git log --format=%B -n 1 ${{ github.event.after }} > release_notes.txt
+
     - name: Github Bumpversion Action
       id: version-bump
       uses: jaumann/github-bumpversion-action@v0.0.6
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         DEFAULT_BUMP: "patch"
+
     - name: Push changes
       uses: ad-m/github-push-action@master
       with:
