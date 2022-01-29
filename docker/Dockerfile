@@ -6,7 +6,7 @@ ARG branch
 
 # install gsutil
 RUN apt-get update
-RUN apt-get install -y curl git-lfs time datamash wget zlib1g-dev libssl-dev
+RUN apt-get install -y curl git-lfs time datamash wget zlib1g-dev libssl-dev lbzip2 make gcc
 RUN curl https://sdk.cloud.google.com | bash
 
 # Setup crcmodc for gsutil:
@@ -37,7 +37,7 @@ RUN wget https://github.com/samtools/samtools/releases/download/1.14/samtools-1.
     && tar xjf samtools-1.14.tar.bz2 \
     && rm samtools-1.14.tar.bz2 \
     && cd samtools-1.14 \
-    && ./configure --without-curses --disable-lzma \
+    && ./configure --without-curses --disable-lzma --disable-bz2 \
     && make \
     && make install
 
