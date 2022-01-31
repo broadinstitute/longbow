@@ -53,8 +53,6 @@ click_log.basic_config(logger)
 @click.option(
     "-m",
     "--model",
-    default=longbow.utils.constants.DEFAULT_MODEL,
-    show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
          "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
@@ -85,22 +83,10 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         read_count = bam_utils.load_read_count(pbi)
         logger.info("Annotating %d reads", read_count)
 
-    # Get our model:
-    if LibraryModel.has_prebuilt_model(model):
-        lb_model = LibraryModel.build_pre_configured_model(model)
-    else:
-        logger.info(f"Loading model from json file: %s", model)
-        lb_model = LibraryModel.from_json_file(model)
-    logger.info(f"Using %s: %s", model, lb_model.description)
-    model = lb_model
-
     if do_simple_splitting:
         logger.warning("Simple splitting is now the default.  \"-s\" / \"--do-simple-splitting\" is now DEPRECATED.")
     do_simple_splitting = True
     logger.info("Using simple splitting mode.")
-
-    # Prepare our delimiters for segmentation below:
-    delimiters = segment.create_simple_delimiters(model)
 
     # Flush the loggers before the pbar is created.
     # NOTE: this is considered bad form (to access the logger handlers directly)
@@ -109,8 +95,6 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
 
     # Track the lengths of our array elements:
     array_element_lengths = []
-
-    logger.debug(f"Splitting delimiters: %s", str(delimiters))
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
@@ -125,10 +109,24 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         disable=not sys.stdin.isatty(),
     ) as pbar:
 
+        # Get our model:
+        if model is None:
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
+        elif model is not None and LibraryModel.has_prebuilt_model(model):
+            lb_model = LibraryModel.build_pre_configured_model(model)
+        else:
+            lb_model = LibraryModel.from_json_file(model)
+
+        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
+        # Prepare our delimiters for segmentation below:
+        delimiters = segment.create_simple_delimiters(lb_model)
+        logger.debug(f"Splitting delimiters: %s", str(delimiters))
+
         # Get our adapter names:
-        mas_adapter_names = [array_element_adapters[0] for array_element_adapters in model.array_element_structure]
+        mas_adapter_names = [array_element_adapters[0] for array_element_adapters in lb_model.array_element_structure]
         # Manually add in the last adapter which is the array end marker:
-        mas_adapter_names.append(model.array_element_structure[-1][-1])
+        mas_adapter_names.append(lb_model.array_element_structure[-1][-1])
         mas_adapter_name_set = set(mas_adapter_names)
 
         # Create storage point for heatmap data:
@@ -159,10 +157,10 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             # Get the list of MAS-seq adapters in the segments and adjust for missing first adapters:
             read_mas_seq_adapters = [s.name for s in segments if s.name in mas_adapter_name_set]
             if segments[0].name not in mas_adapter_name_set and \
-                    segments[0].name == model.array_element_structure[0][1] and \
+                    segments[0].name == lb_model.array_element_structure[0][1] and \
                     len(read_mas_seq_adapters) > 1 and \
-                    read_mas_seq_adapters[0] == model.array_element_structure[1][0]:
-                read_mas_seq_adapters.insert(0, model.array_element_structure[0][0])
+                    read_mas_seq_adapters[0] == lb_model.array_element_structure[1][0]:
+                read_mas_seq_adapters.insert(0, lb_model.array_element_structure[0][0])
             # NOTE: here model.array_element_structure[0][1] corresponds to "VENUS"
             #       that we use as our second segment in each array element.
 
@@ -175,7 +173,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
                 for seg_tup in segment_tuples:
                     array_element_lengths.append(seg_tup[3] - seg_tup[2] + 1)
             else:
-                delimiter_found, delimiter_segments = segment.segment_read_with_bounded_region_algorithm(read, model, segments)
+                delimiter_found, delimiter_segments = segment.segment_read_with_bounded_region_algorithm(read, lb_model, segments)
                 array_len = sum(delimiter_found)
                 # Track segment lengths:
                 segment_tuples = []
@@ -234,19 +232,19 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     array_element_lengths = np.array(array_element_lengths)
 
     # Write our stats out to the appropriate files:
-    _write_stats(input_bam.name, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix, model, output_prefix, do_simple_splitting)
+    _write_stats(input_bam.name, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix, lb_model, output_prefix, do_simple_splitting)
 
     logger.info("Writing complete ligation matrix...")
-    _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model.name})")
+    _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({lb_model.name})")
 
     logger.info("Writing reduced ligation matrix...")
-    _create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({model.name})")
+    _create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({lb_model.name})")
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
 def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix,
-                 model, output_prefix, do_simple_splitting):
+                 lb_model, output_prefix, do_simple_splitting):
     """Write out all basic statistics for the data in the input file."""
 
     # Calculate histogram of array lengths.  Bins are created around integer values.
@@ -297,7 +295,7 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
 
     logger.info("Writing summary stats file...")
     _write_summary_stats_file(input_bam,
-                              model,
+                              lb_model,
                               output_prefix,
                               do_simple_splitting,
                               array_lengths,
@@ -317,7 +315,7 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
                                    array_length_hist_bins,
                                    array_length_mean,
                                    array_length_median,
-                                   model.name)
+                                   lb_model.name)
 
     logger.info("Writing array element stat histograms...")
     _create_array_element_length_histogram(output_prefix,
@@ -326,11 +324,11 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
                                            array_element_length_hist_bins,
                                            array_element_length_mean,
                                            array_element_length_median,
-                                           model.name)
+                                           lb_model.name)
 
 
 def _write_summary_stats_file(input_bam,
-                              model,
+                              lb_model,
                               output_prefix,
                               do_simple_splitting,
                               array_lengths,
@@ -439,15 +437,15 @@ def _write_summary_stats_file(input_bam,
             f.write("\n")
 
         f.write("#" + ("-" * 80) + "\n")
-        f.write(f"MAS-seq / Longbow Model:\t{model.name}\n")
+        f.write(f"MAS-seq / Longbow Model:\t{lb_model.name}\n")
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
         f.write(f"Total Num Array Elements (Segmented Arrays):\t{num_array_elements}\n")
         f.write(f"Output yield gain:\t{num_array_elements/len(array_lengths):.2f}x\n")
         f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
         f.write("\n")
         f.write("#" + ("-" * 80) + "\n")
-        f.write(f"Model structure ({model.name}):\n")
-        for array_element_structure in model.array_element_structure:
+        f.write(f"Model structure ({lb_model.name}):\n")
+        for array_element_structure in lb_model.array_element_structure:
             s = " ".join(array_element_structure)
             f.write(f"\t{s}\n")
         f.write("\n")
