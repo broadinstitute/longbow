@@ -6,7 +6,7 @@ Longbow
 .. |GitHub release| image:: https://img.shields.io/github/release/broadinstitute/longbow.svg
    :target: https://github.com/broadinstitute/longbow/releases/
 
-.. |Generic badge| image:: https://img.shields.io/badge/Docker-v0.5.12-blue.svg
+.. |Generic badge| image:: https://img.shields.io/badge/Docker-v0.5.13-blue.svg
    :target: https://console.cloud.google.com/gcr/images/broad-dsp-lrma/US/lr-longbow
 
 .. |PyPI version maslongbow| image:: https://img.shields.io/pypi/v/maslongbow.svg
@@ -29,7 +29,7 @@ For a pre-built version including all dependencies, access our Docker image.
 
 ::
 
-   docker pull us.gcr.io/broad-dsp-lrma/lr-longbow:0.5.12
+   docker pull us.gcr.io/broad-dsp-lrma/lr-longbow:0.5.13
 
 To install from Github source for development, the following commands can be run.
 
