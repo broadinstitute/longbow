@@ -591,7 +591,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     a.mapping_quality = 255
 
     # Reset read name (we need a unique name for each read that's also compatible with IsoSeq3)
-    zmw = abs(hash(a.query_sequence)) % (10 ** 9)
+    zmw = abs(hash(a.query_sequence + f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")) % (10 ** 9)
     movie_name = read.query_name.split("/")[0]
     a.query_name = f'{movie_name}/{zmw}/ccs'
     a.set_tag(longbow.utils.constants.READ_ZMW_TAG, zmw)
