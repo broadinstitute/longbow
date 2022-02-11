@@ -451,7 +451,7 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
 
     valid_library_order_string = f"[{library_model.name} adapters: {' '.join(library_model.key_adapters)}]"
     is_valid_order_string = "[Segment order: Valid]" if segment_order_valid else "[Segment order: INVALID]"
-    read_mas_adapter_string = f"[MAS adapters: {' '.join(read_mas_adapters)}]"
+    read_mas_adapter_string = f"[Key adapters: {' '.join(read_mas_adapters)}]"
 
     f.suptitle(
         r"$\bf{" + read.query_name.replace("_", "\\_") + "}$" + f"\n{qual_string}{np_string}"
