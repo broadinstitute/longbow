@@ -2270,4 +2270,39 @@ class LibraryModel:
             },
             "deprecated": False,
         },
+        "scRNA_10x5p": {
+            "description": "Single-cell RNA (without MAS-seq prep).",
+            "version": "1.0.0",
+            "array_element_structure": (
+                ("V", "CBC", "UMI", "B", "cDNA", "Poly_A", "M"),
+            ),
+            "adapters": {
+                "V": "TCTACACGACGCTCTTCCGATCT",
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                "M": "GTACTCTGCGTTGATACCACTGCTT",
+                "B": "TTTCTTATATGGG",
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "cDNA": RANDOM_SEGMENT_NAME,
+            },
+            "direct_connections": {
+                "V": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"B"},
+                "B": {"cDNA"},
+                "cDNA": {"Poly_A"},
+                "Poly_A": {"M"},
+            },
+            "start_element_names": {"V"},
+            "end_element_names": {"M"},
+            "named_random_segments": {"UMI", "cDNA", "CBC"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
+            "deprecated": False,
+        },
     }
