@@ -30,7 +30,7 @@ from ..utils.model import LibraryModel
 
 
 logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("refine")
+logger = logging.getLogger("correct-tag")
 click_log.basic_config(logger)
 
 
@@ -73,9 +73,9 @@ click_log.basic_config(logger)
     "-b",
     "--barcode-tag",
     type=str,
-    default=longbow.utils.constants.DEFAULT_MODEL,
+    default="CBC",
     show_default=True,
-    help="The barcode tag to adjust based on the allowlist"
+    help="The barcode tag to adjust based on the allowlist."
 )
 @click.option(
     "-a",
@@ -118,7 +118,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
     worker_process_pool = []
     for _ in range(threads):
         p = mp.Process(
-            target=_refine_barcode_fn, args=(process_input_data_queue, results, barcode_tag, bc_corrected)
+            target=_correct_barcode_fn, args=(process_input_data_queue, results, barcode_tag, bc_corrected)
         )
         p.start()
         worker_process_pool.append(p)
@@ -148,7 +148,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Start output worker:
-        res = manager.dict({"num_reads_refined": 0, "num_reads": 0})
+        res = manager.dict({"num_reads_corrected": 0, "num_reads": 0})
         output_worker = mp.Process(
             target=_write_thread_fn,
             args=(
@@ -179,7 +179,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
         results.put(None)
         output_worker.join()
 
-    logger.info(f"Refined {res['num_reads_refined']} reads of {res['num_reads']} total.")
+    logger.info(f"Corrected CBCs in {res['num_reads_corrected']} reads of {res['num_reads']} total.")
     
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
@@ -222,12 +222,12 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res):
             # Increment our counters:
             res["num_reads"] += 1
             if num_corrected_segments > 0:
-                res["num_reads_refined"] += 1
+                res["num_reads_corrected"] += 1
 
             pbar.update(1)
 
 
-def _refine_barcode_fn(in_queue, out_queue, barcode_tag, bc_corrected, pad=0):
+def _correct_barcode_fn(in_queue, out_queue, barcode_tag, bc_corrected, pad=0):
     """Function to run in each subprocess.
     Replace barcode with corrected value."""
 
