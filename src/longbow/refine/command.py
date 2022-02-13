@@ -5,6 +5,7 @@ import itertools
 import re
 import time
 import os
+import io
 from collections import defaultdict
 
 import click
@@ -15,6 +16,8 @@ import ssw
 
 import pysam
 import multiprocessing as mp
+import subprocess
+import tempfile
 
 import gzip
 from construct import *
@@ -103,7 +106,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
     logger.info(f"Running with {threads} worker subprocess(es)")
 
     # Load barcode allow list
-    barcodes = barcode_utils.load_barcode_allowlist(allow_list)
+    bc_corrected = _correct_barcodes_to_allowlist(io.open(input_bam.name, "rb"), allow_list, barcode_tag, threads)
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
@@ -115,7 +118,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
     worker_process_pool = []
     for _ in range(threads):
         p = mp.Process(
-            target=_refine_barcode_fn, args=(process_input_data_queue, results, barcode_tag, barcodes, same_barcode_within_read)
+            target=_refine_barcode_fn, args=(process_input_data_queue, results, barcode_tag, bc_corrected)
         )
         p.start()
         worker_process_pool.append(p)
@@ -145,7 +148,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Start output worker:
-        res = manager.dict({"num_reads_refined": 0, "num_reads": 0, "num_segments_refined": 0, "num_segments": 0})
+        res = manager.dict({"num_reads_refined": 0, "num_reads": 0})
         output_worker = mp.Process(
             target=_write_thread_fn,
             args=(
@@ -176,9 +179,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
         results.put(None)
         output_worker.join()
 
-    
-    logger.info( f"Refined {res['num_reads_refined']} reads of {res['num_reads']} total.")
-    logger.info( f"Refined {res['num_segments_refined']} segments of {res['num_segments']} total.")
+    logger.info(f"Refined {res['num_reads_refined']} reads of {res['num_reads']} total.")
     
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
@@ -203,7 +204,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res):
                 continue
 
             # Unpack data:
-            read, refined_segments, total_segments = raw_data
+            read, num_segments, num_corrected_segments = raw_data
             read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
             # Obligatory log message:
@@ -220,20 +221,15 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res):
 
             # Increment our counters:
             res["num_reads"] += 1
-            if refined_segments > 0:
+            if num_corrected_segments > 0:
                 res["num_reads_refined"] += 1
-
-            res["num_segments"] += total_segments
-            res["num_segments_refined"] += refined_segments
 
             pbar.update(1)
 
 
-def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_within_read):
+def _refine_barcode_fn(in_queue, out_queue, barcode_tag, bc_corrected, pad=0):
     """Function to run in each subprocess.
-    Extracts and returns all segments from an input read."""
-
-    ssw_aligner = ssw.Aligner()
+    Replace barcode with corrected value."""
 
     while True:
         # Wait until we get some data.
@@ -251,15 +247,20 @@ def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_
             raw_data, pysam.AlignmentHeader.from_dict(dict())
         )
 
-        refined_segments = 0
         num_segments = 0
-        barcode_array = {}
+        num_corrected_segments = 0
 
-        if read.has_tag(longbow.utils.constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(longbow.utils.constants.SEGMENTS_TAG):
-            called_barcodes = defaultdict(int)
+        if read.has_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG):
+            old_bc = read.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)
+            new_bc = bc_corrected[old_bc] if old_bc in bc_corrected else None
 
+            num_segments += 1
+            if new_bc is not None:
+                read.set_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG, new_bc)
+                num_corrected_segments += 1
+
+        elif read.has_tag(longbow.utils.constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(longbow.utils.constants.SEGMENTS_TAG):
             segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(",")
-            num_segments = len(segments)
 
             for i, segment in enumerate(segments):
                 if barcode_tag in segment:
@@ -267,29 +268,38 @@ def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_
                     start = int(start)
                     stop = int(stop)
 
-                    pad = 2 if read.get_tag("rq") > 0.0 else 4
-                    bc = read.query_sequence[start - pad:stop + pad]
+                    old_bc = read.query_sequence[start - pad:stop + pad]
+                    new_bc = bc_corrected[old_bc] if old_bc in bc_corrected else None
 
-                    best_score = 0
-                    best_barcode = None
-                    for barcode in barcodes:
-                        a = ssw_aligner.align(query=bc, reference=barcode, revcomp=False)
+                    num_segments += 1
+                    if new_bc is not None:
+                        read.set_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG, new_bc)
+                        num_corrected_segments += 1
 
-                        if a.score > best_score and a.score >= len(barcode):
-                            best_score = a.score
-                            best_barcode = barcode
+        # Process and place our data on the output queue:
+        out_queue.put((read.to_string(), num_segments, num_corrected_segments))
 
-                    if best_barcode is not None:
-                        called_barcodes[best_barcode] += 1
 
-                    if not same_barcode_within_read:
-                        # TODO: placeholder for future development
-                        pass
+def _extract_barcodes(input_bam, barcode_tag, pad=0):
+    barcodes = set()
 
-            if same_barcode_within_read and len(called_barcodes) > 0:
-                # adjust all barcode boundaries
-                called_barcodes = {k: v for k, v in sorted(called_barcodes.items(), key=lambda item: item[1], reverse=True)}
-                best_barcode, best_count = next(iter(called_barcodes.items()))
+    pysam.set_verbosity(0)  # silence message about the .bai file not being found
+    with pysam.AlignmentFile(
+        input_bam, "rb", check_sq=False, require_index=False
+    ) as bam_file, tqdm.tqdm(
+        desc="Progress",
+        unit=" read",
+        colour="green",
+        file=sys.stderr,
+        leave=False,
+        disable=not sys.stdin.isatty(),
+    ) as pbar:
+        for read in bam_file:
+            if read.has_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG):
+                bc = read.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)
+                barcodes.add(bc)
+            elif read.has_tag(longbow.utils.constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(longbow.utils.constants.SEGMENTS_TAG):
+                segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(",")
 
                 for i, segment in enumerate(segments):
                     if barcode_tag in segment:
@@ -297,34 +307,45 @@ def _refine_barcode_fn(in_queue, out_queue, barcode_tag, barcodes, same_barcode_
                         start = int(start)
                         stop = int(stop)
 
-                        pad = 2 if read.get_tag("rq") > 0.0 else 4
                         bc = read.query_sequence[start - pad:stop + pad]
+                        barcodes.add(bc)
 
-                        a = ssw_aligner.align(query=bc, reference=best_barcode, revcomp=False)
+    return barcodes
 
-                        new_start = start - pad + a.query_begin
-                        new_stop = start - pad + a.query_end + 1
 
-                        if new_start != start or new_stop != stop:
-                            segments[i] = f'{tag}:{new_start}-{new_stop}'
-                            refined_segments += 1
+def _correct_barcodes_to_allowlist(input_bam, allow_list, barcode_tag, pad=0, pseudocount=1000, threads=1):
+    """Extracts barcode from an input read and corrects them."""
 
-                            if i - 1 >= 0:
-                                prev_tag, prev_start, _ = re.split("[:-]", segments[i-1])
-                                segments[i-1] = f'{prev_tag}:{prev_start}-{new_start-1}'
-                                refined_segments += 1
+    logger.info("Loading barcode allowlist...")
+    bc_allow = barcode_utils.load_barcode_allowlist(allow_list)
 
-                            if i + 1 < len(segments):
-                                next_tag, _, next_stop = re.split("[:-]", segments[i+1])
-                                segments[i+1] = f'{next_tag}:{new_stop+1}-{next_stop}'
-                                refined_segments += 1
+    logger.info("Loading barcodes from BAM file...")
+    bc_extract = _extract_barcodes(input_bam, barcode_tag, pad=0)
 
-                        barcode_array[segments[i]] = best_barcode
+    logger.info("Clustering barcodes...")
+    bc_corrected = {}
+    tmp = tempfile.NamedTemporaryFile(delete=True)
+    try:
+        for bc in bc_allow:
+            tmp.write(f'{bc}\t{pseudocount}\n'.encode())
+        for bc in bc_extract:
+            tmp.write(f'{bc}\t1\n'.encode())
 
-                ba_tag = ",".join([f'{k}:{v}' for k, v in barcode_array.items()])
+        scarg = ["starcode", "-q", "--print-clusters", "-d2", f"-t{threads}", tmp.name]
+        sc = subprocess.run(scarg, capture_output=True)
 
-                read.set_tag(longbow.utils.constants.SEGMENTS_TAG, ",".join(segments))
-                read.set_tag(longbow.utils.constants.READ_INDEX_ARRAY_TAG, ba_tag)
+        for line in sc.stdout.split(b'\n'):
+            if line != b'':
+                centroid, count, members = line.split(b'\t')
+                centroid = centroid.decode("utf-8")
+                count = int(count)
+                members = list(map(lambda x: x.decode("utf-8"), members.split(b",")))
 
-        # Process and place our data on the output queue:
-        out_queue.put((read.to_string(), refined_segments, num_segments))
+                if count > pseudocount:
+                    for member in members:
+                        bc_corrected[member] = centroid
+    finally:
+        tmp.close() 
+
+    return bc_corrected
+
