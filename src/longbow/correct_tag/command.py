@@ -73,9 +73,17 @@ click_log.basic_config(logger)
     "-b",
     "--barcode-tag",
     type=str,
-    default="CBC",
+    default=longbow.utils.constants.READ_BARCODE_TAG,
     show_default=True,
-    help="The barcode tag to adjust based on the allowlist."
+    help="The tag from which to read the uncorrected barcode."
+)
+@click.option(
+    "-c",
+    "--corrected-tag",
+    type=str,
+    default=longbow.utils.constants.READ_BARCODE_CORRECTED_TAG,
+    show_default=True,
+    help="The tag in which to store the corrected barcode."
 )
 @click.option(
     "-a",
@@ -83,16 +91,8 @@ click_log.basic_config(logger)
     type=click.Path(exists=True),
     help="list of allowed barcodes for specified tag (.txt, .txt.gz)",
 )
-@click.option(
-    '-s',
-    '--same-barcode-within-read',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Enforce constraint that all barcodes found within a single read are identical."
-)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcode_within_read, input_bam):
+def main(threads, output_bam, model, force, barcode_tag, corrected_tag, allow_list, input_bam):
     """Adjust model annotations based on a provided barcode allowlist."""
 
     t_start = time.time()
@@ -106,7 +106,7 @@ def main(threads, output_bam, model, force, barcode_tag, allow_list, same_barcod
     logger.info(f"Running with {threads} worker subprocess(es)")
 
     # Load barcode allow list
-    bc_corrected = _correct_barcodes_to_allowlist(io.open(input_bam.name, "rb"), allow_list, barcode_tag, threads)
+    bc_corrected = _correct_barcodes_to_allowlist(io.open(input_bam.name, "rb"), allow_list, barcode_tag, threads=threads)
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
@@ -259,28 +259,11 @@ def _correct_barcode_fn(in_queue, out_queue, barcode_tag, bc_corrected, pad=0):
                 read.set_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG, new_bc)
                 num_corrected_segments += 1
 
-        elif read.has_tag(longbow.utils.constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(longbow.utils.constants.SEGMENTS_TAG):
-            segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(",")
-
-            for i, segment in enumerate(segments):
-                if barcode_tag in segment:
-                    tag, start, stop = re.split("[:-]", segment)
-                    start = int(start)
-                    stop = int(stop)
-
-                    old_bc = read.query_sequence[start - pad:stop + pad]
-                    new_bc = bc_corrected[old_bc] if old_bc in bc_corrected else None
-
-                    num_segments += 1
-                    if new_bc is not None:
-                        read.set_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG, new_bc)
-                        num_corrected_segments += 1
-
         # Process and place our data on the output queue:
         out_queue.put((read.to_string(), num_segments, num_corrected_segments))
 
 
-def _extract_barcodes(input_bam, barcode_tag, pad=0):
+def _extract_barcodes(input_bam, barcode_tag):
     barcodes = set()
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
@@ -294,33 +277,23 @@ def _extract_barcodes(input_bam, barcode_tag, pad=0):
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
+
         for read in bam_file:
-            if read.has_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG):
-                bc = read.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)
+            if read.has_tag(barcode_tag):
+                bc = read.get_tag(barcode_tag)
                 barcodes.add(bc)
-            elif read.has_tag(longbow.utils.constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(longbow.utils.constants.SEGMENTS_TAG):
-                segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(",")
-
-                for i, segment in enumerate(segments):
-                    if barcode_tag in segment:
-                        tag, start, stop = re.split("[:-]", segment)
-                        start = int(start)
-                        stop = int(stop)
-
-                        bc = read.query_sequence[start - pad:stop + pad]
-                        barcodes.add(bc)
 
     return barcodes
 
 
-def _correct_barcodes_to_allowlist(input_bam, allow_list, barcode_tag, pad=0, pseudocount=1000, threads=1):
+def _correct_barcodes_to_allowlist(input_bam, allow_list, barcode_tag, pseudocount=1000, threads=1):
     """Extracts barcode from an input read and corrects them."""
 
     logger.info("Loading barcode allowlist...")
     bc_allow = barcode_utils.load_barcode_allowlist(allow_list)
 
     logger.info("Loading barcodes from BAM file...")
-    bc_extract = _extract_barcodes(input_bam, barcode_tag, pad=0)
+    bc_extract = _extract_barcodes(input_bam, barcode_tag)
 
     logger.info("Clustering barcodes...")
     bc_corrected = {}
