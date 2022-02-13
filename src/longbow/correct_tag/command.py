@@ -118,7 +118,7 @@ def main(threads, output_bam, model, force, barcode_tag, corrected_tag, allow_li
     worker_process_pool = []
     for _ in range(threads):
         p = mp.Process(
-            target=_correct_barcode_fn, args=(process_input_data_queue, results, barcode_tag, bc_corrected)
+            target=_correct_barcode_fn, args=(process_input_data_queue, results, barcode_tag, corrected_tag, bc_corrected)
         )
         p.start()
         worker_process_pool.append(p)
@@ -179,7 +179,7 @@ def main(threads, output_bam, model, force, barcode_tag, corrected_tag, allow_li
         results.put(None)
         output_worker.join()
 
-    logger.info(f"Corrected CBCs in {res['num_reads_corrected']} reads of {res['num_reads']} total.")
+    logger.info(f"Corrected tags in {res['num_reads_corrected']} reads of {res['num_reads']} total ({100.0*res['num_reads_corrected']/res['num_reads']:.2f}%).")
     
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
@@ -227,7 +227,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res):
             pbar.update(1)
 
 
-def _correct_barcode_fn(in_queue, out_queue, barcode_tag, bc_corrected, pad=0):
+def _correct_barcode_fn(in_queue, out_queue, barcode_tag, corrected_tag, bc_corrected):
     """Function to run in each subprocess.
     Replace barcode with corrected value."""
 
@@ -250,13 +250,13 @@ def _correct_barcode_fn(in_queue, out_queue, barcode_tag, bc_corrected, pad=0):
         num_segments = 0
         num_corrected_segments = 0
 
-        if read.has_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG):
-            old_bc = read.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)
+        if read.has_tag(barcode_tag):
+            old_bc = read.get_tag(barcode_tag)
             new_bc = bc_corrected[old_bc] if old_bc in bc_corrected else None
 
             num_segments += 1
             if new_bc is not None:
-                read.set_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG, new_bc)
+                read.set_tag(corrected_tag, new_bc)
                 num_corrected_segments += 1
 
         # Process and place our data on the output queue:
@@ -303,6 +303,8 @@ def _correct_barcodes_to_allowlist(input_bam, allow_list, barcode_tag, pseudocou
             tmp.write(f'{bc}\t{pseudocount}\n'.encode())
         for bc in bc_extract:
             tmp.write(f'{bc}\t1\n'.encode())
+
+        tmp.flush()
 
         scarg = ["starcode", "-q", "--print-clusters", "-d2", f"-t{threads}", tmp.name]
         sc = subprocess.run(scarg, capture_output=True)
