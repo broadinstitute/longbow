@@ -41,6 +41,10 @@ RUN wget https://github.com/samtools/samtools/releases/download/1.14/samtools-1.
     && make \
     && make install
 
+# install Starcode
+RUN wget -O /usr/local/bin/starcode https://github.com/gui11aume/starcode/releases/download/1.4/starcode-1.4 \
+    && chmod 755 /usr/local/bin/starcode
+
 # activate conda environment
 ENV PATH="/longbow/venv/bin:/root/google-cloud-sdk/bin/:$PATH"
 RUN echo "source /longbow/venv/bin/activate" >> ~/.bashrc
