@@ -227,8 +227,12 @@ class LibraryModel:
         """Build the HMM underlying this model given our segment information."""
 
         # Warn if model is deprecated
-        if self.pre_configured_models[self.name]['deprecated']:
-            logger.warning(f"Model {self.name} is deprecated.")
+        try:
+            if self.pre_configured_models[self.name]['deprecated']:
+                logger.warning(f"Model {self.name} is deprecated.")
+        except KeyError:
+            # This is OK - it may be the user specifying a model that is not in our preconfigured set.
+            pass
 
         # Validate our model here so we can go through and just worry about creating it:
         self.validate_model()
