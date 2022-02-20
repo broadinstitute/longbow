@@ -418,6 +418,17 @@ def get_model_name_from_bam_header(header):
     return get_model_name_from_bam_header(header)['name']
 
 
+def get_model_from_bam_header(header):
+    model_jsons = []
+    for pg in header.as_dict()['PG']:
+        if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
+            desc, models_str= pg['DS'].split('MODEL(s): ')
+            model_json = json.loads(models_str)
+            model_jsons.append(model_json)
+
+    return model_jsons[0]
+
+
 def get_models_from_bam_header(header):
     model_jsons = []
     for pg in header.as_dict()['PG']:
