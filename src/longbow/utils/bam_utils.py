@@ -4,6 +4,7 @@ import gzip
 import logging
 import click_log
 import re
+from numpy import isin
 import pysam
 import sys
 import array
@@ -21,6 +22,10 @@ from ..meta import VERSION
 from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_QUAL_TAG, SEGMENTS_RC_TAG, \
     SEGMENT_TAG_DELIMITER, READ_MODEL_NAME_TAG, READ_MODEL_SCORE_TAG, READ_APPROX_QUAL_TAG, READ_RAW_UMI_TAG, \
     READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE
+
+from ..utils.model import LibraryModel
+from ..utils import bam_utils
+
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("bam_utils")
@@ -196,6 +201,36 @@ def check_for_preexisting_files(file_list, exist_ok=False):
                 do_files_exist = True
     if do_files_exist:
         sys.exit(1)
+
+
+def load_models(models, input_bam=None):
+    """Load LibraryModel objects from a BAM file header, built-in models, or an external JSON file."""
+
+    lb_models = []
+    sources = []
+    if models is None and input_bam is not None:
+        pysam.set_verbosity(0)
+        with pysam.AlignmentFile(input_bam.name, "rb", check_sq=False, require_index=False) as bam_file:
+            if bam_utils.bam_header_has_model(bam_file.header):
+                for model_json in get_models_from_bam_header(bam_file.header):
+                    lb_models.append(LibraryModel.from_json_obj(model_json))
+                    sources.append("BAM header")
+            else:
+                logger.fatal("Model not specified and no model present in BAM header.")
+                sys.exit(1)
+    else:
+        for model in models:
+            if LibraryModel.has_prebuilt_model(model):
+                lb_models.append(LibraryModel.build_pre_configured_model(model))
+                sources.append("pre-built models")
+            else:
+                lb_models.append(LibraryModel.from_json_file(model))
+                sources.append("user-supplied JSON")
+
+    for lb_model, source in zip(lb_models, sources):
+        logger.info(f"Using {lb_model.name} ({lb_model.description}) from {source}")
+
+    return lb_models
 
 
 def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
@@ -383,11 +418,21 @@ def get_model_name_from_bam_header(header):
     return get_model_name_from_bam_header(header)['name']
 
 
-def get_model_from_bam_header(header):
+def get_models_from_bam_header(header):
+    model_jsons = []
     for pg in header.as_dict()['PG']:
         if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
             desc, models_str= pg['DS'].split('MODEL(s): ')
-            models_json = json.loads(models_str)
-            return models_json
+            model_json = json.loads(models_str)
+            model_jsons.append(model_json)
 
-    return None
+    return model_jsons
+
+
+def bam_header_has_model(header):
+    if 'PG' in header.as_dict():
+        for pg in header.as_dict()['PG']:
+            if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
+                return True
+
+    return False

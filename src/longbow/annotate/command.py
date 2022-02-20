@@ -58,9 +58,9 @@ click_log.basic_config(logger)
     "-m",
     "--model",
     type=str,
-    default=longbow.utils.constants.DEFAULT_MODEL,
+    multiple=True,
     show_default=True,
-    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
+    help="The model(s) to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
          "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
          "of a LibraryModel as per LibraryModel.to_json()."
@@ -122,13 +122,8 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
 
-    # Get our model:
-    if LibraryModel.has_prebuilt_model(model):
-        m = LibraryModel.build_pre_configured_model(model)
-    else:
-        logger.info(f"Loading model from json file: %s", model)
-        m = LibraryModel.from_json_file(model)
-    logger.info(f"Using %s: %s", model, m.description)
+    # Get our model(s):
+    lb_models = bam_utils.load_models(model, input_bam)
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
@@ -169,7 +164,7 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_segmentation_fn, args=(input_data_queue, results, i, m, min_length, max_length, min_rq)
+            target=_worker_segmentation_fn, args=(input_data_queue, results, i, lb_models, min_length, max_length, min_rq)
         )
         p.start()
         worker_pool.append(p)
@@ -184,13 +179,13 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
             bam_file.seek(start_offset)
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[m])
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=lb_models)
 
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
         output_worker = mp.Process(
             target=_write_thread_fn,
-            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, m)
+            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, lb_models)
         )
         output_worker.start()
 
@@ -239,8 +234,10 @@ def get_segments(read):
     ]
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, model):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, lb_models):
     """Thread / process fn to write out all our data."""
+
+    lb_models_dict = {k.name:k for k in lb_models}
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
@@ -267,37 +264,38 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
                 continue
 
             # Unpack data:
-            read, ppath, logp, is_rc = raw_data
+            read, ppath, logp, is_rc, model_name = raw_data
 
-            # Condense the output annotations so we can write them out with indices:
-            segments = bam_utils.collapse_annotations(ppath)
+            if read is not None:
+                # Condense the output annotations so we can write them out with indices:
+                segments = bam_utils.collapse_annotations(ppath)
 
-            read = pysam.AlignedSegment.fromstring(read, out_bam_header)
+                read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
-            # Obligatory log message:
-            logger.debug(
-                "Path for read %s (%2.2f)%s: %s",
-                read.query_name,
-                logp,
-                " (RC)" if is_rc else "",
-                segments,
-            )
+                # Obligatory log message:
+                logger.debug(
+                    "Path for read %s (%2.2f)%s: %s",
+                    read.query_name,
+                    logp,
+                    " (RC)" if is_rc else "",
+                    segments,
+                )
 
-            # Write our our read:
-            bam_utils.write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_bam_file)
+                # Write our our read:
+                bam_utils.write_annotated_read(read, segments, is_rc, logp, lb_models_dict[model_name], ssw_aligner, out_bam_file)
 
-            # Increment our counters:
-            res["num_reads_annotated"] += 1
-            res["num_sections"] += len(segments)
+                # Increment our counters:
+                res["num_reads_annotated"] += 1
+                res["num_sections"] += len(segments)
 
             pbar.update(1)
 
 
-def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, min_length, max_length, min_rq):
+def _worker_segmentation_fn(in_queue, out_queue, worker_num, lb_models, min_length, max_length, min_rq):
     """Function to run in each subthread / subprocess.
     Segments each read and place the segments in the output queue."""
 
-    num_reads_segmented = 0
+    num_reads_processed, num_reads_segmented = 0, 0
 
     while True:
         # Wait until we get some data.
@@ -320,42 +318,69 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, model, min_length, 
         )
 
         # Check for min/max length and min quality:
-
+        segment_info = None, None, None, None, None
         if len(read.query_sequence) < min_length:
-            logger.warning(f"Read is shorter than min length.  "
-                           f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})")
-            continue
+            logger.debug(f"Read is shorter than min length.  "
+                         f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})")
         elif len(read.query_sequence) > max_length:
-            logger.warning(f"Read is longer than max length.  "
-                           f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
-            continue
+            logger.debug(f"Read is longer than max length.  "
+                         f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
         elif read.get_tag("rq") < min_rq:
-            logger.warning(f"Read quality is below the minimum.  "
-                           f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
-            continue
-
-        # Process and place our data on the output queue:
-        segment_info = _segment_read(read, model)
+            logger.debug(f"Read quality is below the minimum.  "
+                         f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
+        else:
+            # Process and place our data on the output queue:
+            segment_info = _annotate_and_assign_read_to_model(read, lb_models)
+            num_reads_segmented += 1
 
         out_queue.put(segment_info)
-        num_reads_segmented += 1
+        num_reads_processed += 1
 
-    logger.debug(f"Worker %d: Num reads segmented: %d", worker_num, num_reads_segmented)
+    logger.debug(f"Worker %d: Num reads segmented/processed: %d/%d", worker_num, num_reads_segmented, num_reads_processed)
 
 
-def _segment_read(read, model):
+def _annotate_and_assign_read_to_model(read, model_list):
+    """Annotate the given read with all given models and assign the read to the model with the best score."""
+
+    best_model = ""
+    best_logp = -math.inf
+    best_path = None
+    best_fit_is_rc = False
+    model_scores = dict()
+    for model in model_list:
+
+        _, ppath, logp, is_rc = _annotate_read(read, model)
+
+        model_scores[model.name] = logp
+
+        if logp > best_logp:
+            best_model = model.name
+            best_logp = logp
+            best_path = ppath
+            best_fit_is_rc = is_rc
+
+    # Provide some info as to which model was chosen:
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("%s model scores: %s", read.query_name, str(model_scores))
+        logger.debug(
+            "Sequence %s scored best with model%s: %s (%2.4f)",
+            read.query_name,
+            " in RC " if best_fit_is_rc else "",
+            best_model,
+            best_logp
+        )
+
+    return read.to_string(), best_path, best_logp, best_fit_is_rc, best_model
+
+
+def _annotate_read(read, model):
     is_rc = False
     logp, ppath = model.annotate(read.query_sequence)
 
     rc_logp, rc_ppath = model.annotate(bam_utils.reverse_complement(read.query_sequence))
-
-    # print(f"Forward Path: {logp}: {ppath}")
-    # print(f"Reverse Path: {rc_logp}: {rc_ppath}")
-
     if rc_logp > logp:
         logp = rc_logp
         ppath = rc_ppath
         is_rc = True
-        logger.debug("Sequence scored better in RC: %s", read.query_name)
 
     return read.to_string(), ppath, logp, is_rc
