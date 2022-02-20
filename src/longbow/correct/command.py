@@ -30,7 +30,7 @@ from ..utils.model import LibraryModel
 
 
 logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("correct-tag")
+logger = logging.getLogger("correct")
 click_log.basic_config(logger)
 
 
@@ -93,7 +93,7 @@ click_log.basic_config(logger)
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(threads, output_bam, model, force, barcode_tag, corrected_tag, allow_list, input_bam):
-    """Adjust model annotations based on a provided barcode allowlist."""
+    """Correct tag to values provided in barcode allowlist."""
 
     t_start = time.time()
 

@@ -65,7 +65,7 @@ click_log.basic_config(logger)
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(pbi, output_bam, reject_bam, model, force, input_bam):
-    """Filter reads by whether they conform to expected segment order."""
+    """Filter reads by conformation to expected segment order."""
 
     t_start = time.time()
 
