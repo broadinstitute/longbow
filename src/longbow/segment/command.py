@@ -185,7 +185,7 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
             else:
                 process_input_data_queue.put((r, read_index))
 
-            read_index += 1
+            read_index += lb_model.num_array_elements
 
         # Wait for our input jobs to finish:
         for p in worker_process_pool:
@@ -525,7 +525,7 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
 
 
 def _write_segmented_read(
-    model, read, segments, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi, read_index
+    model, read, segments, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi, split_read_index
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -544,7 +544,6 @@ def _write_segmented_read(
 
     segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segments)
 
-    split_read_index = read_index * 100
     for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
         # Write our segment here:
         _write_split_array_element(

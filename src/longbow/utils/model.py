@@ -128,6 +128,10 @@ class LibraryModel:
     def has_named_random_segments(self):
         return self.named_random_segments is not None
 
+    @property
+    def num_array_elements(self):
+        return len(self.array_element_structure)
+
     def annotate(self, seq):
         """Annotate the given segment using this model."""
         logp, path = self.hmm.viterbi(seq)
