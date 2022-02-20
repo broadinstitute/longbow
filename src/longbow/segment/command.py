@@ -111,6 +111,8 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
         p.start()
         worker_process_pool.append(p)
 
+    read_index = 0
+
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
@@ -179,9 +181,11 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
         iter_data = itertools.chain(bam_file, (None,) * threads)
         for r in iter_data:
             if r is not None:
-                process_input_data_queue.put(r.to_string())
+                process_input_data_queue.put((r.to_string(), read_index))
             else:
-                process_input_data_queue.put(r)
+                process_input_data_queue.put((r, read_index))
+
+            read_index += 1
 
         # Wait for our input jobs to finish:
         for p in worker_process_pool:
@@ -216,14 +220,18 @@ def _sub_process_work_fn(in_queue, out_queue):
             return
 
         # Unpack our data here:
-        read = raw_data
+        read, read_index = raw_data
 
-        read = pysam.AlignedSegment.fromstring(
-            read, pysam.AlignmentHeader.from_dict(dict())
-        )
+        if read is None:
+            return
 
-        # Process and place our data on the output queue:
-        out_queue.put(get_segments(read))
+        if read is not None:
+            read = pysam.AlignedSegment.fromstring(
+                read, pysam.AlignmentHeader.from_dict(dict())
+            )
+
+            # Process and place our data on the output queue:
+            out_queue.put(get_segments(read) + (read_index,))
 
 
 def _sub_process_write_fn(
@@ -263,7 +271,7 @@ def _sub_process_write_fn(
                 break
 
             # Unpack data:
-            read, segments = raw_data
+            read, segments, read_index = raw_data
             read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
             # Obligatory log message:
@@ -516,7 +524,7 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
 
 
 def _write_segmented_read(
-    model, read, segments, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi
+    model, read, segments, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi, read_index
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -529,7 +537,7 @@ def _write_segmented_read(
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
     :param barcode_conf_file: An open file ready to write out the barcodes and confidence scores.
     :param ignore_cbc_and_umi: Boolean indicating whether we should ignore CBC/UMI tags.
-    :param split_read_index: The index of the read.
+    :param read_index: The index of the read.
     :return: the number of segments written.
     """
 
