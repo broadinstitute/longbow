@@ -73,7 +73,7 @@ click_log.basic_config(logger)
 )
 @click.argument("input-spec", required=True, type=click.Path(exists=True))
 def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_length, force, input_spec):
-    """Convert reads from fastq{,.gz} files to a format compatible with `annotate`"""
+    """Convert reads from fastq{,.gz} files for use with `annotate`."""
 
     t_start = time.time()
 

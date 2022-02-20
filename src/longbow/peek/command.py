@@ -115,7 +115,7 @@ click_log.basic_config(logger)
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, min_rq, force, include_deprecated_models, input_bam):
-    """Peeks at MAS-ISO-seq reads to guess the most appropriate pre-built array model to use."""
+    """Guess the best pre-built array model to use for annotation."""
 
     t_start = time.time()
 
