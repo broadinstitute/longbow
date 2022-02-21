@@ -19,12 +19,11 @@ TEST_DATA_FOLDER = path = os.path.abspath(
     (TEST_DATA_FOLDER + "mas15_test_input.bam", "mas15v2"),
     (TEST_DATA_FOLDER + "mas10_test_input.bam", "mas10v2"),
 ])
-def segmented_bam_file_from_pipeline(request):
+def filtered_bam_file_from_pipeline(request):
     input_bam, model_name = request.param
 
     with tempfile.NamedTemporaryFile(delete=True) as annotate_bam, \
-         tempfile.NamedTemporaryFile(delete=True) as filter_bam, \
-         tempfile.NamedTemporaryFile(delete=True) as segment_bam:
+         tempfile.NamedTemporaryFile(delete=True) as filter_bam:
 
         runner = CliRunner()
 
@@ -34,16 +33,13 @@ def segmented_bam_file_from_pipeline(request):
         result_filter = runner.invoke(longbow, ["filter",   "-m", model_name, "-f", "-o", filter_bam.name,   annotate_bam.name])
         assert result_filter.exit_code == 0
 
-        result_segment = runner.invoke(longbow, ["segment",  "-m", model_name, "-f", "-o", segment_bam.name,  filter_bam.name])
-        assert result_segment.exit_code == 0
-
         # Yield file here so that when we return, we get to clean up automatically
-        yield segment_bam.name
+        yield filter_bam.name
 
 
-def test_extract_from_file(tmpdir, segmented_bam_file_from_pipeline):
-    actual_file = tmpdir.join(f"extract_actual_out.bam")
-    args = ["extract", "-f", "-o", actual_file, segmented_bam_file_from_pipeline]
+def test_segment_from_file(tmpdir, filtered_bam_file_from_pipeline):
+    actual_file = tmpdir.join(f"segment_actual_out.bam")
+    args = ["segment", "-f", "-o", actual_file, filtered_bam_file_from_pipeline]
 
     runner = CliRunner()
     result = runner.invoke(longbow, args)
@@ -51,14 +47,14 @@ def test_extract_from_file(tmpdir, segmented_bam_file_from_pipeline):
     assert result.exit_code == 0
 
 
-def test_extract_from_pipe(tmpdir, segmented_bam_file_from_pipeline):
-    actual_file = tmpdir.join(f"extract_actual_out.pipe.bam")
+def test_segment_from_pipe(tmpdir, filtered_bam_file_from_pipeline):
+    actual_file = tmpdir.join(f"filter_actual_out.pipe.bam")
 
     proc = subprocess.Popen(
-        [ sys.executable, "-m", "longbow", "extract", "-f", "-o", actual_file ],
+        [ sys.executable, "-m", "longbow", "segment", "-f", "-o", actual_file ],
         stdin=subprocess.PIPE
     )
 
-    cat_file_to_pipe(segmented_bam_file_from_pipeline, proc)
+    cat_file_to_pipe(filtered_bam_file_from_pipeline, proc)
 
     assert proc.returncode == 0
