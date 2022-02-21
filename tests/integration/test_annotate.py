@@ -10,6 +10,7 @@ from click.testing import CliRunner
 from longbow.__main__ import main_entry as longbow
 
 from ..utils import assert_bam_files_equal
+from ..utils import cat_file_to_pipe
 
 TEST_DATA_FOLDER = path = os.path.abspath(
     __file__ + os.path.sep + "../../" + os.path.sep + "test_data"
@@ -36,7 +37,7 @@ def test_annotate_from_file(tmpdir, input_bam, expected_bam, model_name):
     [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15_expected.bam", "mas15v2"],
     [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10_expected.bam", "mas10v2"],
 ])
-def test_annotate_input_from_pipe(tmpdir, input_bam, expected_bam, model_name):
+def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.pipe.bam")
 
     proc = subprocess.Popen(
@@ -44,14 +45,7 @@ def test_annotate_input_from_pipe(tmpdir, input_bam, expected_bam, model_name):
         stdin=subprocess.PIPE
     )
 
-    with open(input_bam, "rb") as input_file:
-        input_bytes = input_file.read()
-
-        proc.stdin.write(input_bytes)
-        proc.stdin.flush()
-
-    proc.stdin.close()
-    proc.wait()
+    cat_file_to_pipe(input_bam, proc)
 
     assert proc.returncode == 0
     assert_bam_files_equal(actual_bam, expected_bam)

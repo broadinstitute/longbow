@@ -33,3 +33,12 @@ def assert_bam_files_equal(file1, file2, order_matters=False, compare_header=Fal
             assert nreads_2 == len(f1_reads)
 
 
+def cat_file_to_pipe(filename, proc):
+    with open(filename, "rb") as input_file:
+        input_bytes = input_file.read()
+
+        proc.stdin.write(input_bytes)
+        proc.stdin.flush()
+
+    proc.stdin.close()
+    proc.wait()
