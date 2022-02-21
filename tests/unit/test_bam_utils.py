@@ -106,3 +106,15 @@ def test_bam_header_missing_model(bam_header_without_program_group):
     assert ret == False
 
 
+@pytest.mark.slow
+def test_generate_read_name_produces_no_collisions():
+    movie_name = 'm64020e_210000_000000'
+
+    read_names = set()
+    for zmw in range(8000000):
+        for split_read_index in range(20):
+            new_read_name = bam_utils.generate_read_name(movie_name, zmw, split_read_index)
+
+            assert new_read_name not in read_names
+
+            read_names.add(new_read_name)

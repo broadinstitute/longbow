@@ -1,5 +1,6 @@
 pytest
 pytest-cov
+pytest-skip-slow
 coverage >= 4.5
 click
 click_log

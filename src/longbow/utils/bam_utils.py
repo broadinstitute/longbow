@@ -445,3 +445,7 @@ def bam_header_has_model(header):
                 return True
 
     return False
+
+
+def generate_read_name(movie_name, zmw, split_read_index):
+    return f'{movie_name}/1{zmw:09d}{split_read_index:03d}/ccs'
