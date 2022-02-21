@@ -1,5 +1,9 @@
 import pytest
+
+import subprocess
+import sys
 import os
+import time
 
 from click.testing import CliRunner
 
@@ -13,23 +17,41 @@ TEST_DATA_FOLDER = path = os.path.abspath(
 EXPECTED_DATA_FOLDER = TEST_DATA_FOLDER + "annotate" + os.path.sep
 
 
-@pytest.mark.parametrize("input_bam, expected_bam, use_mas10", [
-    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15_expected.bam", False],
-    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10_expected.bam", True],
+@pytest.mark.parametrize("input_bam, expected_bam, model_name", [
+    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15_expected.bam", "mas15v2"],
+    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10_expected.bam", "mas10v2"],
 ])
-def test_annotate(tmpdir, input_bam, expected_bam, use_mas10):
-
-    if use_mas10:
-        actual_file = tmpdir.join("annotate_actual_out.mas10.bam")
-        args = ["annotate", "-t", 4, "-m", "mas10v2", input_bam, "-f", "-o", actual_file]
-    else:
-        actual_file = tmpdir.join("annotate_actual_out.mas15.bam")
-        args = ["annotate", "-t", 4, "-m", "mas15v2", input_bam, "-f", "-o", actual_file]
+def test_annotate_from_file(tmpdir, input_bam, expected_bam, model_name):
+    actual_bam = tmpdir.join("annotate_actual_out.mas10.bam")
+    args = ["annotate", "-t", 4, "-m", model_name, "-f", "-o", actual_bam, input_bam]
 
     runner = CliRunner()
-    runner.invoke(longbow, args)
+    result = runner.invoke(longbow, args)
 
-    # Equal files result as True:
-    assert_bam_files_equal(actual_file, expected_bam)
+    assert result.exit_code == 0
+    assert_bam_files_equal(actual_bam, expected_bam)
 
 
+@pytest.mark.parametrize("input_bam, expected_bam, model_name", [
+    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15_expected.bam", "mas15v2"],
+    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10_expected.bam", "mas10v2"],
+])
+def test_annotate_input_from_pipe(tmpdir, input_bam, expected_bam, model_name):
+    actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.pipe.bam")
+
+    proc = subprocess.Popen(
+        [ sys.executable, "-m", "longbow", "annotate", "-m", model_name, "-f", "-o", actual_bam ],
+        stdin=subprocess.PIPE
+    )
+
+    with open(input_bam, "rb") as input_file:
+        input_bytes = input_file.read()
+
+        proc.stdin.write(input_bytes)
+        proc.stdin.flush()
+
+    proc.stdin.close()
+    proc.wait()
+
+    assert proc.returncode == 0
+    assert_bam_files_equal(actual_bam, expected_bam)
