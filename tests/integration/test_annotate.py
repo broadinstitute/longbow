@@ -21,10 +21,10 @@ def test_annotate(tmpdir, input_bam, expected_bam, use_mas10):
 
     if use_mas10:
         actual_file = tmpdir.join("annotate_actual_out.mas10.bam")
-        args = ["annotate", "-t", 4, "-v", "INFO", "--m10", input_bam, "-o", actual_file]
+        args = ["annotate", "-t", 4, "-m", "mas10v2", input_bam, "-f", "-o", actual_file]
     else:
         actual_file = tmpdir.join("annotate_actual_out.mas15.bam")
-        args = ["annotate", "-t", 4, "-v", "INFO", input_bam, "-o", actual_file]
+        args = ["annotate", "-t", 4, "-m", "mas15v2", input_bam, "-f", "-o", actual_file]
 
     runner = CliRunner()
     runner.invoke(longbow, args)
