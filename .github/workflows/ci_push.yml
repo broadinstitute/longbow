@@ -8,6 +8,7 @@ on:
 
 jobs:
   # Run test suite
+  test_suite:
     runs-on: ubuntu-latest
 
     steps:
