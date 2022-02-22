@@ -20,8 +20,8 @@ jobs:
       with:
         credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
 
-    - name: Pytest
-      uses: fylein/python-pytest-github-action@v1
+    - name: GitHub Action for pytest
+      uses: cclauss/GitHub-Action-for-pytest@master
       with:
         args: pip3 install -r dev-requirements.txt && pip3 install -r test-requirements.txt && pytest
 
