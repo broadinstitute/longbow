@@ -18,13 +18,14 @@ jobs:
         python-version: '3.7.9'
         architecture: 'x64'
 
-    - name: wget
-      uses: wei/wget@v1
-      with:
-        args: -O /usr/local/bin/starcode https://github.com/gui11aume/starcode/releases/download/1.4/starcode-1.4
+    # - name: wget
+    #   uses: wei/wget@v1
+    #   with:
+    #     args: -O /usr/local/bin/starcode https://github.com/gui11aume/starcode/releases/download/1.4/starcode-1.4
 
     - name: pytest
       run: |-
+        wget -O /usr/local/bin/starcode https://github.com/gui11aume/starcode/releases/download/1.4/starcode-1.4
         python3 -mvenv venv
         . venv/bin/activate
         pip install --upgrade pip
