@@ -20,6 +20,13 @@ jobs:
       with:
         credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
 
+    - name: Pytest
+      uses: fylein/python-pytest-github-action@v1
+      run: |-
+        pip3 install -r dev-requirements.txt
+        pip3 install -r test-requirements.txt
+        pytest
+
     - name: Image
       run: |-
         TAG=$(git rev-parse --abbrev-ref HEAD)
