@@ -422,7 +422,7 @@ def get_model_from_bam_header(header):
     model_jsons = get_models_from_bam_header(header)
 
     if len(model_jsons) > 0:
-        logger.warn(f"Loading model {model_jsons[0]['name']}, but more than one detected ({', '.join([m['name'] for m in model_jsons])}).")
+        logger.warning(f"Loading model {model_jsons[0]['name']}, but more than one detected ({', '.join([m['name'] for m in model_jsons])}).")
 
     return model_jsons[0]
 

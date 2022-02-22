@@ -23,7 +23,7 @@ EXPECTED_DATA_FOLDER = TEST_DATA_FOLDER + "annotate" + os.path.sep
     [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10_expected.bam", "mas10v2"],
 ])
 def test_annotate_from_file(tmpdir, input_bam, expected_bam, model_name):
-    actual_bam = tmpdir.join("annotate_actual_out.mas10.bam")
+    actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.bam")
     args = ["annotate", "-t", 4, "-m", model_name, "-f", "-o", actual_bam, input_bam]
 
     runner = CliRunner()
