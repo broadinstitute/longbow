@@ -64,6 +64,8 @@ READ_SPATIAL_BARCODE1_POS_TAG = "XP"
 READ_SPATIAL_BARCODE2_TAG = "X2"
 READ_SPATIAL_BARCODE2_POS_TAG = "XQ"
 
+READ_BGZF_VIRTUAL_OFFSET_TAG = "vo"
+
 ################################################################################
 # Constants for PacBio compatibility:
 #######################################

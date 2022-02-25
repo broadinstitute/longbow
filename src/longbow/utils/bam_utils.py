@@ -418,6 +418,15 @@ def get_model_name_from_bam_header(header):
     return get_model_name_from_bam_header(header)['name']
 
 
+def get_model_from_bam_header(header):
+    model_jsons = get_models_from_bam_header(header)
+
+    if len(model_jsons) > 0:
+        logger.warn(f"Loading model {model_jsons[0]['name']}, but more than one detected ({', '.join([m['name'] for m in model_jsons])}).")
+
+    return model_jsons[0]
+
+
 def get_models_from_bam_header(header):
     model_jsons = []
     for pg in header.as_dict()['PG']:
@@ -436,3 +445,7 @@ def bam_header_has_model(header):
                 return True
 
     return False
+
+
+def generate_read_name(movie_name, zmw, split_read_index):
+    return f'{movie_name}/1{zmw:09d}{split_read_index:03d}/ccs'

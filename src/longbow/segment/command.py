@@ -279,7 +279,7 @@ def _sub_process_write_fn(
                 delimiters,
                 out_bam_file,
                 barcode_conf_file,
-                ignore_cbc_and_umi
+                ignore_cbc_and_umi,
             )
 
             # Increment our counters:
@@ -526,11 +526,13 @@ def _write_segmented_read(
     :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
     :param barcode_conf_file: An open file ready to write out the barcodes and confidence scores.
+    :param ignore_cbc_and_umi: Boolean indicating whether we should ignore CBC/UMI tags.
     :return: the number of segments written.
     """
 
     segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segments)
 
+    sri = 1
     for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
         # Write our segment here:
         _write_split_array_element(
@@ -543,8 +545,11 @@ def _write_segmented_read(
             segments,
             delim_name,
             prev_delim_name,
-            ignore_cbc_and_umi
+            ignore_cbc_and_umi,
+            sri
         )
+
+        sri += 1
 
     return len(segment_bounds_tuples)
 
@@ -564,10 +569,11 @@ def _write_split_array_element(
     segments,
     delim_name,
     prev_delim_name,
-    ignore_cbc_and_umi
+    ignore_cbc_and_umi,
+    split_read_index
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
-    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord)
+    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord, split_read_index)
 
     # Write our barcode confidence to the file if we have to:
     if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
@@ -579,7 +585,7 @@ def _write_split_array_element(
         bam_out.write(a)
 
 
-def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord):
+def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord, split_read_index):
     """Package an array element into an AlignedSegment from the results of simple splitting rules."""
 
     # Add one to end_coord because coordinates are inclusive:
@@ -591,10 +597,8 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     a.mapping_quality = 255
 
     # Reset read name (we need a unique name for each read that's also compatible with IsoSeq3)
-    zmw = abs(hash(a.query_sequence + f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")) % (10 ** 9)
     movie_name = read.query_name.split("/")[0]
-    a.query_name = f'{movie_name}/{zmw}/ccs'
-    a.set_tag(longbow.utils.constants.READ_ZMW_TAG, zmw)
+    a.query_name = bam_utils.generate_read_name(movie_name, read.get_tag("zm"), split_read_index)
     a.set_tag(longbow.utils.constants.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
 
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
