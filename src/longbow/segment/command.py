@@ -527,7 +527,6 @@ def _write_segmented_read(
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
     :param barcode_conf_file: An open file ready to write out the barcodes and confidence scores.
     :param ignore_cbc_and_umi: Boolean indicating whether we should ignore CBC/UMI tags.
-    :param read_index: The index of the read.
     :return: the number of segments written.
     """
 
