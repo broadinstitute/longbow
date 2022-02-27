@@ -2,10 +2,16 @@ import pytest
 
 import pysam
 import tempfile
+import os
+import json
 
 from longbow.utils import bam_utils
 from longbow.utils import model
 
+
+TEST_DATA_FOLDER = path = os.path.abspath(
+    __file__ + os.path.sep + "../../" + os.path.sep + "test_data"
+) + os.path.sep
 
 @pytest.fixture
 def bam_header_without_program_group():
@@ -170,18 +176,50 @@ def test_load_models_from_bam_header(bam_header_with_multiple_program_groups):
         assert models[1].name == 'mas15teloprimev2'
 
 
+def _compare_models(prebuilt_model, stored_model):
+    assert prebuilt_model.name == stored_model.name
+    assert prebuilt_model.description == stored_model.description
+    assert prebuilt_model.version == stored_model.version
+    assert prebuilt_model.array_element_structure == stored_model.array_element_structure
+    assert prebuilt_model.direct_connections_dict == stored_model.direct_connections_dict
+    assert prebuilt_model.end_element_names == stored_model.end_element_names
+    assert prebuilt_model.key_adapter_set == stored_model.key_adapter_set
+    assert prebuilt_model.key_adapters == stored_model.key_adapters
+    assert prebuilt_model.start_element_names == stored_model.start_element_names
+
+    assert prebuilt_model.adapter_dict.keys() == stored_model.adapter_dict.keys()
+    for p, s in zip(prebuilt_model.adapter_dict.values(), stored_model.adapter_dict.values()):
+        if isinstance(p, dict):
+            assert p.keys() == s.keys()
+
+            for k in p.keys():
+                if isinstance(p[k], tuple):
+                    # TODO: This is specifically to fix an issue comparing HomopolymerRepeat objects.
+                    # Apparently, retrieving this from the pre-built model yields ('A', 30), but
+                    # loading from json yields ['A', 30].  This should be fixed.
+                    assert tuple(p[k]) == tuple(s[k])
+                else:
+                    assert p[k] == s[k]
+
+
 def test_load_model_from_name():
     for model_name in list(model.LibraryModel.pre_configured_models.keys()):
         lb_models = bam_utils.load_models([model_name])
 
-        assert lb_models[0].name == model_name
+        stored_model = model.LibraryModel.from_json_file(f'{TEST_DATA_FOLDER}/models/{model_name}.json')
+
+        _compare_models(lb_models[0], stored_model)
 
 
 def test_load_model_from_json():
+    json_string = b'{"name":"mas3teloprimev2","description":"An example model for a 3-element array.","version":"1.0.0","array_element_structure":[["A","TPV2_adapter","cDNA","Poly_A","idx","rev_bind"],["B","TPV2_adapter","cDNA","Poly_A","idx","rev_bind"], ["C","TPV2_adapter","cDNA","Poly_A","idx","rev_bind","D"]],"adapters":{"TPV2_adapter":"CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG","rev_bind":"CTCTGCGTTGATACCACTGCTT","A":"AGCTTACTTGTGAAGAT","B":"ACTTGTAAGCTGTCTAT","C":"ACTCTGTCAGGTCCGAT","D":"ACCTCCTCCTCCAGAAT","Poly_A":{"HomopolymerRepeat":["A",30]},"idx":{"FixedLengthRandomBases":10},"cDNA":"random"},"direct_connections":{"A":["TPV2_adapter"],"B":["TPV2_adapter"],"C":["TPV2_adapter"],"D":["TPV2_adapter"],"TPV2_adapter":["cDNA"],"cDNA":["Poly_A"],"Poly_A":["idx"],"idx":["rev_bind"],"rev_bind":["B","C","D"]},"start_element_names":["A","TPV2_adapter"],"end_element_names":["rev_bind","D"],"named_random_segments":["idx","cDNA"],"coding_region":"cDNA","annotation_segments":{"idx":[["BC","XB"]]}}\n'
     with tempfile.NamedTemporaryFile(delete=False) as f:
-        f.write(b'{"name":"mas3teloprimev2","description":"An example model for a 3-element array.","version":"1.0.0","array_element_structure":[["A","TPV2_adapter","cDNA","Poly_A","idx","rev_bind"],["B","TPV2_adapter","cDNA","Poly_A","idx","rev_bind"], ["C","TPV2_adapter","cDNA","Poly_A","idx","rev_bind","D"]],"adapters":{"TPV2_adapter":"CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG","rev_bind":"CTCTGCGTTGATACCACTGCTT","A":"AGCTTACTTGTGAAGAT","B":"ACTTGTAAGCTGTCTAT","C":"ACTCTGTCAGGTCCGAT","D":"ACCTCCTCCTCCAGAAT","Poly_A":{"HomopolymerRepeat":["A",30]},"idx":{"FixedLengthRandomBases":10},"cDNA":"random"},"direct_connections":{"A":["TPV2_adapter"],"B":["TPV2_adapter"],"C":["TPV2_adapter"],"D":["TPV2_adapter"],"TPV2_adapter":["cDNA"],"cDNA":["Poly_A"],"Poly_A":["idx"],"idx":["rev_bind"],"rev_bind":["B","C","D"]},"start_element_names":["A","TPV2_adapter"],"end_element_names":["rev_bind","D"],"named_random_segments":["idx","cDNA"],"coding_region":"cDNA","annotation_segments":{"idx":[["BC","XB"]]}}\n')
+        f.write(json_string)
 
     lb_models = bam_utils.load_models([f.name])
+    stored_model = model.LibraryModel.from_json_obj(json.loads(json_string))
+
+    _compare_models(lb_models[0], stored_model)
 
     assert lb_models[0].name == "mas3teloprimev2"
 

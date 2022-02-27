@@ -1,0 +1,256 @@
+{
+    "name": "mas15teloprimev2",
+    "description": "The MAS15 Teloprime V2 indexed array element model.",
+    "version": "1.0.0",
+    "array_element_structure": [
+        [
+            "A",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "B",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "C",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "D",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "E",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "F",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "G",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "H",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "I",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "J",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "K",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "L",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "M",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "N",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        [
+            "O",
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind",
+            "P"
+        ]
+    ],
+    "adapters": {
+        "TPV2_adapter": "CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG",
+        "rev_bind": "CTCTGCGTTGATACCACTGCTT",
+        "A": "AGCTTACTTGTGAAGAT",
+        "B": "ACTTGTAAGCTGTCTAT",
+        "C": "ACTCTGTCAGGTCCGAT",
+        "D": "ACCTCCTCCTCCAGAAT",
+        "E": "AACCGGACACACTTAGT",
+        "F": "AGAGTCCAATTCGCAGT",
+        "G": "AATCAAGGCTTAACGGT",
+        "H": "ATGTTGAATCCTAGCGT",
+        "I": "AGTGCGTTGCGAATTGT",
+        "J": "AATTGCGTAGTTGGCCT",
+        "K": "ACACTTGGTCGCAATCT",
+        "L": "AGTAAGCCTTCGTGTCT",
+        "M": "ACCTAGATCAGAGCCTT",
+        "N": "AGGTATGCCGGTTAAGT",
+        "O": "AAGTCACCGGCACCTTT",
+        "P": "ATGAAGTGGCTCGAGA",
+        "Poly_A": {
+            "HomopolymerRepeat": [
+                "A",
+                30
+            ]
+        },
+        "idx": {
+            "FixedLengthRandomBases": 10
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "A": [
+            "TPV2_adapter"
+        ],
+        "B": [
+            "TPV2_adapter"
+        ],
+        "C": [
+            "TPV2_adapter"
+        ],
+        "D": [
+            "TPV2_adapter"
+        ],
+        "E": [
+            "TPV2_adapter"
+        ],
+        "F": [
+            "TPV2_adapter"
+        ],
+        "G": [
+            "TPV2_adapter"
+        ],
+        "H": [
+            "TPV2_adapter"
+        ],
+        "I": [
+            "TPV2_adapter"
+        ],
+        "J": [
+            "TPV2_adapter"
+        ],
+        "K": [
+            "TPV2_adapter"
+        ],
+        "L": [
+            "TPV2_adapter"
+        ],
+        "M": [
+            "TPV2_adapter"
+        ],
+        "N": [
+            "TPV2_adapter"
+        ],
+        "O": [
+            "TPV2_adapter"
+        ],
+        "TPV2_adapter": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "Poly_A"
+        ],
+        "Poly_A": [
+            "idx"
+        ],
+        "idx": [
+            "rev_bind"
+        ],
+        "rev_bind": [
+            "G",
+            "H",
+            "M",
+            "I",
+            "P",
+            "D",
+            "F",
+            "A",
+            "B",
+            "C",
+            "K",
+            "J",
+            "L",
+            "O",
+            "E",
+            "N"
+        ]
+    },
+    "start_element_names": [
+        "A",
+        "TPV2_adapter"
+    ],
+    "end_element_names": [
+        "rev_bind",
+        "P"
+    ],
+    "named_random_segments": [
+        "idx",
+        "cDNA"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "idx": [
+            [
+                "BC",
+                "XB"
+            ]
+        ]
+    }
+}

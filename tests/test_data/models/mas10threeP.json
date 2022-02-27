@@ -1,0 +1,224 @@
+{
+    "name": "mas10threeP",
+    "description": "The 3' kit MAS-seq 10 array element model.",
+    "version": "2.0.0",
+    "array_element_structure": [
+        [
+            "Q",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "C",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "M",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "I",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "O",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "J",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "B",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "D",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "K",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "H",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS",
+            "R"
+        ]
+    ],
+    "adapters": {
+        "VENUS": "TCTACACGACGCTCTTCCGATCT",
+        "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+        "B": "ACTTGTAAGCTGTCTA",
+        "C": "ACTCTGTCAGGTCCGA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "H": "ATGTTGAATCCTAGCG",
+        "I": "AGTGCGTTGCGAATTG",
+        "J": "AATTGCGTAGTTGGCC",
+        "K": "ACACTTGGTCGCAATC",
+        "M": "ACCTAGATCAGAGCCT",
+        "O": "AAGTCACCGGCACCTT",
+        "Q": "AAGCACCATAATGTGT",
+        "R": "AACCGGACACACTTAG",
+        "Poly_T": {
+            "HomopolymerRepeat": [
+                "T",
+                30
+            ]
+        },
+        "CBC": {
+            "FixedLengthRandomBases": 16
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 10
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "MARS": [
+            "H",
+            "M",
+            "I",
+            "D",
+            "B",
+            "C",
+            "O",
+            "Q",
+            "J",
+            "K",
+            "R"
+        ],
+        "B": [
+            "VENUS"
+        ],
+        "C": [
+            "VENUS"
+        ],
+        "D": [
+            "VENUS"
+        ],
+        "H": [
+            "VENUS"
+        ],
+        "I": [
+            "VENUS"
+        ],
+        "J": [
+            "VENUS"
+        ],
+        "K": [
+            "VENUS"
+        ],
+        "M": [
+            "VENUS"
+        ],
+        "O": [
+            "VENUS"
+        ],
+        "Q": [
+            "VENUS"
+        ],
+        "R": [
+            "VENUS"
+        ],
+        "VENUS": [
+            "CBC"
+        ],
+        "CBC": [
+            "UMI"
+        ],
+        "UMI": [
+            "Poly_T"
+        ],
+        "Poly_T": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "MARS"
+        ]
+    },
+    "start_element_names": [
+        "Q",
+        "VENUS"
+    ],
+    "end_element_names": [
+        "R"
+    ],
+    "named_random_segments": [
+        "CBC",
+        "UMI",
+        "cDNA"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "UMI": [
+            [
+                "ZU",
+                "XU"
+            ],
+            [
+                "XM",
+                "XU"
+            ]
+        ],
+        "CBC": [
+            [
+                "CR",
+                "XB"
+            ],
+            [
+                "XC",
+                "XB"
+            ]
+        ]
+    }
+}

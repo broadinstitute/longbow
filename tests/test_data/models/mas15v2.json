@@ -1,0 +1,314 @@
+{
+    "name": "mas15v2",
+    "description": "The standard MAS-seq 15 array element model.",
+    "version": "2.0.0",
+    "array_element_structure": [
+        [
+            "A",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "B",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "C",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "D",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "E",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "F",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "G",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "H",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "I",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "J",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "K",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "L",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "M",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "N",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "O",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS",
+            "P"
+        ]
+    ],
+    "adapters": {
+        "VENUS": "TCTACACGACGCTCTTCCGATCT",
+        "Poly_A": {
+            "HomopolymerRepeat": [
+                "A",
+                30
+            ]
+        },
+        "MARS": "GTACTCTGCGTTGATACCACTGCTT",
+        "BOREAS": "TTTCTTATATGGG",
+        "A": "AGCTTACTTGTGAAGA",
+        "B": "ACTTGTAAGCTGTCTA",
+        "C": "ACTCTGTCAGGTCCGA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "E": "AACCGGACACACTTAG",
+        "F": "AGAGTCCAATTCGCAG",
+        "G": "AATCAAGGCTTAACGG",
+        "H": "ATGTTGAATCCTAGCG",
+        "I": "AGTGCGTTGCGAATTG",
+        "J": "AATTGCGTAGTTGGCC",
+        "K": "ACACTTGGTCGCAATC",
+        "L": "AGTAAGCCTTCGTGTC",
+        "M": "ACCTAGATCAGAGCCT",
+        "N": "AGGTATGCCGGTTAAG",
+        "O": "AAGTCACCGGCACCTT",
+        "P": "ATGAAGTGGCTCGAGA",
+        "CBC": {
+            "FixedLengthRandomBases": 16
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 10
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "Poly_A": [
+            "MARS"
+        ],
+        "MARS": [
+            "G",
+            "H",
+            "M",
+            "I",
+            "P",
+            "D",
+            "F",
+            "A",
+            "B",
+            "C",
+            "K",
+            "J",
+            "L",
+            "O",
+            "E",
+            "N"
+        ],
+        "A": [
+            "VENUS"
+        ],
+        "B": [
+            "VENUS"
+        ],
+        "C": [
+            "VENUS"
+        ],
+        "D": [
+            "VENUS"
+        ],
+        "E": [
+            "VENUS"
+        ],
+        "F": [
+            "VENUS"
+        ],
+        "G": [
+            "VENUS"
+        ],
+        "H": [
+            "VENUS"
+        ],
+        "I": [
+            "VENUS"
+        ],
+        "J": [
+            "VENUS"
+        ],
+        "K": [
+            "VENUS"
+        ],
+        "L": [
+            "VENUS"
+        ],
+        "M": [
+            "VENUS"
+        ],
+        "N": [
+            "VENUS"
+        ],
+        "O": [
+            "VENUS"
+        ],
+        "P": [
+            "VENUS"
+        ],
+        "VENUS": [
+            "CBC"
+        ],
+        "CBC": [
+            "UMI"
+        ],
+        "UMI": [
+            "BOREAS"
+        ],
+        "BOREAS": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "Poly_A"
+        ]
+    },
+    "start_element_names": [
+        "A",
+        "VENUS"
+    ],
+    "end_element_names": [
+        "Poly_A",
+        "P"
+    ],
+    "named_random_segments": [
+        "CBC",
+        "UMI",
+        "cDNA"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "UMI": [
+            [
+                "ZU",
+                "XU"
+            ],
+            [
+                "XM",
+                "XU"
+            ]
+        ],
+        "CBC": [
+            [
+                "CR",
+                "XB"
+            ],
+            [
+                "XC",
+                "XB"
+            ]
+        ]
+    }
+}
