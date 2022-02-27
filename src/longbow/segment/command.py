@@ -216,10 +216,8 @@ def _sub_process_work_fn(in_queue, out_queue):
             return
 
         # Unpack our data here:
-        read = raw_data
-
         read = pysam.AlignedSegment.fromstring(
-            read, pysam.AlignmentHeader.from_dict(dict())
+            raw_data, pysam.AlignmentHeader.from_dict(dict())
         )
 
         # Process and place our data on the output queue:

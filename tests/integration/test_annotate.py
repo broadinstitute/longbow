@@ -24,7 +24,7 @@ EXPECTED_DATA_FOLDER = TEST_DATA_FOLDER + "annotate" + os.path.sep
 ])
 def test_annotate_from_file(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.bam")
-    args = ["annotate", "-t", 4, "-m", model_name, "-f", "-o", actual_bam, input_bam]
+    args = ["annotate", "-t", 1, "-m", model_name, "-f", "-o", actual_bam, input_bam]
 
     runner = CliRunner()
     result = runner.invoke(longbow, args)
