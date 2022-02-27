@@ -224,8 +224,6 @@ def test_load_model_from_json():
 
     _compare_models(lb_models[0], stored_model)
 
-    assert lb_models[0].name == "mas3teloprimev2"
-
 
 def test_reverse_complement():
     d = {
