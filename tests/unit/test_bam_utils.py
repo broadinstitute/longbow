@@ -193,12 +193,19 @@ def test_reverse_complement():
         'TTTCGCGCATATAG': 'CTATATGCGCGAAA',
         'CCAA': 'TTGG',
         'TTATATTTAT': 'ATAAATATAA',
+        'TANG': 'CNTA',
+        'SGYACGR': 'YCGTRCS',
+        'GCWATMCKVAABHGCD': 'HGCDVTTBMGKATWGC'
     }
 
     for k, v_exp in d.items():
         v_obs = bam_utils.reverse_complement(k)
 
         assert v_obs == v_exp
+
+        v_obs_lc = bam_utils.reverse_complement(k.lower())
+
+        assert v_obs_lc == v_exp.lower()
 
 
 @pytest.mark.slow
