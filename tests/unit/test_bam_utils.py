@@ -158,22 +158,9 @@ def test_bam_header_has_model(bam_header_with_program_group):
     assert ret == True
 
 
-def test_bam_header_missing_model(bam_header_without_program_group):
+def test_bam_header_is_missing_model(bam_header_without_program_group):
     ret = bam_utils.bam_header_has_model(bam_header_without_program_group)
     assert ret == False
-
-
-@pytest.mark.parametrize("bam_header_with_multiple_program_groups", ['mas15teloprimev2'], indirect=True)
-def test_load_models_from_bam_header(bam_header_with_multiple_program_groups):
-    with tempfile.NamedTemporaryFile(delete=True) as f:
-        with pysam.AlignmentFile(f.name, "wb", header=bam_header_with_multiple_program_groups) as bf:
-            bf.close()
-
-        models = bam_utils.load_models(None, input_bam=f)
-
-        assert len(models) == 2
-        assert models[0].name == 'mas15v2'
-        assert models[1].name == 'mas15teloprimev2'
 
 
 def _compare_models(prebuilt_model, stored_model):
@@ -200,6 +187,22 @@ def _compare_models(prebuilt_model, stored_model):
                     assert tuple(p[k]) == tuple(s[k])
                 else:
                     assert p[k] == s[k]
+
+
+@pytest.mark.parametrize("bam_header_with_multiple_program_groups", ['mas15teloprimev2'], indirect=True)
+def test_load_models_from_bam_header(bam_header_with_multiple_program_groups):
+    with tempfile.NamedTemporaryFile(delete=True) as f:
+        with pysam.AlignmentFile(f.name, "wb", header=bam_header_with_multiple_program_groups) as bf:
+            bf.close()
+
+        lb_models = bam_utils.load_models(None, input_bam=f)
+
+        assert len(lb_models) == 2
+
+        for lb_model in lb_models:
+            stored_model = model.LibraryModel.from_json_file(f'{TEST_DATA_FOLDER}/models/{lb_model.name}.json')
+
+            _compare_models(lb_model, stored_model)
 
 
 def test_load_model_from_name():
@@ -238,11 +241,9 @@ def test_reverse_complement():
 
     for k, v_exp in d.items():
         v_obs = bam_utils.reverse_complement(k)
-
-        assert v_obs == v_exp
-
         v_obs_lc = bam_utils.reverse_complement(k.lower())
 
+        assert v_obs == v_exp
         assert v_obs_lc == v_exp.lower()
 
 
