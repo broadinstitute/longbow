@@ -258,6 +258,8 @@ def _correct_barcode_fn(in_queue, out_queue, barcode_tag, corrected_tag, bc_corr
             if new_bc is not None:
                 read.set_tag(corrected_tag, new_bc)
                 num_corrected_segments += 1
+            else:
+                read.set_tag(corrected_tag, 'unclassified')
 
         # Process and place our data on the output queue:
         out_queue.put((read.to_string(), num_segments, num_corrected_segments))
