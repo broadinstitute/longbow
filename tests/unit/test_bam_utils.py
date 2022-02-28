@@ -155,12 +155,12 @@ def test_compute_shard_offsets():
 
 def test_bam_header_has_model(bam_header_with_program_group):
     ret = bam_utils.bam_header_has_model(bam_header_with_program_group)
-    assert ret == True
+    assert ret is True
 
 
 def test_bam_header_is_missing_model(bam_header_without_program_group):
     ret = bam_utils.bam_header_has_model(bam_header_without_program_group)
-    assert ret == False
+    assert ret is False
 
 
 def _compare_models(prebuilt_model, stored_model):

@@ -66,6 +66,9 @@ READ_SPATIAL_BARCODE2_POS_TAG = "XQ"
 
 READ_BGZF_VIRTUAL_OFFSET_TAG = "vo"
 
+COULD_CORRECT_BARCODE_TAG = "YC"  # True IFF barcode correction was able to be performed (including "correction" where the original barcode did not change).  False otherwise.
+BARCODE_CORRECTION_PERFORMED = "YP"  # True IFF the barcode was able to be corrected AND the corrected barcode != the raw barcode.  False otherwise.
+
 ################################################################################
 # Constants for PacBio compatibility:
 #######################################

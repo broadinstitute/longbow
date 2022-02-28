@@ -13,3 +13,5 @@ pandas
 pomegranate
 matplotlib
 editdistance
+ordered-set
+symspellpy

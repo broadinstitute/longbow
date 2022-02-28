@@ -45,6 +45,10 @@ the following commands:
     # run only integration tests
     tox -e integration
 
+    # run only a single test
+    # (in this case, the integration tests for `annotate`)
+    tox -e singletest -- tests/integration/test_annotate.py::test_annotate
+
     # run only linting
     tox -e lint
 

@@ -21,11 +21,15 @@ Options:
 
 Commands:
   annotate     Annotate reads in a BAM file with segments from the model.
+  convert      Convert reads from fastq{,.gz} files for use with `annotate`.
+  correct      Correct tag to values provided in barcode allowlist.
   demultiplex  Separate reads into files based on which model they fit best.
   extract      Extract coding segments from the reads in the given bam.
-  filter       Filter reads by whether they conform to expected segment order.
+  filter       Filter reads by conformation to expected segment order.
   inspect      Inspect the classification results on specified reads.
   model        Get information about built-in Longbow models.
+  pad          Pad tag by specified number of adjacent bases from the read.
+  peek         Guess the best pre-built array model to use for annotation.
   scsplit      Create files for use in `alevin` for single-cell analysis.
   segment      Segment pre-annotated reads from an input BAM file.
   stats        Calculate and produce stats on the given input bam file.

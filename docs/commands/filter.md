@@ -2,7 +2,7 @@
 layout: default
 title: filter
 description: "Filter reads."
-nav_order: 3
+nav_order: 6
 parent: Commands
 ---
 

@@ -36,6 +36,8 @@ the read tags added by each tool and what data they contain:
 | XQ | i | Segment | Position (0-based) in the read of the first base in the Spatial Barcode 2 sequence in the given segmented read |
 | XM | Z | Segment | Raw Unique Molecular Identifier (UMI) sequence for the given segmented read (for IsoSeq3 compatibility) |
 | XC | Z | Segment | Raw Cell Barcode (CBC) sequence for the given segmented read (for IsoSeq3 compatibility) |
+| YC | i | Correct | True IFF barcode correction was able to be performed (including "correction" where the original barcode did not change).  False otherwise. |
+| YP | i | Correct | True IFF the barcode was able to be corrected AND the corrected barcode != the raw barcode.  False otherwise.   |
 | ic | i | Segment | Sum of number of passes from all ZMWs used to create consensus.  Always set to 1.  (for IsoSeq3 compatibility) |
 | im | Z | Segment | ZMW names associated with a given segmented read.  Set to the name of the parent read for a segmented read. (e.g. `m64013e_211031_055434/1/ccs`).  (for IsoSeq3 compatibility) |
 | is | i | Segment | Number of ZMWs associated with a given segmented read.  Always set to 1.  (for IsoSeq3 compatibility) |

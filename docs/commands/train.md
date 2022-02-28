@@ -2,7 +2,7 @@
 layout: default
 title: train
 description: "Train model."
-nav_order: 8
+nav_order: 14
 parent: Commands
 ---
 

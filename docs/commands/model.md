@@ -2,7 +2,7 @@
 layout: default
 title: model 
 description: "Get info on built-in models."
-nav_order: 10
+nav_order: 8
 parent: Commands
 ---
 
