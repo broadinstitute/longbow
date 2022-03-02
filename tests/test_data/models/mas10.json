@@ -1,0 +1,153 @@
+{
+    "name": "mas10",
+    "description": "The MAS-seq 10 array element model.",
+    "version": "1.0.0",
+    "array_element_structure": [
+        [
+            "Q",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "C",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "M",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "I",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "O",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "J",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "B",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "D",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "K",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "H",
+            "10x_Adapter",
+            "random",
+            "Poly_A",
+            "3p_Adapter",
+            "R"
+        ]
+    ],
+    "adapters": {
+        "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
+        "Poly_A": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
+        "B": "ACTTGTAAGCTGTCTA",
+        "C": "ACTCTGTCAGGTCCGA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "H": "ATGTTGAATCCTAGCG",
+        "I": "AGTGCGTTGCGAATTG",
+        "J": "AATTGCGTAGTTGGCC",
+        "K": "ACACTTGGTCGCAATC",
+        "M": "ACCTAGATCAGAGCCT",
+        "O": "AAGTCACCGGCACCTT",
+        "Q": "AAGCACCATAATGTGT",
+        "R": "AACCGGACACACTTAG"
+    },
+    "direct_connections": {
+        "Poly_A": [
+            "3p_Adapter"
+        ],
+        "3p_Adapter": [
+            "H",
+            "M",
+            "I",
+            "D",
+            "B",
+            "C",
+            "O",
+            "Q",
+            "J",
+            "K",
+            "R"
+        ],
+        "B": [
+            "10x_Adapter"
+        ],
+        "C": [
+            "10x_Adapter"
+        ],
+        "D": [
+            "10x_Adapter"
+        ],
+        "H": [
+            "10x_Adapter"
+        ],
+        "I": [
+            "10x_Adapter"
+        ],
+        "J": [
+            "10x_Adapter"
+        ],
+        "K": [
+            "10x_Adapter"
+        ],
+        "M": [
+            "10x_Adapter"
+        ],
+        "O": [
+            "10x_Adapter"
+        ],
+        "Q": [
+            "10x_Adapter"
+        ],
+        "R": [
+            "10x_Adapter"
+        ]
+    },
+    "start_element_names": [
+        "10x_Adapter",
+        "Q"
+    ],
+    "end_element_names": [
+        "Poly_A",
+        "R"
+    ]
+}

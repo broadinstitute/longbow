@@ -1,0 +1,193 @@
+{
+    "name": "mas8prototypeV2",
+    "description": "The prototype MAS-seq 8 array element model.",
+    "version": "2.0.0",
+    "array_element_structure": [
+        [
+            "A",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "B",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "C",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "D",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "E",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "F",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "G",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS"
+        ],
+        [
+            "H",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "MARS",
+            "A"
+        ]
+    ],
+    "adapters": {
+        "VENUS": "CTACACGACGCTCTTCCGATCT",
+        "Poly_T": {
+            "HomopolymerRepeat": [
+                "T",
+                30
+            ]
+        },
+        "ZEPHYR": "CCCATGTA",
+        "MARS": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+        "A": "ACGTACAGT",
+        "B": "AAACTGCAT",
+        "C": "AGAGTCACT",
+        "D": "AGCAAGTTT",
+        "E": "AAGTGGTGT",
+        "F": "AGTGGACTT",
+        "G": "ACAGGTTAT",
+        "H": "ATCTCACAT",
+        "CBC": {
+            "FixedLengthRandomBases": 16
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 12
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "MARS": [
+            "G",
+            "H",
+            "D",
+            "F",
+            "A",
+            "B",
+            "C",
+            "E"
+        ],
+        "A": [
+            "VENUS"
+        ],
+        "B": [
+            "VENUS"
+        ],
+        "C": [
+            "VENUS"
+        ],
+        "D": [
+            "VENUS"
+        ],
+        "E": [
+            "VENUS"
+        ],
+        "F": [
+            "VENUS"
+        ],
+        "G": [
+            "VENUS"
+        ],
+        "H": [
+            "VENUS"
+        ],
+        "VENUS": [
+            "CBC"
+        ],
+        "CBC": [
+            "UMI"
+        ],
+        "UMI": [
+            "Poly_T"
+        ],
+        "Poly_T": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "MARS"
+        ]
+    },
+    "start_element_names": [
+        "A",
+        "VENUS"
+    ],
+    "end_element_names": [
+        "A",
+        "MARS"
+    ],
+    "named_random_segments": [
+        "CBC",
+        "UMI",
+        "cDNA"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "UMI": [
+            [
+                "ZU",
+                "XU"
+            ],
+            [
+                "XM",
+                "XU"
+            ]
+        ],
+        "CBC": [
+            [
+                "CR",
+                "XB"
+            ],
+            [
+                "XC",
+                "XB"
+            ]
+        ]
+    }
+}

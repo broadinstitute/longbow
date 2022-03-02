@@ -1,0 +1,129 @@
+{
+    "name": "mas8prototype",
+    "description": "The prototype MAS-seq 8 array element model.",
+    "version": "1.0.0",
+    "array_element_structure": [
+        [
+            "A",
+            "10x_Adapter",
+            "random",
+            "Poly_T",
+            "random",
+            "TSO"
+        ],
+        [
+            "B",
+            "10x_Adapter",
+            "random",
+            "Poly_T",
+            "random",
+            "TSO"
+        ],
+        [
+            "C",
+            "10x_Adapter",
+            "random",
+            "Poly_T",
+            "random",
+            "TSO"
+        ],
+        [
+            "D",
+            "10x_Adapter",
+            "random",
+            "Poly_T",
+            "random",
+            "TSO"
+        ],
+        [
+            "E",
+            "10x_Adapter",
+            "random",
+            "Poly_T",
+            "random",
+            "TSO"
+        ],
+        [
+            "F",
+            "10x_Adapter",
+            "random",
+            "Poly_T",
+            "random",
+            "TSO"
+        ],
+        [
+            "G",
+            "10x_Adapter",
+            "random",
+            "Poly_T",
+            "random",
+            "TSO"
+        ],
+        [
+            "H",
+            "10x_Adapter",
+            "random",
+            "Poly_T",
+            "random",
+            "TSO",
+            "A"
+        ]
+    ],
+    "adapters": {
+        "10x_Adapter": "CTACACGACGCTCTTCCGATCT",
+        "Poly_T": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+        "TSO": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+        "A": "ACGTACAGT",
+        "B": "AAACTGCAT",
+        "C": "AGAGTCACT",
+        "D": "AGCAAGTTT",
+        "E": "AAGTGGTGT",
+        "F": "AGTGGACTT",
+        "G": "ACAGGTTAT",
+        "H": "ATCTCACAT"
+    },
+    "direct_connections": {
+        "TSO": [
+            "G",
+            "H",
+            "D",
+            "F",
+            "A",
+            "B",
+            "C",
+            "E"
+        ],
+        "A": [
+            "10x_Adapter"
+        ],
+        "B": [
+            "10x_Adapter"
+        ],
+        "C": [
+            "10x_Adapter"
+        ],
+        "D": [
+            "10x_Adapter"
+        ],
+        "E": [
+            "10x_Adapter"
+        ],
+        "F": [
+            "10x_Adapter"
+        ],
+        "G": [
+            "10x_Adapter"
+        ],
+        "H": [
+            "10x_Adapter"
+        ]
+    },
+    "start_element_names": [
+        "10x_Adapter",
+        "A"
+    ],
+    "end_element_names": [
+        "A",
+        "TSO"
+    ]
+}

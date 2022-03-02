@@ -1,0 +1,239 @@
+{
+    "name": "mas10v2",
+    "description": "The MAS-seq 10 array element model.",
+    "version": "2.0.0",
+    "array_element_structure": [
+        [
+            "Q",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "C",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "M",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "I",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "O",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "J",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "B",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "D",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "K",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS"
+        ],
+        [
+            "H",
+            "VENUS",
+            "CBC",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS",
+            "R"
+        ]
+    ],
+    "adapters": {
+        "VENUS": "TCTACACGACGCTCTTCCGATCT",
+        "Poly_A": {
+            "HomopolymerRepeat": [
+                "A",
+                30
+            ]
+        },
+        "MARS": "GTACTCTGCGTTGATACCACTGCTT",
+        "BOREAS": "TTTCTTATATGGG",
+        "B": "ACTTGTAAGCTGTCTA",
+        "C": "ACTCTGTCAGGTCCGA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "H": "ATGTTGAATCCTAGCG",
+        "I": "AGTGCGTTGCGAATTG",
+        "J": "AATTGCGTAGTTGGCC",
+        "K": "ACACTTGGTCGCAATC",
+        "M": "ACCTAGATCAGAGCCT",
+        "O": "AAGTCACCGGCACCTT",
+        "Q": "AAGCACCATAATGTGT",
+        "R": "AACCGGACACACTTAG",
+        "CBC": {
+            "FixedLengthRandomBases": 16
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 10
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "Poly_A": [
+            "MARS"
+        ],
+        "MARS": [
+            "H",
+            "M",
+            "I",
+            "D",
+            "B",
+            "C",
+            "O",
+            "Q",
+            "J",
+            "K",
+            "R"
+        ],
+        "B": [
+            "VENUS"
+        ],
+        "C": [
+            "VENUS"
+        ],
+        "D": [
+            "VENUS"
+        ],
+        "H": [
+            "VENUS"
+        ],
+        "I": [
+            "VENUS"
+        ],
+        "J": [
+            "VENUS"
+        ],
+        "K": [
+            "VENUS"
+        ],
+        "M": [
+            "VENUS"
+        ],
+        "O": [
+            "VENUS"
+        ],
+        "Q": [
+            "VENUS"
+        ],
+        "R": [
+            "VENUS"
+        ],
+        "VENUS": [
+            "CBC"
+        ],
+        "CBC": [
+            "UMI"
+        ],
+        "UMI": [
+            "BOREAS"
+        ],
+        "BOREAS": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "Poly_A"
+        ]
+    },
+    "start_element_names": [
+        "Q",
+        "VENUS"
+    ],
+    "end_element_names": [
+        "Poly_A",
+        "R"
+    ],
+    "named_random_segments": [
+        "CBC",
+        "UMI",
+        "cDNA"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "UMI": [
+            [
+                "ZU",
+                "XU"
+            ],
+            [
+                "XM",
+                "XU"
+            ]
+        ],
+        "CBC": [
+            [
+                "CR",
+                "XB"
+            ],
+            [
+                "XC",
+                "XB"
+            ]
+        ]
+    }
+}

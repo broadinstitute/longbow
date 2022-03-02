@@ -1,0 +1,191 @@
+{
+    "name": "slide-seq",
+    "description": "The Slide-seq 15 array element model.",
+    "version": "0.0.1",
+    "array_element_structure": [
+        [
+            "A",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "B",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "C",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "D",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "E",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "F",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "G",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "H",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "I",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "J",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "K",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "L",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "M",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "N",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter"
+        ],
+        [
+            "O",
+            "10x_Adapter",
+            "random",
+            "5p_Adapter",
+            "P"
+        ]
+    ],
+    "adapters": {
+        "10x_Adapter": "TCTACACGACGCTCTTCCGATCT",
+        "5p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+        "A": "AGCTTACTTGTGAAGA",
+        "B": "ACTTGTAAGCTGTCTA",
+        "C": "ACTCTGTCAGGTCCGA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "E": "AACCGGACACACTTAG",
+        "F": "AGAGTCCAATTCGCAG",
+        "G": "AATCAAGGCTTAACGG",
+        "H": "ATGTTGAATCCTAGCG",
+        "I": "AGTGCGTTGCGAATTG",
+        "J": "AATTGCGTAGTTGGCC",
+        "K": "ACACTTGGTCGCAATC",
+        "L": "AGTAAGCCTTCGTGTC",
+        "M": "ACCTAGATCAGAGCCT",
+        "N": "AGGTATGCCGGTTAAG",
+        "O": "AAGTCACCGGCACCTT",
+        "P": "ATGAAGTGGCTCGAGA"
+    },
+    "direct_connections": {
+        "5p_Adapter": [
+            "G",
+            "H",
+            "M",
+            "I",
+            "P",
+            "D",
+            "F",
+            "A",
+            "B",
+            "C",
+            "K",
+            "J",
+            "L",
+            "O",
+            "E",
+            "N"
+        ],
+        "A": [
+            "10x_Adapter"
+        ],
+        "B": [
+            "10x_Adapter"
+        ],
+        "C": [
+            "10x_Adapter"
+        ],
+        "D": [
+            "10x_Adapter"
+        ],
+        "E": [
+            "10x_Adapter"
+        ],
+        "F": [
+            "10x_Adapter"
+        ],
+        "G": [
+            "10x_Adapter"
+        ],
+        "H": [
+            "10x_Adapter"
+        ],
+        "I": [
+            "10x_Adapter"
+        ],
+        "J": [
+            "10x_Adapter"
+        ],
+        "K": [
+            "10x_Adapter"
+        ],
+        "L": [
+            "10x_Adapter"
+        ],
+        "M": [
+            "10x_Adapter"
+        ],
+        "N": [
+            "10x_Adapter"
+        ],
+        "O": [
+            "10x_Adapter"
+        ]
+    },
+    "start_element_names": [
+        "10x_Adapter",
+        "A"
+    ],
+    "end_element_names": [
+        "5p_Adapter",
+        "P"
+    ]
+}

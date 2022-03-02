@@ -1,0 +1,306 @@
+{
+    "name": "mas15BulkWithIndices",
+    "description": "A MAS-seq 15 array element model with a 10 base index just before the 3' adapter for bulk sequencing.",
+    "version": "1.0.0",
+    "array_element_structure": [
+        [
+            "A",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "B",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "C",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "D",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "E",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "F",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "G",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "H",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "I",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "J",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "K",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "L",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "M",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "N",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "MARS"
+        ],
+        [
+            "O",
+            "VENUS",
+            "UMI",
+            "BOREAS",
+            "cDNA",
+            "Poly_A",
+            "MARS",
+            "sample_index",
+            "P"
+        ]
+    ],
+    "adapters": {
+        "VENUS": "TCTACACGACGCTCTTCCGATCT",
+        "Poly_A": {
+            "HomopolymerRepeat": [
+                "A",
+                30
+            ]
+        },
+        "MARS": "CTCTGCGTTGATACCACTGCTT",
+        "BOREAS": "TTTCTTATATGGG",
+        "A": "AGCTTACTTGTGAAGA",
+        "B": "ACTTGTAAGCTGTCTA",
+        "C": "ACTCTGTCAGGTCCGA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "E": "AACCGGACACACTTAG",
+        "F": "AGAGTCCAATTCGCAG",
+        "G": "AATCAAGGCTTAACGG",
+        "H": "ATGTTGAATCCTAGCG",
+        "I": "AGTGCGTTGCGAATTG",
+        "J": "AATTGCGTAGTTGGCC",
+        "K": "ACACTTGGTCGCAATC",
+        "L": "AGTAAGCCTTCGTGTC",
+        "M": "ACCTAGATCAGAGCCT",
+        "N": "AGGTATGCCGGTTAAG",
+        "O": "AAGTCACCGGCACCTT",
+        "P": "ATGAAGTGGCTCGAGA",
+        "sample_index": {
+            "FixedLengthRandomBases": 10
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 10
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "MARS": [
+            "G",
+            "H",
+            "M",
+            "I",
+            "P",
+            "D",
+            "F",
+            "A",
+            "B",
+            "C",
+            "K",
+            "J",
+            "L",
+            "O",
+            "E",
+            "N"
+        ],
+        "A": [
+            "VENUS"
+        ],
+        "B": [
+            "VENUS"
+        ],
+        "C": [
+            "VENUS"
+        ],
+        "D": [
+            "VENUS"
+        ],
+        "E": [
+            "VENUS"
+        ],
+        "F": [
+            "VENUS"
+        ],
+        "G": [
+            "VENUS"
+        ],
+        "H": [
+            "VENUS"
+        ],
+        "I": [
+            "VENUS"
+        ],
+        "J": [
+            "VENUS"
+        ],
+        "K": [
+            "VENUS"
+        ],
+        "L": [
+            "VENUS"
+        ],
+        "M": [
+            "VENUS"
+        ],
+        "N": [
+            "VENUS"
+        ],
+        "O": [
+            "VENUS"
+        ],
+        "P": [
+            "VENUS"
+        ],
+        "VENUS": [
+            "UMI"
+        ],
+        "UMI": [
+            "BOREAS"
+        ],
+        "BOREAS": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "Poly_A"
+        ],
+        "Poly_A": [
+            "sample_index"
+        ],
+        "sample_index": [
+            "MARS"
+        ]
+    },
+    "start_element_names": [
+        "A",
+        "VENUS"
+    ],
+    "end_element_names": [
+        "Poly_A",
+        "P"
+    ],
+    "named_random_segments": [
+        "sample_index",
+        "UMI",
+        "cDNA"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "UMI": [
+            [
+                "ZU",
+                "XU"
+            ]
+        ],
+        "sample_index": [
+            [
+                "CR",
+                "XB"
+            ]
+        ]
+    }
+}

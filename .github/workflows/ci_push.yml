@@ -7,6 +7,36 @@ on:
     - main
 
 jobs:
+  # Run test suite
+  test_suite:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: 'actions/checkout@v2'
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.7.9'
+        architecture: 'x64'
+
+    # - name: wget
+    #   uses: wei/wget@v1
+    #   with:
+    #     args: -O /usr/local/bin/starcode https://github.com/gui11aume/starcode/releases/download/1.4/starcode-1.4
+
+    - name: pytest
+      run: |-
+        wget -O /usr/local/bin/starcode https://github.com/gui11aume/starcode/releases/download/1.4/starcode-1.4
+        chmod 755 /usr/local/bin/starcode
+        echo "/usr/local/bin" >> $GITHUB_PATH
+        starcode --help
+        python3 -mvenv venv
+        . venv/bin/activate
+        pip install --upgrade pip
+        pip3 install -r test-requirements.txt
+        pip3 install -r dev-requirements.txt
+        pip install -e .
+        pytest
+
   # Build Docker image
   build_docker:
     runs-on: ubuntu-latest
