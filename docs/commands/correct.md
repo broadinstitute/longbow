@@ -26,43 +26,58 @@ Usage: longbow correct [OPTIONS] INPUT_BAM
   Correct tag to values provided in barcode allowlist.
 
 Options:
-  -v, --verbosity LVL          Either CRITICAL, ERROR, WARNING, INFO or DEBUG
-  -p, --pbi PATH               BAM .pbi index file
-  -t, --threads INTEGER        number of threads to use (0 for all)  [default:
-                               7]
-  -o, --output-bam PATH        annotated bam output  [default: stdout]
-  -m, --model TEXT             The model to use for annotation.  If not
-                               specified, it will be autodetected from the BAM
-                               header.  If the given value is a pre-configured
-                               model name, then that model will be used.
-                               Otherwise, the given value will be treated as a
-                               file name and Longbow will attempt to read in
-                               the file and create a LibraryModel from it.
-                               Longbow will assume the contents are the
-                               configuration of a LibraryModel as per
-                               LibraryModel.to_json().
-  -f, --force                  Force overwrite of the output files if they
-                               exist.  [default: False]
-  -r, --restrict-to-allowlist  Restrict barcode correction possibilities to
-                               only those on the allowlist.  [default: True]
-  -b, --barcode-tag TEXT       The tag from which to read the uncorrected
-                               barcode.  [default: CR]
-  -c, --corrected-tag TEXT     The tag in which to store the corrected
-                               barcode.  [default: CB]
-  -a, --allow-list PATH        List of allowed barcodes for specified tag
-                               (.txt, .txt.gz).  [required]
-  --barcode-freqs PATH         TSV file containing barcodes and the
-                               frequencies associated with them in the data
-                               (BARCODE      FREQ).  If not provided, barcode
-                               freqs will be uniformly seeded by the barcode
-                               whitelist.
-  --max-hifi-dist INTEGER      Maximum levenshtein distance to allow for
-                               hifi/CCS reads during correction.  [default: 2]
-  --max-clr-dist INTEGER       Maximum levenshtein distance to allow for CLR
-                               (ccs uncorrected) reads during correction.
-                               [default: 3]
-  --help                       Show this message and exit.
-
+  -v, --verbosity LVL             Either CRITICAL, ERROR, WARNING, INFO or
+                                  DEBUG
+  -p, --pbi PATH                  BAM .pbi index file
+  -t, --threads INTEGER           number of threads to use (0 for all)
+                                  [default: 7]
+  -o, --output-bam PATH           annotated bam output  [default: stdout]
+  -m, --model TEXT                The model to use for annotation.  If not
+                                  specified, it will be autodetected from the
+                                  BAM header.  If the given value is a pre-
+                                  configured model name, then that model will
+                                  be used.  Otherwise, the given value will be
+                                  treated as a file name and Longbow will
+                                  attempt to read in the file and create a
+                                  LibraryModel from it.  Longbow will assume
+                                  the contents are the configuration of a
+                                  LibraryModel as per LibraryModel.to_json().
+  -f, --force                     Force overwrite of the output files if they
+                                  exist.  [default: False]
+  -r, --restrict-to-allowlist     Restrict barcode correction possibilities to
+                                  only those on the allowlist.  [default:
+                                  True]
+  -b, --barcode-tag TEXT          The tag from which to read the uncorrected
+                                  barcode.  [default: CR]
+  -c, --corrected-tag TEXT        The tag in which to store the corrected
+                                  barcode.  [default: CB]
+  -a, --allow-list PATH           List of allowed barcodes for specified tag
+                                  (.txt, .txt.gz).  [required]
+  --barcode-freqs PATH            TSV file containing barcodes and the
+                                  frequencies associated with them in the data
+                                  (BARCODE      FREQ).  If not provided,
+                                  barcode freqs will be uniformly seeded by
+                                  the barcode whitelist.  NOTE: If barcodes in
+                                  this freqs file are not in the allow list
+                                  and the `-r` flag is not given, it is
+                                  possibleto end up with reads that have
+                                  barcodes which where corrected to values
+                                  that are not on the allow list.
+  --max-hifi-dist INTEGER         Maximum levenshtein distance to allow for
+                                  hifi/CCS reads during correction.  [default:
+                                  2]
+  --max-clr-dist INTEGER          Maximum levenshtein distance to allow for
+                                  CLR (ccs uncorrected) reads during
+                                  correction.  [default: 3]
+  --ccs-corrected-rq-threshold FLOAT
+                                  Value of the `rq` tag above which reads are
+                                  considered to be CCS corrected (Hifi).
+                                  [default: 0.0]
+  --barcode-uncorrectable-bam PATH
+                                  File to which to write all reads with
+                                  barcodes that could not be corrected.
+                                  [default: /dev/null]
+  --help                          Show this message and exit.
 ```
 
 ## Example

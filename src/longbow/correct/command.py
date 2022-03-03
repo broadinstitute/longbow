@@ -104,7 +104,9 @@ click_log.basic_config(logger)
     type=click.Path(exists=True),
     required=False,
     help="TSV file containing barcodes and the frequencies associated with them in the data (BARCODE\tFREQ).  "
-         "If not provided, barcode freqs will be uniformly seeded by the barcode whitelist.",
+         "If not provided, barcode freqs will be uniformly seeded by the barcode whitelist.  "
+         "NOTE: If barcodes in this freqs file are not in the allow list and the `-r` flag is not given, it is possible"
+         "to end up with reads that have barcodes which where corrected to values that are not on the allow list.",
 )
 @click.option(
     "--max-hifi-dist",
@@ -120,9 +122,23 @@ click_log.basic_config(logger)
     show_default=True,
     help="Maximum levenshtein distance to allow for CLR (ccs uncorrected) reads during correction.",
 )
+@click.option(
+    "--ccs-corrected-rq-threshold",
+    type=float,
+    default=0,
+    show_default=True,
+    help="Value of the `rq` tag above which reads are considered to be CCS corrected (Hifi).",
+)
+@click.option(
+    "--barcode-uncorrectable-bam",
+    default="/dev/null",
+    show_default=True,
+    type=click.Path(exists=False),
+    help="File to which to write all reads with barcodes that could not be corrected.",
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_tag, corrected_tag, allow_list,
-         barcode_freqs, max_hifi_dist, max_clr_dist, input_bam):
+         barcode_freqs, max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold, barcode_uncorrectable_bam, input_bam):
     """Correct tag to values provided in barcode allowlist."""
 
     t_start = time.time()
@@ -134,6 +150,9 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
 
     # Decide if we're disabling progress bars:
     disable_pbar = not sys.stdin.isatty()
+
+    logger.info(f"Writing reads with corrected barcodes to: {output_bam}")
+    logger.info(f"Writing reads with barcodes that could not be corrected to: {barcode_uncorrectable_bam}")
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
@@ -196,7 +215,7 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
             p = mp.Process(
                 target=_correct_barcode_fn,
                 args=(process_input_data_queue, results, bam_file.header.to_dict(), barcode_tag, corrected_tag,
-                      barcode_allow_list, max_hifi_dist, max_clr_dist, sym_spell_index)
+                      barcode_allow_list, max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold, sym_spell_index)
             )
             p.start()
             worker_process_pool.append(p)
@@ -205,10 +224,13 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Start output worker:
-        res = manager.dict({"num_reads_corrected": 0, "num_reads": 0, "num_with_barcodes": 0})
+        res = manager.dict({"num_ccs_reads": 0, "num_ccs_reads_corrected": 0, "num_ccs_reads_raw_was_correct": 0,
+                            "num_clr_reads": 0, "num_clr_reads_corrected": 0, "num_clr_reads_raw_was_correct": 0,
+                            "num_ccs_with_barcodes": 0, "num_clr_with_barcodes": 0})
         output_worker = mp.Process(
             target=_write_thread_fn,
-            args=(results, out_header, output_bam, num_reads, disable_pbar, res),
+            args=(results, out_header, output_bam, barcode_uncorrectable_bam, barcode_tag,
+                  ccs_corrected_rq_threshold, num_reads, disable_pbar, res),
         )
         output_worker.start()
 
@@ -230,32 +252,106 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
         results.put(None)
         output_worker.join()
 
-    logger.info(f"Corrected tags in {res['num_reads_corrected']} reads of {res['num_reads']} total "
-                f"({100.0*res['num_reads_corrected']/res['num_reads']:.2f}%).")
-    logger.info(f"Num reads with barcodes: {res['num_with_barcodes']}/{res['num_reads']} "
-                f"({100.0*res['num_with_barcodes']/res['num_reads']:.2f}%)")
-    logger.info(f"Num reads without barcodes: {(res['num_reads'] - res['num_with_barcodes'])}/{res['num_reads']} "
-                f"({(100.0*(res['num_reads'] - res['num_with_barcodes']))/res['num_reads']:.2f}%)")
+    # Print out some stats:
+
+    stat_prefix = "STATS: "
+
+    total_reads = res["num_ccs_reads"] + res["num_clr_reads"]
+    logger.info(f"{stat_prefix}Total reads seen: {total_reads}")
+
+    total_with_barcodes = res["num_ccs_with_barcodes"] + res["num_clr_with_barcodes"]
+    count_str, pct_str = _get_field_count_and_percent_string(total_with_barcodes, total_reads)
+    logger.info(f"{stat_prefix}Reads with {barcode_tag} barcodes: {count_str} {pct_str}")
+
+    total_without_barcodes = total_reads - total_with_barcodes
+    count_str, pct_str = _get_field_count_and_percent_string(total_without_barcodes, total_reads)
+    logger.info(f"{stat_prefix}Reads without {barcode_tag} barcodes: {count_str} {pct_str}")
+
+    total_corrected = res["num_ccs_reads_corrected"] + res["num_clr_reads_corrected"]
+    count_str, pct_str = _get_field_count_and_percent_string(total_corrected, total_reads)
+    logger.info(f"{stat_prefix}Reads able to be corrected into {corrected_tag} tag: {count_str} {pct_str}")
+
+    total_were_already_correct = res["num_ccs_reads_raw_was_correct"] + res["num_clr_reads_raw_was_correct"]
+    count_str, pct_str = _get_field_count_and_percent_string(total_were_already_correct, total_reads)
+    logger.info(f"{stat_prefix}Reads with already correct {barcode_tag} barcodes: {count_str} {pct_str}")
+
+    logger.info("=" * 80)
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_ccs_reads"], total_reads)
+    logger.info(f"{stat_prefix}CCS reads seen: {count_str} {pct_str}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_ccs_with_barcodes"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_ccs_with_barcodes"], res["num_ccs_reads"])
+    logger.info(f"{stat_prefix}CCS reads with {barcode_tag} barcodes (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CCS reads with {barcode_tag} barcodes (of ccs reads): {count_str2} {pct_str2}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_ccs_reads"] - res["num_ccs_with_barcodes"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_ccs_reads"] - res["num_ccs_with_barcodes"], res["num_ccs_reads"])
+    logger.info(f"{stat_prefix}CCS reads without {barcode_tag} barcodes (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CCS reads without {barcode_tag} barcodes (of ccs reads): {count_str2} {pct_str2}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_ccs_reads_corrected"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_ccs_reads_corrected"], res["num_ccs_reads"])
+    logger.info(f"{stat_prefix}CCS reads able to be corrected into {corrected_tag} tag (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CCS reads able to be corrected into {corrected_tag} tag (of ccs reads): {count_str2} {pct_str2}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_ccs_reads_raw_was_correct"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_ccs_reads_raw_was_correct"], res["num_ccs_reads"])
+    logger.info(f"{stat_prefix}CCS reads with already correct {corrected_tag} tag (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CCS reads with already correct {corrected_tag} tag (of ccs reads): {count_str2} {pct_str2}")
+
+    logger.info("=" * 80)
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_clr_reads"], total_reads)
+    logger.info(f"{stat_prefix}CLR reads seen: {count_str} {pct_str}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_clr_with_barcodes"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_clr_with_barcodes"], res["num_clr_reads"])
+    logger.info(f"{stat_prefix}CLR reads with {barcode_tag} barcodes (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CLR reads with {barcode_tag} barcodes (of clr reads): {count_str2} {pct_str2}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_clr_reads"] - res["num_clr_with_barcodes"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_clr_reads"] - res["num_clr_with_barcodes"], res["num_clr_reads"])
+    logger.info(f"{stat_prefix}CLR reads without {barcode_tag} barcodes (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CLR reads without {barcode_tag} barcodes (of clr reads): {count_str2} {pct_str2}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_clr_reads_corrected"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_clr_reads_corrected"], res["num_clr_reads"])
+    logger.info(f"{stat_prefix}CLR reads able to be corrected into {corrected_tag} tag (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CLR reads able to be corrected into {corrected_tag} tag (of clr reads): {count_str2} {pct_str2}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_clr_reads_raw_was_correct"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_clr_reads_raw_was_correct"], res["num_clr_reads"])
+    logger.info(f"{stat_prefix}CLR reads with already correct {corrected_tag} tag (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CLR reads with already correct {corrected_tag} tag (of clr reads): {count_str2} {pct_str2}")
 
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
-                f"Overall processing rate: {res['num_reads']/(et - t_start):2.2f} reads/s.")
+                f"Overall processing rate: {total_reads/(et - t_start):2.2f} reads/s.")
 
 
-def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, num_reads, disable_pbar, res):
+def _get_field_count_and_percent_string(count, total):
+    count_str = f"{count}/{total}"
+    pct_str = f"({0:2.4f}%)" if total == 0 else f"({100.0*count/total:2.4f}%)"
+
+    return count_str, pct_str
+
+
+def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, barcode_uncorrectable_bam,
+                     barcode_tag, ccs_corrected_rq_threshold, num_reads, disable_pbar, res):
     """Thread / process fn to write out all our data."""
 
-    with pysam.AlignmentFile(
-        out_bam_file_name, "wb", header=out_bam_header
-    ) as out_bam_file, tqdm(
-        desc="Progress",
-        unit=" read",
-        colour="green",
-        file=sys.stderr,
-        disable=disable_pbar,
-        total=num_reads,
-        leave=False,
-    ) as pbar:
+    with pysam.AlignmentFile(out_bam_file_name, "wb", header=out_bam_header) as out_bam_file, \
+        pysam.AlignmentFile(barcode_uncorrectable_bam, "wb", header=out_bam_header) as barcode_uncorrectable_bam, \
+        tqdm(
+            desc="Progress",
+            unit=" read",
+            colour="green",
+            file=sys.stderr,
+            disable=disable_pbar,
+            total=num_reads,
+            leave=False
+        ) as pbar:
 
         while True:
             # Wait for some output data:
@@ -273,19 +369,34 @@ def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, num_reads, d
             read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
             # Write our our read:
-            out_bam_file.write(read)
+            if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG):
+                out_bam_file.write(read)
+            else:
+                barcode_uncorrectable_bam.write(read)
 
             # Increment our counters:
-            res["num_reads"] += 1
-            if num_corrected_segments > 0:
-                res["num_reads_corrected"] += 1
-            res["num_with_barcodes"] += 1 if has_barcode else 0
+            if read.get_tag("rq") > ccs_corrected_rq_threshold:
+                res["num_ccs_reads"] += 1
+                if read.has_tag(barcode_tag):
+                    res["num_ccs_with_barcodes"] += 1
+                if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG) == 1:
+                    res["num_ccs_reads_corrected"] += 1
+                    if read.get_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED) == 0:
+                        res["num_ccs_reads_raw_was_correct"] += 1
+            else:
+                res["num_clr_reads"] += 1
+                if read.has_tag(barcode_tag):
+                    res["num_clr_with_barcodes"] += 1
+                if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG) == 1:
+                    res["num_clr_reads_corrected"] += 1
+                    if read.get_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED) == 0:
+                        res["num_clr_reads_raw_was_correct"] += 1
 
             pbar.update(1)
 
 
 def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corrected_tag, bc_allow_list,
-                        max_hifi_dist, max_clr_dist, sym_spell_index):
+                        max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold, sym_spell_index):
     """Function to run in each subprocess.
     Replace barcode with corrected value."""
 
@@ -317,7 +428,7 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
         if read.has_tag(barcode_tag):
             has_barcode = True
             old_bc = read.get_tag(barcode_tag)
-            dist_threshold = max_hifi_dist if read.get_tag('rq') != -1 else max_clr_dist
+            dist_threshold = max_hifi_dist if read.get_tag('rq') > ccs_corrected_rq_threshold else max_clr_dist
 
             new_bc = barcode_utils.find_match_symspell(old_bc, bc_allow_list, sym_spell_index, dist_threshold)
 
