@@ -164,7 +164,8 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_segmentation_fn, args=(input_data_queue, results, i, lb_models, min_length, max_length, min_rq)
+            target=_worker_segmentation_fn,
+            args=(input_data_queue, results, i, lb_models, min_length, max_length, min_rq)
         )
         p.start()
         worker_pool.append(p)
@@ -237,7 +238,7 @@ def get_segments(read):
 def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, lb_models):
     """Thread / process fn to write out all our data."""
 
-    lb_models_dict = {k.name:k for k in lb_models}
+    lb_models_dict = {k.name: k for k in lb_models}
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header

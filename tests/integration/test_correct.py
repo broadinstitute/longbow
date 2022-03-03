@@ -2,57 +2,63 @@ import pytest
 import os
 import sys
 import subprocess
-import tempfile
+
+import pysam
 
 from click.testing import CliRunner
 
 from longbow.__main__ import main_entry as longbow
 
+from ..utils import assert_bam_files_equal
 from ..utils import cat_file_to_pipe
+
+################################################################################
+
+TOOL_NAME = "correct"
 
 TEST_DATA_FOLDER = path = os.path.abspath(
     __file__ + os.path.sep + "../../" + os.path.sep + "test_data"
-) + os.path.sep
+) + os.path.sep + TOOL_NAME + os.path.sep
+
+################################################################################
 
 
-@pytest.fixture(scope="module", params=[
-    (TEST_DATA_FOLDER + "mas15_test_input.bam", "mas15v2"),
-    (TEST_DATA_FOLDER + "mas10_test_input.bam", "mas10v2"),
+def convert_sam_to_bam(sam_path, out_bam_path):
+    with pysam.AlignmentFile(sam_path, "r", check_sq=False, require_index=False) as input_file:
+        with pysam.AlignmentFile(out_bam_path, "wb", header=input_file.header) as out_bam_file:
+            for r in input_file:
+                out_bam_file.write(r)
+
+################################################################################
+
+
+@pytest.mark.parametrize("input_sam, expected_bc_corrected_sam, expected_bc_uncorrected_sam", [
+    [TEST_DATA_FOLDER + "correct_test_data.sam", TEST_DATA_FOLDER + "correct_expected_corrected_data.sam",
+     TEST_DATA_FOLDER + "correct_expected_uncorrected_data.sam"],
 ])
-def extracted_bam_file_from_pipeline(request):
-    input_bam, model_name = request.param
+def test_correct(tmpdir, input_sam, expected_bc_corrected_sam, expected_bc_uncorrected_sam):
 
-    with tempfile.NamedTemporaryFile(delete=True) as annotate_bam, \
-         tempfile.NamedTemporaryFile(delete=True) as filter_bam, \
-         tempfile.NamedTemporaryFile(delete=True) as segment_bam, \
-         tempfile.NamedTemporaryFile(delete=True) as extract_bam:
+    # Convert test files to bam:
+    input_bam = tmpdir.join("input.bam")
+    convert_sam_to_bam(input_sam, input_bam)
 
-        runner = CliRunner()
+    expected_bc_corrected_bam = tmpdir.join("expected.bam")
+    convert_sam_to_bam(expected_bc_corrected_sam, expected_bc_corrected_bam)
 
-        result_annotate = runner.invoke(longbow, ["annotate", "-m", model_name, "-f", "-o", annotate_bam.name, input_bam])
-        assert result_annotate.exit_code == 0
+    actual_bc_corrected_file = tmpdir.join(f"{TOOL_NAME}_actual_out.mas15.bam")
+    actual_bc_uncorrected_file = tmpdir.join(f"{TOOL_NAME}_actual_bc_uncorrected_out.mas15.bam")
+    args = ["correct", "-t", 1, "-m", "mas15v2", "-v", "INFO",
+            "-a", f"{TEST_DATA_FOLDER}barcode_allow_list.txt", str(input_bam), "-o", str(actual_bc_corrected_file),
+            "--barcode-uncorrectable-bam", str(actual_bc_uncorrected_file)]
 
-        result_filter = runner.invoke(longbow, ["filter",   "-m", model_name, "-f", "-o", filter_bam.name,   annotate_bam.name])
-        assert result_filter.exit_code == 0
-
-        result_segment = runner.invoke(longbow, ["segment",  "-m", model_name, "-f", "-o", segment_bam.name,  filter_bam.name])
-        assert result_segment.exit_code == 0
-
-        result_extract = runner.invoke(longbow, ["extract",  "-m", model_name, "-f", "-o", extract_bam.name,  segment_bam.name])
-        assert result_extract.exit_code == 0
-
-        # Yield file here so that when we return, we get to clean up automatically
-        yield extract_bam.name
-
-
-def test_correct_from_file(tmpdir, extracted_bam_file_from_pipeline):
-    actual_file = tmpdir.join(f"correct_actual_out.bam")
-    args = ["correct", "-f", "-o", actual_file, extracted_bam_file_from_pipeline]
-
-    runner = CliRunner()
+    runner = CliRunner(mix_stderr=False)
     result = runner.invoke(longbow, args)
 
     assert result.exit_code == 0
+
+    # Equal files result as True:
+    assert_bam_files_equal(actual_bc_corrected_file, expected_bc_corrected_bam, order_matters=True)
+    assert_bam_files_equal(actual_bc_uncorrected_file, expected_bc_uncorrected_sam, order_matters=True)
 
 
 @pytest.mark.skip(reason="`correct` command currently does not accept data from a pipe")
@@ -60,7 +66,7 @@ def test_correct_from_pipe(tmpdir, extracted_bam_file_from_pipeline):
     actual_file = tmpdir.join(f"correct_actual_out.pipe.bam")
 
     proc = subprocess.Popen(
-        [ sys.executable, "-m", "longbow", "correct", "-f", "-o", actual_file ],
+        [sys.executable, "-m", "longbow", "correct", "-f", "-o", actual_file],
         stdin=subprocess.PIPE
     )
 

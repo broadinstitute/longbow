@@ -2,7 +2,7 @@
 layout: default
 title: extract
 description: "Extract reads."
-nav_order: 4
+nav_order: 5
 parent: Commands
 ---
 

@@ -1,0 +1,10 @@
+@HD	VN:1.5	SO:unknown	pb:3.0.1
+@SQ	SN:chr1	LN:248956422
+@RG	ID:cd9b433d	PL:PACBIO	DS:READTYPE=CCS;BINDINGKIT=101-894-200;SEQUENCINGKIT=101-826-100;BASECALLERVERSION=5.0.0;FRAMERATEHZ=100.000000	LB:Mouse_Mas-seq_SD	PU:m64013e_211029_235558	SM:Mouse_Mas-seq_SD	PM:SEQUELII	CM:S/P5-C2/5.0-8M
+no_barcode	4	*	0	255	*	*	0	0	AAAAAAAAAA	++++++++++	RG:Z:cd9b433d	YC:i:0	YP:i:0	rq:f:1	CB:Z:unclassified
+ccs_barcode_lev_3_not_corrected	4	*	0	255	*	*	0	0	AAAAAAAAAA	++++++++++	RG:Z:cd9b433d	CR:Z:AAAAAAAAAAAAATTT	YC:i:0	YP:i:0	rq:f:1	CB:Z:unclassified
+clr_barcode_lev_4_not_corrected	4	*	0	255	*	*	0	0	AAAAAAAAAA	++++++++++	RG:Z:cd9b433d	CR:Z:AAAAAAAAAAAATTTT	YC:i:0	YP:i:0	rq:f:-1	CB:Z:unclassified
+ccs_barcode_lev_3_not_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCCTTT	YC:i:0	YP:i:0	rq:f:1	CB:Z:unclassified
+clr_barcode_lev_4_not_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCTTTT	YC:i:0	YP:i:0	rq:f:-1	CB:Z:unclassified
+ccs_correction_equidistant	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AGGGGGGGGTTTTTTC	YC:i:0	YP:i:0	rq:f:1	CB:Z:unclassified
+clr_correction_equidistant	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AGGGGGGGGTTTTTTC	YC:i:0	YP:i:0	rq:f:-1	CB:Z:unclassified

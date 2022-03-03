@@ -29,7 +29,8 @@ setup(
         'construct',
         'pathos',
         'ssw==0.4.1',
-        'tqdm'
+        'tqdm',
+        'symspellpy'
     ],
     tests_require=["coverage", "pytest"],
     python_requires=">=3.6, <=3.7.9",

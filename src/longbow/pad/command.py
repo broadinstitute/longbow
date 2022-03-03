@@ -80,7 +80,7 @@ click_log.basic_config(logger)
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(threads, output_bam, model, force, barcode_tag, expand, input_bam):
-    """Pad tag by specified number of bases from the read."""
+    """Pad tag by specified number of adjacent bases from the read."""
 
     t_start = time.time()
 

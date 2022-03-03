@@ -25,3 +25,4 @@ pydoc-markdown
 lxml
 editdistance
 ordered-set
+symspellpy
