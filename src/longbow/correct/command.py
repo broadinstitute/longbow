@@ -271,6 +271,10 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
     count_str, pct_str = _get_field_count_and_percent_string(total_corrected, total_reads)
     logger.info(f"{stat_prefix}Reads able to be corrected into {corrected_tag} tag: {count_str} {pct_str}")
 
+    total_uncorrected = total_reads - (res["num_ccs_reads_corrected"] + res["num_clr_reads_corrected"])
+    count_str, pct_str = _get_field_count_and_percent_string(total_uncorrected, total_reads)
+    logger.info(f"{stat_prefix}Reads unable to be corrected into {corrected_tag} tag: {count_str} {pct_str}")
+
     total_were_already_correct = res["num_ccs_reads_raw_was_correct"] + res["num_clr_reads_raw_was_correct"]
     count_str, pct_str = _get_field_count_and_percent_string(total_were_already_correct, total_reads)
     logger.info(f"{stat_prefix}Reads with already correct {barcode_tag} barcodes: {count_str} {pct_str}")
@@ -294,6 +298,11 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
     count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_ccs_reads_corrected"], res["num_ccs_reads"])
     logger.info(f"{stat_prefix}CCS reads able to be corrected into {corrected_tag} tag (of total reads): {count_str} {pct_str}")
     logger.info(f"{stat_prefix}CCS reads able to be corrected into {corrected_tag} tag (of ccs reads): {count_str2} {pct_str2}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_ccs_reads"] - res["num_ccs_reads_corrected"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_ccs_reads"] - res["num_ccs_reads_corrected"], res["num_ccs_reads"])
+    logger.info(f"{stat_prefix}CCS unreads able to be corrected into {corrected_tag} tag (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CCS unreads able to be corrected into {corrected_tag} tag (of ccs reads): {count_str2} {pct_str2}")
 
     count_str, pct_str = _get_field_count_and_percent_string(res["num_ccs_reads_raw_was_correct"], total_reads)
     count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_ccs_reads_raw_was_correct"], res["num_ccs_reads"])
@@ -319,6 +328,11 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
     count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_clr_reads_corrected"], res["num_clr_reads"])
     logger.info(f"{stat_prefix}CLR reads able to be corrected into {corrected_tag} tag (of total reads): {count_str} {pct_str}")
     logger.info(f"{stat_prefix}CLR reads able to be corrected into {corrected_tag} tag (of clr reads): {count_str2} {pct_str2}")
+
+    count_str, pct_str = _get_field_count_and_percent_string(res["num_clr_reads"] - res["num_clr_reads_corrected"], total_reads)
+    count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_clr_reads"] - res["num_clr_reads_corrected"], res["num_clr_reads"])
+    logger.info(f"{stat_prefix}CLR reads unable to be corrected into {corrected_tag} tag (of total reads): {count_str} {pct_str}")
+    logger.info(f"{stat_prefix}CLR reads unable to be corrected into {corrected_tag} tag (of clr reads): {count_str2} {pct_str2}")
 
     count_str, pct_str = _get_field_count_and_percent_string(res["num_clr_reads_raw_was_correct"], total_reads)
     count_str2, pct_str2 = _get_field_count_and_percent_string(res["num_clr_reads_raw_was_correct"], res["num_clr_reads"])
