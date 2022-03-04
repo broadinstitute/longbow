@@ -233,7 +233,8 @@ def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_m
                         tag_bc = read.get_tag(barcode_tag)
 
                         for query_sequence in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
-                            pos = query_sequence.find(read.get_tag(barcode_tag), int(start), int(stop))
+                            # Must add 1 to include the final base:
+                            pos = query_sequence.find(read.get_tag(barcode_tag), int(start), int(stop)+1)
 
                             if pos >= 0:
                                 start_pos = pos - expand
@@ -245,13 +246,17 @@ def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_m
 
                                 # old_bc = query_sequence[pos:pos + len(tag_bc)]
                                 # logger.info(f"{read.query_name} {pos}")
-                                # logger.info(f" -   {tag_bc}")
-                                # logger.info(f" -   {old_bc}")
+                                # logger.info(f" - {expand * ' '}{tag_bc}")
+                                # logger.info(f" - {expand * ' '}{old_bc}")
                                 # logger.info(f" - {new_bc}")
                                 # logger.info("")
 
                                 read.set_tag(new_barcode_tag, new_bc)
                                 read_is_refined = True
+
+                                # We only need to look in the correct direction of the read.
+                                # No need to continue here:
+                                break
 
             # Write our our read:
             out_bam_file.write(read)
