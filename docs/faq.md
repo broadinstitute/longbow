@@ -44,6 +44,7 @@ the read tags added by each tool and what data they contain:
 | it | Z | Segment | List of barcodes / UMIs tagged/clipped during segmentation (e.g. `it:Z:CATTAGGTCATCCCTA,AAATTTTGGA`) (for IsoSeq3 compatibility) |
 | zm | i | Segment | ZMW number from which the given read originates.  (for IsoSeq3 compatibility) |
 | XN | Z | Segment, Extract | Altered read name given by Longbow to a segmented read (used for debugging).  This name consists of the original read name followed by the start and end positions of the segment on the original read, then the names of the bounding adapters / known regions.  For example:  `XN:Z:m64013e_211029_235558/24/ccs/0_1960/START-MARS` |
+| pz | i | Correct | Offset of the new, corrected, barcode/tag relative to the original, raw value (0-based).  NOTE: if the tag could not be corrected, this tag is not present in the output read. |
 
 ### Read Tag Types
 The SAM spec defines the following as types for read tags:
