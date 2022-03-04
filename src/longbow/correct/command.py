@@ -5,6 +5,7 @@ import sys
 import os
 import itertools
 import tempfile
+import enum
 
 import click
 import click_log
@@ -24,6 +25,12 @@ from ..utils.model import LibraryModel
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("correct")
 click_log.basic_config(logger)
+
+
+class BarcodeResolutionFailure(enum.Enum):
+    NO_RAW_BARCODE = enum.auto()
+    AMBIGUOUS = enum.auto()
+    NO_MATCH_IN_LEV_DIST = enum.auto()
 
 
 @click.command(name=logger.name)
@@ -226,10 +233,12 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
         # Start output worker:
         res = manager.dict({"num_ccs_reads": 0, "num_ccs_reads_corrected": 0, "num_ccs_reads_raw_was_correct": 0,
                             "num_clr_reads": 0, "num_clr_reads_corrected": 0, "num_clr_reads_raw_was_correct": 0,
-                            "num_ccs_with_barcodes": 0, "num_clr_with_barcodes": 0})
+                            "num_ccs_with_barcodes": 0, "num_clr_with_barcodes": 0,
+                            "num_ccs_could_not_correct_ambiguous": 0, "num_ccs_could_not_correct_no_match": 0,
+                            "num_clr_could_not_correct_ambiguous": 0, "num_clr_could_not_correct_no_match": 0, })
         output_worker = mp.Process(
             target=_write_thread_fn,
-            args=(results, out_header, output_bam, barcode_uncorrectable_bam, barcode_tag,
+            args=(results, out_header, output_bam, barcode_uncorrectable_bam, barcode_tag, corrected_tag,
                   ccs_corrected_rq_threshold, num_reads, disable_pbar, res),
         )
         output_worker.start()
@@ -352,7 +361,7 @@ def _get_field_count_and_percent_string(count, total):
 
 
 def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, barcode_uncorrectable_bam,
-                     barcode_tag, ccs_corrected_rq_threshold, num_reads, disable_pbar, res):
+                     barcode_tag, corrected_tag, ccs_corrected_rq_threshold, num_reads, disable_pbar, res):
     """Thread / process fn to write out all our data."""
 
     with pysam.AlignmentFile(out_bam_file_name, "wb", header=out_bam_header) as out_bam_file, \
@@ -382,29 +391,41 @@ def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, barcode_unco
             read, num_segments, num_corrected_segments, has_barcode = raw_data
             read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
+            # Save ourselves some trouble later:
+            ccs_type_stat_string = "ccs" if read.get_tag("rq") > ccs_corrected_rq_threshold else "clr"
+
             # Write our our read:
             if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG):
                 out_bam_file.write(read)
             else:
+                # "num_ccs_could_not_correct_ambiguous": 0, "num_ccs_could_not_correct_no_match"
+                # Determine what the problem in correction was for our stats:
+                correction_failure = read.get_tag(corrected_tag)
+
+                # NOTE: using the enum.name field here because of the TYPE of the barcode tag.
+                if correction_failure == BarcodeResolutionFailure.AMBIGUOUS.name:
+                    res[f"num_{ccs_type_stat_string}_could_not_correct_ambiguous"] += 1
+                elif correction_failure == BarcodeResolutionFailure.NO_MATCH_IN_LEV_DIST.name:
+                    res[f"num_{ccs_type_stat_string}_could_not_correct_no_match"] += 1
+                elif correction_failure == BarcodeResolutionFailure.NO_RAW_BARCODE.name:
+                    # This case is already accounted for.
+                    pass
+                else:
+                    raise RuntimeError(f"Unknown BarcodeResolutionFailure type ({correction_failure})!  "
+                                       f"This should never happen!")
+
+                # Set our corrected barcode tag to the unlabeled placeholder:
+                read.set_tag(corrected_tag, longbow.utils.constants.UNLABELED_BARCODE)
                 barcode_uncorrectable_bam.write(read)
 
             # Increment our counters:
-            if read.get_tag("rq") > ccs_corrected_rq_threshold:
-                res["num_ccs_reads"] += 1
-                if read.has_tag(barcode_tag):
-                    res["num_ccs_with_barcodes"] += 1
-                if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG) == 1:
-                    res["num_ccs_reads_corrected"] += 1
-                    if read.get_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED) == 0:
-                        res["num_ccs_reads_raw_was_correct"] += 1
-            else:
-                res["num_clr_reads"] += 1
-                if read.has_tag(barcode_tag):
-                    res["num_clr_with_barcodes"] += 1
-                if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG) == 1:
-                    res["num_clr_reads_corrected"] += 1
-                    if read.get_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED) == 0:
-                        res["num_clr_reads_raw_was_correct"] += 1
+            res[f"num_{ccs_type_stat_string}_reads"] += 1
+            if read.has_tag(barcode_tag):
+                res[f"num_{ccs_type_stat_string}_with_barcodes"] += 1
+            if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG) == 1:
+                res[f"num_{ccs_type_stat_string}_reads_corrected"] += 1
+                if read.get_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED) == 0:
+                    res[f"num_{ccs_type_stat_string}_reads_raw_was_correct"] += 1
 
             pbar.update(1)
 
@@ -444,7 +465,8 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
             old_bc = read.get_tag(barcode_tag)
             dist_threshold = max_hifi_dist if read.get_tag('rq') > ccs_corrected_rq_threshold else max_clr_dist
 
-            new_bc = barcode_utils.find_match_symspell(old_bc, bc_allow_list, sym_spell_index, dist_threshold)
+            new_bc, result_status = barcode_utils.find_match_symspell(old_bc, bc_allow_list,
+                                                                      sym_spell_index, dist_threshold)
 
             num_segments += 1
             if new_bc is not None:
@@ -455,11 +477,20 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
             else:
                 read.set_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG, False)
                 read.set_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED, False)
-                read.set_tag(corrected_tag, 'unclassified')
+
+                if result_status == barcode_utils.SymSpellMatchResultType.NO_MATCH_IN_LEV_DIST:
+                    # NOTE: using the enum.name field here because of the TYPE of the barcode tag.
+                    read.set_tag(corrected_tag, BarcodeResolutionFailure.NO_MATCH_IN_LEV_DIST.name)
+                elif result_status == barcode_utils.SymSpellMatchResultType.AMBIGUOUS:
+                    # NOTE: using the enum.name field here because of the TYPE of the barcode tag.
+                    read.set_tag(corrected_tag, BarcodeResolutionFailure.AMBIGUOUS.name)
+                else:
+                    raise RuntimeError(f"Unknown SymSpellMatchResultType ({result_status})!  This should never happen!")
         else:
             read.set_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG, False)
             read.set_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED, False)
-            read.set_tag(corrected_tag, 'unclassified')
+            # NOTE: using the enum.name field here because of the TYPE of the barcode tag.
+            read.set_tag(corrected_tag, BarcodeResolutionFailure.NO_RAW_BARCODE.name)
 
         # Process and place our data on the output queue:
         out_queue.put(tuple([read.to_string(), num_segments, num_corrected_segments, has_barcode]))

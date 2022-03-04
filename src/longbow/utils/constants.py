@@ -27,6 +27,12 @@ END_STATE_INDICATOR = "-end"
 BAKE_MERGE_STRATEGY = "None"
 MAS_SCAFFOLD_NAMES = {"MARS", "VENUS", "ZEPHYR", "AUSTER", "BOREAS"}
 
+################################################################################
+# Constants for barcode labeling / correction
+#######################################
+
+UNLABELED_BARCODE = "unclassified"
+
 
 ################################################################################
 # Constants for bam file reading / writing:
