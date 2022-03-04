@@ -1,5 +1,7 @@
 import gzip
 import sys
+import enum
+
 
 import symspellpy
 from symspellpy import SymSpell, Verbosity
@@ -7,6 +9,13 @@ from symspellpy import SymSpell, Verbosity
 from tqdm import tqdm
 
 from ordered_set import OrderedSet
+
+
+class SymSpellMatchResultType(enum.Enum):
+    SUCCESS = enum.auto()
+    SUCCESS_BARCODE_ALREADY_CORRECT = enum.auto()
+    AMBIGUOUS = enum.auto()
+    NO_MATCH_IN_LEV_DIST = enum.auto()
 
 
 def _load_barcode_allowlist_helper(open_file_handle, barcode_set, disable_pbar=None):
@@ -42,12 +51,16 @@ def generate_symspell_index(wl_fname, max_dist_allowed, prefix_len=16, freq_list
 
 
 def find_match_symspell(barcode, barcode_allow_list, sym_spell_index, dist_thr):
-    # Code generously donated from Victoria Popic
+    # Adapted from code generously donated from Victoria Popic
     # using faster set lookups to find exact matches
     # for the most common case
     if barcode in barcode_allow_list:  # there is an exact match
-        return barcode
+        return barcode, 0, SymSpellMatchResultType.SUCCESS_BARCODE_ALREADY_CORRECT
+
     matches = sym_spell_index.lookup(barcode, Verbosity.CLOSEST, max_edit_distance=dist_thr)
-    if not matches or len(matches) > 1:
-        return None
-    return matches[0].term
+    if not matches:
+        return None, None, SymSpellMatchResultType.NO_MATCH_IN_LEV_DIST
+    elif len(matches) > 1:
+        return None, None, SymSpellMatchResultType.AMBIGUOUS
+
+    return matches[0].term, matches[0].distance, SymSpellMatchResultType.SUCCESS

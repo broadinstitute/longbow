@@ -8,3 +8,5 @@ ccs_barcode_lev_3_not_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9
 clr_barcode_lev_4_not_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCTTTT	YC:i:0	YP:i:0	rq:f:-1	CB:Z:unclassified
 ccs_correction_equidistant	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AGGGGGGGGTTTTTTC	YC:i:0	YP:i:0	rq:f:1	CB:Z:unclassified
 clr_correction_equidistant	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AGGGGGGGGTTTTTTC	YC:i:0	YP:i:0	rq:f:-1	CB:Z:unclassified
+ccs_multi_correction_failure	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:GGGGGGGGGGGGGGGGGGGGGGGG	YC:i:0	YP:i:0	rq:f:1	CB:Z:unclassified
+clr_multi_correction_failure	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:GGGGGGGGGGGGGGGGGGGGGGGG	YC:i:0	YP:i:0	rq:f:-1	CB:Z:unclassified
