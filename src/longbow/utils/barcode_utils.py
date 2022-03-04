@@ -55,12 +55,12 @@ def find_match_symspell(barcode, barcode_allow_list, sym_spell_index, dist_thr):
     # using faster set lookups to find exact matches
     # for the most common case
     if barcode in barcode_allow_list:  # there is an exact match
-        return barcode, SymSpellMatchResultType.SUCCESS_BARCODE_ALREADY_CORRECT
+        return barcode, 0, SymSpellMatchResultType.SUCCESS_BARCODE_ALREADY_CORRECT
 
     matches = sym_spell_index.lookup(barcode, Verbosity.CLOSEST, max_edit_distance=dist_thr)
     if not matches:
-        return None, SymSpellMatchResultType.NO_MATCH_IN_LEV_DIST
+        return None, None, SymSpellMatchResultType.NO_MATCH_IN_LEV_DIST
     elif len(matches) > 1:
-        return None, SymSpellMatchResultType.AMBIGUOUS
+        return None, None, SymSpellMatchResultType.AMBIGUOUS
 
-    return matches[0].term, SymSpellMatchResultType.SUCCESS
+    return matches[0].term, matches[0].distance, SymSpellMatchResultType.SUCCESS

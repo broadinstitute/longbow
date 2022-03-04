@@ -13,6 +13,8 @@ import click_log
 import pysam
 import multiprocessing as mp
 
+from collections import defaultdict
+
 from tqdm import tqdm
 
 from construct import *
@@ -225,7 +227,8 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
             p = mp.Process(
                 target=_correct_barcode_fn,
                 args=(process_input_data_queue, results, bam_file.header.to_dict(), barcode_tag, corrected_tag,
-                      barcode_allow_list, max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold, sym_spell_index)
+                      barcode_length, barcode_allow_list, max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold,
+                      sym_spell_index)
             )
             p.start()
             worker_process_pool.append(p)
@@ -431,7 +434,7 @@ def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, barcode_unco
             pbar.update(1)
 
 
-def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corrected_tag, bc_allow_list,
+def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corrected_tag, barcode_length, bc_allow_list,
                         max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold, sym_spell_index):
     """Function to run in each subprocess.
     Replace barcode with corrected value."""
@@ -466,8 +469,14 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
             old_bc = read.get_tag(barcode_tag)
             dist_threshold = max_hifi_dist if read.get_tag('rq') > ccs_corrected_rq_threshold else max_clr_dist
 
-            new_bc, result_status = barcode_utils.find_match_symspell(old_bc, bc_allow_list,
-                                                                      sym_spell_index, dist_threshold)
+            # Check to see if we have a barcode that is longer than expected.
+            # If we do, then we should try perform matches at every valid position and take the best result:
+            if len(old_bc) > barcode_length:
+                new_bc, result_status = _perform_barcode_multi_match(barcode_length, bc_allow_list, dist_threshold,
+                                                                     old_bc, sym_spell_index)
+            else:
+                new_bc, _, result_status = \
+                    barcode_utils.find_match_symspell(old_bc, bc_allow_list, sym_spell_index, dist_threshold)
 
             num_segments += 1
             if new_bc is not None:
@@ -495,6 +504,45 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
 
         # Process and place our data on the output queue:
         out_queue.put(tuple([read.to_string(), num_segments, num_corrected_segments, has_barcode]))
+
+
+def _perform_barcode_multi_match(barcode_length, bc_allow_list, dist_threshold, old_bc, sym_spell_index):
+    # OK, we have to do multiple matches to try to find the barcode here:
+    success_dict = dict()
+    failure_counts = defaultdict(int)
+    for i in range(0, len(old_bc) - barcode_length + 1):
+        bc_sub_string = old_bc[i:i + barcode_length]
+
+        new_bc, edit_dist, result_status = \
+            barcode_utils.find_match_symspell(bc_sub_string, bc_allow_list, sym_spell_index, dist_threshold)
+        if new_bc is not None:
+            try:
+                success_dict[edit_dist].append((new_bc, result_status))
+            except KeyError:
+                success_dict[edit_dist] = [(new_bc, result_status)]
+        else:
+            failure_counts[result_status] += 1
+
+    # Now we can see if we have one good success:
+    if len(success_dict) > 0:
+        lowest_dist = min(success_dict.keys())
+        if len(success_dict[lowest_dist]) == 1:
+            new_bc = success_dict[lowest_dist][0][0]
+            result_status = success_dict[lowest_dist][0][1]
+        else:
+            new_bc = None
+            result_status = barcode_utils.SymSpellMatchResultType.AMBIGUOUS
+    else:
+        # Get the most prevalent failure type and report it:
+        new_bc = None
+        result_status = None
+        most_failures = -1
+        for failure_type in failure_counts.keys():
+            if failure_counts[failure_type] > most_failures:
+                result_status = failure_type
+                most_failures = failure_counts[failure_type]
+
+    return new_bc, result_status
 
 
 def _get_barcode_tag_length_from_model(lb_model, barcode_tag):
