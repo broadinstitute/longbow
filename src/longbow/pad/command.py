@@ -24,6 +24,7 @@ from ..utils import bam_utils, barcode_utils
 from ..utils.bam_utils import SegmentInfo
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
+from ..utils.cli_utils import format_obnoxious_warning_message
 
 
 logging.basicConfig(stream=sys.stderr)
@@ -72,6 +73,14 @@ click_log.basic_config(logger)
     help="The barcode tag to adjust"
 )
 @click.option(
+    "-n",
+    "--new-barcode-tag",
+    type=str,
+    default=longbow.utils.constants.READ_RAW_UMI_TAG,
+    show_default=True,
+    help="The barcode tag into which to put the adjusted value."
+)
+@click.option(
     "-e",
     "--expand",
     type=int,
@@ -79,7 +88,7 @@ click_log.basic_config(logger)
     help="Expand tag by specified number of bases",
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, model, force, barcode_tag, expand, input_bam):
+def main(threads, output_bam, model, force, barcode_tag, new_barcode_tag, expand, input_bam):
     """Pad tag by specified number of adjacent bases from the read."""
 
     t_start = time.time()
@@ -91,6 +100,9 @@ def main(threads, output_bam, model, force, barcode_tag, expand, input_bam):
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
+
+    logger.info(f"Expanding tag {barcode_tag} by {expand} bases")
+    logger.info(f"Writing expanded tag to: {new_barcode_tag}")
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
@@ -129,6 +141,12 @@ def main(threads, output_bam, model, force, barcode_tag, expand, input_bam):
 
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
+        # Verify that the given model actually has the barcode to change:
+        if not lb_model.has_annotation_tag(barcode_tag):
+            print(f"ERROR: Could not determine {lb_model.name} model segment from tag name: {barcode_tag}",
+                  file=sys.stderr)
+            sys.exit(1)
+
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Start output worker:
@@ -143,6 +161,7 @@ def main(threads, output_bam, model, force, barcode_tag, expand, input_bam):
                 res,
                 lb_model,
                 barcode_tag,
+                new_barcode_tag,
                 expand
             ),
         )
@@ -166,16 +185,23 @@ def main(threads, output_bam, model, force, barcode_tag, expand, input_bam):
         results.put(None)
         output_worker.join()
 
-    
     logger.info( f"Refined {res['num_reads_refined']} reads of {res['num_reads']} total.")
     
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
                 f"Overall processing rate: {res['num_reads']/(et - t_start):2.2f} reads/s.")
 
+    if res['num_reads_refined'] == 0:
+        logger.warning(format_obnoxious_warning_message("No reads were refined / padded.  This is very likely a misconfiguration."))
 
-def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_model, barcode_tag, expand):
+
+def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_model,
+                   barcode_tag, new_barcode_tag, expand):
     """Thread / process fn to expand a tag and write out all our data."""
+
+    # Get the segment to pad out:
+    # NOTE: by now we know this tag is in the model:
+    barcode_seg_name = lb_model.get_segment_name_for_annotation_tag(barcode_tag)
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
@@ -195,41 +221,42 @@ def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_m
             read = raw_data
             read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
-            # Obligatory log message:
-            # logger.debug(
-            #     "Path for read %s (%2.2f)%s: %s",
-            #     read.query_name,
-            #     logp,
-            #     " (RC)" if is_rc else "",
-            #     segments,
-            # )
-
             read_is_refined = False
 
             if read.has_tag(barcode_tag):
                 segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(",")
 
                 for segment in segments:
-                    if "random" in segment:
+                    if segment.startswith(barcode_seg_name + ":"):
                         tag, start, stop = re.split("[:-]", segment)
 
                         tag_bc = read.get_tag(barcode_tag)
 
                         for query_sequence in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
-                            pos = query_sequence.find(read.get_tag(barcode_tag), int(start), int(stop))
+                            # Must add 1 to include the final base:
+                            pos = query_sequence.find(read.get_tag(barcode_tag), int(start), int(stop)+1)
 
                             if pos >= 0:
-                                old_bc = query_sequence[pos:pos+len(tag_bc)]
-                                new_bc = query_sequence[pos - expand:pos+len(tag_bc)+expand]
+                                start_pos = pos - expand
+                                if start_pos < 0:
+                                    start_pos = 0
+                                end_pos = pos+len(tag_bc)+expand
 
+                                new_bc = query_sequence[start_pos:end_pos]
+
+                                # old_bc = query_sequence[pos:pos + len(tag_bc)]
                                 # logger.info(f"{read.query_name} {pos}")
-                                # logger.info(f" -   {tag_bc}")
-                                # logger.info(f" -   {old_bc}")
+                                # logger.info(f" - {expand * ' '}{tag_bc}")
+                                # logger.info(f" - {expand * ' '}{old_bc}")
                                 # logger.info(f" - {new_bc}")
                                 # logger.info("")
 
-                                read.set_tag("XM", new_bc)
+                                read.set_tag(new_barcode_tag, new_bc)
                                 read_is_refined = True
+
+                                # We only need to look in the correct direction of the read.
+                                # No need to continue here:
+                                break
 
             # Write our our read:
             out_bam_file.write(read)

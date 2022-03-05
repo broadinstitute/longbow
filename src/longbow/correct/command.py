@@ -215,20 +215,14 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
                 logger.warning("Allowing ANY barcode in freqs file to seed corrections.  "
                                "THIS MAY PRODUCE NON-ALLOWLIST BARCODES IN RESULTING CORRECTED DATA!")
 
-        logger.info(f"Generating barcode index...")
-        st = time.time()
-        sym_spell_index = barcode_utils.generate_symspell_index(barcode_freqs, max(max_hifi_dist, max_clr_dist),
-                                                                barcode_length)
-        logger.info(f"Barcode index generated in {time.time() - st:2.4f}s")
-
         # Start worker sub-processes:
         worker_process_pool = []
         for _ in range(threads):
             p = mp.Process(
                 target=_correct_barcode_fn,
                 args=(process_input_data_queue, results, bam_file.header.to_dict(), barcode_tag, corrected_tag,
-                      barcode_length, barcode_allow_list, max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold,
-                      sym_spell_index)
+                      barcode_length, barcode_allow_list, barcode_freqs, max_hifi_dist, max_clr_dist,
+                      ccs_corrected_rq_threshold)
             )
             p.start()
             worker_process_pool.append(p)
@@ -434,12 +428,19 @@ def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, barcode_unco
             pbar.update(1)
 
 
-def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corrected_tag, barcode_length, bc_allow_list,
-                        max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold, sym_spell_index):
+def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corrected_tag, barcode_length,
+                        bc_allow_list, barcode_freqs, max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold):
     """Function to run in each subprocess.
     Replace barcode with corrected value."""
 
     bam_header = pysam.AlignmentHeader.from_dict(bam_header_dict)
+
+    # Create the sym spell index here (in the sub-process) to reduce memory overhead / copying.
+    logger.info(f"Generating barcode index...")
+    st = time.time()
+    sym_spell_index = barcode_utils.generate_symspell_index(barcode_freqs, max(max_hifi_dist, max_clr_dist),
+                                                            barcode_length)
+    logger.info(f"Barcode index generated in {time.time() - st:2.4f}s")
 
     while True:
         # Wait until we get some data.
@@ -465,15 +466,18 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
         has_barcode = False
 
         if read.has_tag(barcode_tag):
+
             has_barcode = True
             old_bc = read.get_tag(barcode_tag)
             dist_threshold = max_hifi_dist if read.get_tag('rq') > ccs_corrected_rq_threshold else max_clr_dist
 
+            offset = 0
+
             # Check to see if we have a barcode that is longer than expected.
             # If we do, then we should try perform matches at every valid position and take the best result:
             if len(old_bc) > barcode_length:
-                new_bc, result_status = _perform_barcode_multi_match(barcode_length, bc_allow_list, dist_threshold,
-                                                                     old_bc, sym_spell_index)
+                new_bc, result_status, offset = _perform_barcode_multi_match(barcode_length, bc_allow_list,
+                                                                             dist_threshold, old_bc, sym_spell_index)
             else:
                 new_bc, _, result_status = \
                     barcode_utils.find_match_symspell(old_bc, bc_allow_list, sym_spell_index, dist_threshold)
@@ -483,6 +487,9 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
                 read.set_tag(corrected_tag, new_bc)
                 read.set_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG, True)
                 read.set_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED, new_bc != old_bc)
+
+                read.set_tag(longbow.utils.constants.READ_ADJUSTED_BARCODE_START, offset)
+
                 num_corrected_segments += 1
             else:
                 read.set_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG, False)
@@ -517,11 +524,16 @@ def _perform_barcode_multi_match(barcode_length, bc_allow_list, dist_threshold, 
             barcode_utils.find_match_symspell(bc_sub_string, bc_allow_list, sym_spell_index, dist_threshold)
         if new_bc is not None:
             try:
-                success_dict[edit_dist].append((new_bc, result_status))
+                success_dict[edit_dist].append((new_bc, result_status, i))
             except KeyError:
-                success_dict[edit_dist] = [(new_bc, result_status)]
+                success_dict[edit_dist] = [(new_bc, result_status, i)]
         else:
             failure_counts[result_status] += 1
+
+    # Setup for later:
+    new_bc = None
+    result_status = None
+    offset = None
 
     # Now we can see if we have one good success:
     if len(success_dict) > 0:
@@ -529,45 +541,28 @@ def _perform_barcode_multi_match(barcode_length, bc_allow_list, dist_threshold, 
         if len(success_dict[lowest_dist]) == 1:
             new_bc = success_dict[lowest_dist][0][0]
             result_status = success_dict[lowest_dist][0][1]
+            offset = success_dict[lowest_dist][0][2]
         else:
-            new_bc = None
             result_status = barcode_utils.SymSpellMatchResultType.AMBIGUOUS
     else:
         # Get the most prevalent failure type and report it:
-        new_bc = None
-        result_status = None
         most_failures = -1
         for failure_type in failure_counts.keys():
             if failure_counts[failure_type] > most_failures:
                 result_status = failure_type
                 most_failures = failure_counts[failure_type]
 
-    return new_bc, result_status
+    return new_bc, result_status, offset
 
 
 def _get_barcode_tag_length_from_model(lb_model, barcode_tag):
 
-    # Now get the length of the barcode tag we're using from the model:
-    barcode_seg_name = None
-    for n, tag_tuple_list in lb_model.annotation_segments.items():
-        for seg_tag, seg_pos_tag in tag_tuple_list:
-            if seg_tag == barcode_tag:
-                barcode_seg_name = n
-
+    barcode_seg_name = lb_model.get_segment_name_for_annotation_tag(barcode_tag)
     if not barcode_seg_name:
         print(f"ERROR: Could not determine {lb_model.name} model segment from tag name: {barcode_tag}", file=sys.stderr)
         sys.exit(1)
 
-    barcode_length = None
-    if type(lb_model.adapter_dict[barcode_seg_name]) == str:
-        barcode_length = len(lb_model.adapter_dict[barcode_seg_name])
-    elif type(lb_model.adapter_dict[barcode_seg_name]) == dict:
-        if next(iter(lb_model.adapter_dict[barcode_seg_name].keys())) == longbow.utils.constants.HPR_SEGMENT_TYPE_NAME:
-            barcode_length = next(iter(lb_model.adapter_dict[barcode_seg_name].values()))[1]
-        elif next(iter(lb_model.adapter_dict[barcode_seg_name].keys())) == \
-                longbow.utils.constants.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
-            barcode_length = next(iter(lb_model.adapter_dict[barcode_seg_name].values()))
-
+    barcode_length = lb_model.get_segment_length(barcode_seg_name)
     if not barcode_length:
         print(f"ERROR: Could not extract {lb_model.name} model {barcode_seg_name} barcode segment from model.",
               file=sys.stderr)

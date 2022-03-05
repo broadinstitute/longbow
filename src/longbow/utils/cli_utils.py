@@ -52,3 +52,21 @@ class MutuallyExclusiveOption(click.Option):
             opts,
             args
         )
+
+
+def format_obnoxious_warning_message(message):
+    """Adds some obnoxious formatting to the given message."""
+    header = r"""
+#############################################
+__        ___    ____  _   _ ___ _   _  ____ 
+\ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|
+ \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _ 
+  \ V  V / ___ \|  _ <| |\  || || |\  | |_| |
+   \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|
+
+#############################################
+
+"""
+
+    return f"{header}{message}\n\n#############################################"
+

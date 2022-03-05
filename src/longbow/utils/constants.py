@@ -58,6 +58,8 @@ READ_UMI_TAG = 'ZU'
 READ_UMI_POS_TAG = "XU"
 READ_BARCODE_TAG = 'CR'  # Cell barcode
 
+READ_ADJUSTED_BARCODE_START = "pz"
+
 READ_BARCODE_POS_TAG = "XB"
 READ_BARCODE_QUAL_TAG = "CY"  # Cell barcode read quality
 READ_BARCODE_CORRECTED_TAG = 'CB'  # Cell barcode that is error-corrected and confirmed against a list of known-good barcode sequences

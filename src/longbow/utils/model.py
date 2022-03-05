@@ -1172,6 +1172,53 @@ class LibraryModel:
 
         return json.dumps(model_data, indent=indent)
 
+    def has_annotation_tag(self, tag):
+        """Returns true if this model has an annotation segment that is written out to the given tag."""
+        return self.get_segment_name_for_annotation_tag(tag) is not None
+
+    def get_segment_name_for_annotation_tag(self, tag):
+        """Returns the name of the model segment that corresponds to the given tag if such a segment exists.
+        Otherwise returns None."""
+        barcode_seg_name = None
+        for n, tag_tuple_list in self.annotation_segments.items():
+            for seg_tag, seg_pos_tag in tag_tuple_list:
+                if seg_tag == tag:
+                    barcode_seg_name = n
+
+            if barcode_seg_name:
+                break
+
+        return barcode_seg_name
+
+    def get_segment_length(self, segment_name):
+        """Returns the number of bases in this model for the given segment_name if that segment_name is in this model.
+        If the segment_name is a random segment with variable length, zero is returned.
+        If the segment_name is not in this model, None is returned."""
+        if segment_name not in self.adapter_dict.keys():
+            return None
+
+        segment_length = None
+        if type(self.adapter_dict[segment_name]) == str:
+            segment_length = len(self.adapter_dict[segment_name])
+        elif type(self.adapter_dict[segment_name]) == dict:
+            seg_type = next(iter(self.adapter_dict[segment_name].keys()))
+            if seg_type == longbow.utils.constants.HPR_SEGMENT_TYPE_NAME:
+                segment_length = next(iter(self.adapter_dict[segment_name].values()))[1]
+            elif seg_type == longbow.utils.constants.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                segment_length = next(iter(self.adapter_dict[segment_name].values()))
+            elif seg_type == longbow.utils.constants.RANDOM_SEGMENT_NAME:
+                segment_length = 0
+            else:
+                # We should never get here:
+                raise RuntimeError(f"ERROR: Got an unknown segment type for {segment_name}: {seg_type}")
+
+        # Just one last sanity check:
+        if segment_length is None:
+            # We should never get here!
+            raise RuntimeError(f"ERROR: Got a NoneType segment_length for segment {segment_name}")
+
+        return segment_length
+
     @staticmethod
     def from_json_file(json_file):
         """Create a LibraryModel instance from the given json file.
