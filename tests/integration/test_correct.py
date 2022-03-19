@@ -56,6 +56,8 @@ def test_correct(tmpdir, input_sam, expected_bc_corrected_sam, expected_bc_uncor
 
     assert result.exit_code == 0
 
+    os.system(f"cp -v {str(actual_bc_corrected_file)} .")
+
     # Equal files result as True:
     assert_bam_files_equal(actual_bc_corrected_file, expected_bc_corrected_bam, order_matters=True)
     assert_bam_files_equal(actual_bc_uncorrected_file, expected_bc_uncorrected_sam, order_matters=True)
