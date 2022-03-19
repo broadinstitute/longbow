@@ -537,11 +537,33 @@ def _perform_barcode_multi_match(barcode_length, bc_allow_list, dist_threshold, 
 
     # Now we can see if we have one good success:
     if len(success_dict) > 0:
-        lowest_dist = min(success_dict.keys())
-        if len(success_dict[lowest_dist]) == 1:
-            new_bc = success_dict[lowest_dist][0][0]
-            result_status = success_dict[lowest_dist][0][1]
-            offset = success_dict[lowest_dist][0][2]
+
+        # We need to collapse entries with the same barcode here.
+        # That is, it's possible that for different padded positions we're getting the same barcode back.
+        # If this is the case, we should not call the correction ambiguous.
+
+        lowest_dist = float("inf")
+        collapsed_success_dict = dict()
+        for lev_dist, match_info in success_dict.items():
+            new_match_info = dict()
+
+            # Arbitrarily keep only the first match:
+            for barcode, status, index in match_info:
+                if barcode not in new_match_info:
+                    new_match_info[barcode] = (status, index)
+
+            collapsed_success_dict[lev_dist] = [(barcode, status, index) for barcode, (status, index) in
+                                                new_match_info.items()]
+
+            # Since we're in here, let's just get the minimum distance now:
+            if lev_dist < lowest_dist:
+                lowest_dist = lev_dist
+
+        # Now we can check that the lowest distance entry is a singleton:
+        if len(collapsed_success_dict[lowest_dist]) == 1:
+            new_bc = collapsed_success_dict[lowest_dist][0][0]
+            result_status = collapsed_success_dict[lowest_dist][0][1]
+            offset = collapsed_success_dict[lowest_dist][0][2]
         else:
             result_status = barcode_utils.SymSpellMatchResultType.AMBIGUOUS
     else:
