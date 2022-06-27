@@ -47,7 +47,7 @@ jobs:
     steps:
     
     - name: Work around permissions issue
-      run: git config --global --add safe.directory /__w/longbow/longbow
+      run: git config --global --add safe.directory /github/workspace
     
     - uses: actions/checkout@v2
 
@@ -75,7 +75,7 @@ jobs:
     steps:
     
     - name: Work around permissions issue
-      run: git config --global --add safe.directory /__w/longbow/longbow
+      run: git config --global --add safe.directory /github/workspace
     
     - uses: actions/checkout@v2
 
