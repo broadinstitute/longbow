@@ -5,7 +5,8 @@ MAINTAINER Kiran V Garimella
 ARG branch
 
 # install gsutil
-RUN apt-get update
+RUN apt-get update --allow-releaseinfo-change
+RUN apt-get update -m
 RUN apt-get install -y curl git-lfs time datamash wget zlib1g-dev libssl-dev lbzip2 make gcc
 RUN curl https://sdk.cloud.google.com | bash
 
