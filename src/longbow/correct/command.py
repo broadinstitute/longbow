@@ -486,7 +486,14 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
             if new_bc is not None:
                 read.set_tag(corrected_tag, new_bc)
                 read.set_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG, True)
-                read.set_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED, new_bc != old_bc)
+
+                # Need to do some basic math for padded barcode strings:
+                if len(old_bc) > barcode_length:
+                    end_pad_bases = int((len(old_bc) - barcode_length)/2)
+                    correction_performed = new_bc != old_bc[end_pad_bases:end_pad_bases+barcode_length]
+                else:
+                    correction_performed = new_bc != old_bc
+                read.set_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED, correction_performed)
 
                 read.set_tag(longbow.utils.constants.READ_ADJUSTED_BARCODE_START, offset)
 

@@ -430,10 +430,13 @@ def get_model_from_bam_header(header):
 def get_models_from_bam_header(header):
     model_jsons = []
     for pg in header.as_dict()['PG']:
-        if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
-            desc, models_str= pg['DS'].split('MODEL(s): ')
-            model_json = json.loads(models_str)
-            model_jsons.append(model_json)
+        try:
+            if pg['PN'] == 'longbow' and (pg['ID'].startswith('longbow-annotate') or pg['ID'].startswith('longbow-pad')):
+                desc, models_str = pg['DS'].split('MODEL(s): ')
+                model_json = json.loads(models_str)
+                model_jsons.append(model_json)
+        except KeyError:
+            continue
 
     return model_jsons
 
