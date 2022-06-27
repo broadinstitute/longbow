@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Work around permissions issue
+      run: git config --global --add safe.directory /__w/longbow/longbow
+
     - uses: 'actions/checkout@v2'
     - uses: actions/setup-python@v2
       with:
@@ -42,6 +45,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Work around permissions issue
+      run: git config --global --add safe.directory /__w/longbow/longbow
     - uses: 'actions/checkout@v2'
 
     - id: 'auth'
