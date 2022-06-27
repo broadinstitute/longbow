@@ -15,6 +15,9 @@ clr_barcode_in_whitelist	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	C
 clr_barcode_lev_1_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCCCCT	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:-1	pz:i:0
 clr_barcode_lev_2_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCCCTT	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:-1	pz:i:0
 clr_barcode_lev_3_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCCTTT	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:-1	pz:i:0
-ccs_multi_correction_success	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCCCCCCCCCAAAA	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:1	pz:i:4
-clr_multi_correction_success	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCCCCCCCCCAAAA	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:-1	pz:i:4
-ccs_multi_correction_same_barcode_success	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCCCCCCCCCAAAA	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:1	pz:i:0
+ccs_multi_correction_success_no_change_1	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCCCCCCCCCAAAA	YC:i:1	YP:i:0	CB:Z:CCCCCCCCCCCCCCCC	rq:f:1	pz:i:4
+clr_multi_correction_success_no_change_2	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCCCCCCCCCAAAA	YC:i:1	YP:i:0	CB:Z:CCCCCCCCCCCCCCCC	rq:f:-1	pz:i:4
+ccs_multi_correction_success_change_1	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCACCCCCCCCAAAA	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:1	pz:i:4
+clr_multi_correction_success_change_2	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCACCCCCCCAAAA	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:-1	pz:i:4
+ccs_multi_correction_same_barcode_success_1	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCCCCCCCCCAAAA	YC:i:1	YP:i:0	CB:Z:CCCCCCCCCCCCCCCC	rq:f:1	pz:i:0
+ccs_multi_correction_same_barcode_success_2	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCACCCCCCCCAAAA	YC:i:1	YP:i:1	CB:Z:CCCCCCCCCCCCCCCC	rq:f:1	pz:i:0

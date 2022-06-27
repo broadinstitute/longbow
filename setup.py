@@ -24,7 +24,7 @@ setup(
         'pandas',
         'numpy',
         'matplotlib',
-        'pysam>=0.16.0.1',
+        'pysam==0.19.1',
         'progress',
         'construct',
         'pathos',

@@ -22,8 +22,11 @@ clr_barcode_lev_3_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433
 clr_barcode_lev_4_not_corrected	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCTTTT	rq:f:-1
 ccs_correction_equidistant	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AGGGGGGGGTTTTTTC	rq:f:1
 clr_correction_equidistant	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AGGGGGGGGTTTTTTC	rq:f:-1
-ccs_multi_correction_success	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCCCCCCCCCAAAA	rq:f:1
-clr_multi_correction_success	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCCCCCCCCCAAAA	rq:f:-1
+ccs_multi_correction_success_no_change_1	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCCCCCCCCCAAAA	rq:f:1
+clr_multi_correction_success_no_change_2	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCCCCCCCCCAAAA	rq:f:-1
+ccs_multi_correction_success_change_1	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCACCCCCCCCAAAA	rq:f:1
+clr_multi_correction_success_change_2	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:AAAACCCCCCCCACCCCCCCAAAA	rq:f:-1
 ccs_multi_correction_failure	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:GGGGGGGGGGGGGGGGGGGGGGGG	rq:f:1
 clr_multi_correction_failure	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:GGGGGGGGGGGGGGGGGGGGGGGG	rq:f:-1
-ccs_multi_correction_same_barcode_success	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCCCCCCCCCAAAA	rq:f:1
+ccs_multi_correction_same_barcode_success_1	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCCCCCCCCCCAAAA	rq:f:1
+ccs_multi_correction_same_barcode_success_2	4	*	0	255	*	*	0	0	GGGGGGGGGG	++++++++++	RG:Z:cd9b433d	CR:Z:CCCCCCCCCCCACCCCCCCCAAAA	rq:f:1
