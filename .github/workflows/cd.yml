@@ -45,6 +45,10 @@ jobs:
   main_test:
     runs-on: ubuntu-latest
     steps:
+    
+    - name: Work around permissions issue
+      run: git config --global --add safe.directory /__w/longbow/longbow
+    
     - uses: actions/checkout@v2
 
     # Runs a set of commands using the runners shell
@@ -69,6 +73,10 @@ jobs:
     needs: main_test
     runs-on: ubuntu-latest
     steps:
+    
+    - name: Work around permissions issue
+      run: git config --global --add safe.directory /__w/longbow/longbow
+    
     - uses: actions/checkout@v2
 
     - name: Write commit message
