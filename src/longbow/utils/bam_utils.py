@@ -157,7 +157,7 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
 
     if not description:
         prev_frame = currentframe().f_back
-        description = getdoc(prev_frame.f_globals['main']).split("\n")[0]
+        description = getdoc(prev_frame.f_globals["main"]).split("\n")[0]
 
     # If we have a model here, we should add the description of the model to our program group:
     if models:
@@ -415,7 +415,7 @@ def has_cbc_and_umi(read):
 
 
 def get_model_name_from_bam_header(header):
-    return get_model_name_from_bam_header(header)['name']
+    return get_model_name_from_bam_header(header)["name"]
 
 
 def get_model_from_bam_header(header):
@@ -429,9 +429,9 @@ def get_model_from_bam_header(header):
 
 def get_models_from_bam_header(header):
     model_jsons = []
-    for pg in header.as_dict()['PG']:
-        if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
-            desc, models_str= pg['DS'].split('MODEL(s): ')
+    for pg in header.as_dict()["PG"]:
+        if "PN" in pg and pg["PN"] == "longbow" and "ID" in pg and "annotate" in pg["ID"]:
+            desc, models_str = pg["DS"].split("MODEL(s): ")
             model_json = json.loads(models_str)
             model_jsons.append(model_json)
 
@@ -439,13 +439,13 @@ def get_models_from_bam_header(header):
 
 
 def bam_header_has_model(header):
-    if 'PG' in header.as_dict():
-        for pg in header.as_dict()['PG']:
-            if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
+    if "PG" in header.as_dict():
+        for pg in header.as_dict()["PG"]:
+            if "PN" in pg and pg["PN"] == "longbow" and "ID" in pg and "annotate" in pg["ID"]:
                 return True
 
     return False
 
 
 def generate_read_name(movie_name, zmw, split_read_index):
-    return f'{movie_name}/1{zmw:09d}{split_read_index:03d}/ccs'
+    return f"{movie_name}/1{zmw:09d}{split_read_index:03d}/ccs"
