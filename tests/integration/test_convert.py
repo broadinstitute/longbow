@@ -12,7 +12,7 @@ import pysam
 
 from longbow.__main__ import main_entry as longbow
 
-from ..utils import assert_bam_files_equal
+from ..utils import assert_reads_files_equal
 from ..utils import cat_file_to_pipe
 
 

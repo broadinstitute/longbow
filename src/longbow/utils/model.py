@@ -1305,10 +1305,20 @@ class LibraryModel:
         )
 
     # TODO: Make an enum for this...
+    # Model naming convention:
+    #     prefix (mas, isoseq)
+    #     modality (bulk, sc, spatial)
+    #     input library type (10x5p, 103p, slideseq)
+    #     umi style (none, single, dual)
+    #     plexity (pbkit, internal, none)
+    #
+    # mas_<num_array_elements>_<modality>_<library_type>_<umi_style>_<plexity>
+    #
+    # e.g.: mas_15_sc_10x5p_single_none
     pre_configured_models = {
-        "mas15": {
+        "mas_15_sc_10x5p_single_none": {
             "description": "The standard MAS-seq 15 array element model.",
-            "version": "2.0.0",
+            "version": "2.0.1",
             "array_element_structure": (
                 # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
                 ("A", "5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter"),
@@ -1408,9 +1418,9 @@ class LibraryModel:
             },
             "deprecated": False,
         },
-        "mas15threeP": {
+        "mas_15_sc_10x3p_single_none": {
             "description": "The 3' kit MAS-seq 15 array element model.",
-            "version": "2.0.0",
+            "version": "2.0.1",
             "array_element_structure": (
                 # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
                 ("A", "5p_Adapter", "CBC", "UMI", "Poly_T", "cDNA", "3p_Adapter"),
@@ -1507,10 +1517,10 @@ class LibraryModel:
             },
             "deprecated": False,
         },
-        "mas15BulkWithIndices": {
+        "mas_15_bulk_10x5p_single_none": {
             "description": "A MAS-seq 15 array element model with a 10 base index just before the 3' adapter for bulk "
                            "sequencing.",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "array_element_structure": (
                 ("A", "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter"),
                 ("B", "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter"),
@@ -1605,7 +1615,87 @@ class LibraryModel:
             },
             "deprecated": False,
         },
-        "slide-seq": {
+        "mas_10_sc_10x5p_single_none": {
+            "description": "The MAS-seq 10 array element model.",
+            "version": "2.0.1",
+            "array_element_structure": (
+                ("Q", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("C", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("M", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("I", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("O", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("J", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("B", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("D", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                ("K", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS"),
+                # The last element may not currently have the "R" adapter in this version of the library:
+                ("H", "VENUS", "CBC", "UMI", "BOREAS", "cDNA", "Poly_A", "MARS", "R"),
+            ),
+            "adapters": {
+                "VENUS": "TCTACACGACGCTCTTCCGATCT",
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                "MARS": "GTACTCTGCGTTGATACCACTGCTT",
+                "BOREAS": "TTTCTTATATGGG",
+                "B": "ACTTGTAAGCTGTCTA",
+                "C": "ACTCTGTCAGGTCCGA",
+                "D": "ACCTCCTCCTCCAGAA",
+                "H": "ATGTTGAATCCTAGCG",
+                "I": "AGTGCGTTGCGAATTG",
+                "J": "AATTGCGTAGTTGGCC",
+                "K": "ACACTTGGTCGCAATC",
+                "M": "ACCTAGATCAGAGCCT",
+                "O": "AAGTCACCGGCACCTT",
+                "Q": "AAGCACCATAATGTGT",
+                "R": "AACCGGACACACTTAG",
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "cDNA": RANDOM_SEGMENT_NAME,
+            },
+            "direct_connections": {
+                "Poly_A": {"MARS"},
+                "MARS": {
+                    "Q",
+                    "C",
+                    "M",
+                    "I",
+                    "O",
+                    "J",
+                    "B",
+                    "D",
+                    "K",
+                    "H",
+                    "R",
+                },
+                "B": {"VENUS"},
+                "C": {"VENUS"},
+                "D": {"VENUS"},
+                "H": {"VENUS"},
+                "I": {"VENUS"},
+                "J": {"VENUS"},
+                "K": {"VENUS"},
+                "M": {"VENUS"},
+                "O": {"VENUS"},
+                "Q": {"VENUS"},
+                "R": {"VENUS"},
+                "VENUS": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"BOREAS"},
+                "BOREAS": {"cDNA"},
+                "cDNA": {"Poly_A"},
+            },
+            "start_element_names": {"Q", "VENUS"},
+            "end_element_names": {"Poly_A", "R"},
+            "named_random_segments": {"UMI", "cDNA", "CBC"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
+                    longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                    longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
+            "deprecated": False,
+        },
+        "mas_15_spatial_slide-seq_single_none": {
             # The slide-seq model is:
             #
             #                 |-----5p_Adapter---->        |--splitter------>               |------Poly_T---------------->                  |--------5p_Adapter----------|                         # noqa
@@ -1614,7 +1704,7 @@ class LibraryModel:
             #                                          V                           V
             #                                    Spatial Barcode 2         Spatial Barcode 1
             "description": "The Slide-seq 15 array element model.",
-            "version": "2.0.0",
+            "version": "2.0.1",
             "array_element_structure": (
                 ("A", "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter"),
                 ("B", "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter"),
@@ -1714,9 +1804,9 @@ class LibraryModel:
             },
             "deprecated": False,
         },
-        "mas15teloprime": {
+        "mas_15_bulk_teloprimeV2_single_none": {
             "description": "The MAS15 Teloprime V2 indexed array element model.",
-            "version": "2.0.0",
+            "version": "2.0.1",
             "array_element_structure": (
                 ("A", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
                 ("B", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
@@ -1805,9 +1895,9 @@ class LibraryModel:
             },
             "deprecated": False,
         },
-        "scRNA_10x5p": {
+        "isoseq_1_sc_10x5p_single_none": {
             "description": "Single-cell RNA (without MAS-seq prep).",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "array_element_structure": (
                 ("V", "CBC", "UMI", "B", "cDNA", "Poly_A", "M"),
             ),

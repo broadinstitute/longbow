@@ -3,14 +3,13 @@ import os
 import sys
 import subprocess
 
-import pysam
-
 from click.testing import CliRunner
 
 from longbow.__main__ import main_entry as longbow
 
-from ..utils import assert_bam_files_equal
+from ..utils import assert_reads_files_equal
 from ..utils import cat_file_to_pipe
+from ..utils import convert_sam_to_bam
 
 ################################################################################
 
@@ -20,14 +19,6 @@ TEST_DATA_FOLDER = path = os.path.abspath(
     __file__ + os.path.sep + "../../" + os.path.sep + "test_data"
 ) + os.path.sep + TOOL_NAME + os.path.sep
 
-################################################################################
-
-
-def convert_sam_to_bam(sam_path, out_bam_path):
-    with pysam.AlignmentFile(sam_path, "r", check_sq=False, require_index=False) as input_file:
-        with pysam.AlignmentFile(out_bam_path, "wb", header=input_file.header) as out_bam_file:
-            for r in input_file:
-                out_bam_file.write(r)
 
 ################################################################################
 
@@ -47,7 +38,7 @@ def test_correct(tmpdir, input_sam, expected_bc_corrected_sam, expected_bc_uncor
 
     actual_bc_corrected_file = tmpdir.join(f"{TOOL_NAME}_actual_out.mas15.bam")
     actual_bc_uncorrected_file = tmpdir.join(f"{TOOL_NAME}_actual_bc_uncorrected_out.mas15.bam")
-    args = ["correct", "-t", 1, "-m", "mas15v2", "-v", "INFO",
+    args = ["correct", "-t", 1, "-m", "mas_15_sc_10x5p_single_none", "-v", "INFO",
             "-a", f"{TEST_DATA_FOLDER}barcode_allow_list.txt", str(input_bam), "-o", str(actual_bc_corrected_file),
             "--barcode-uncorrectable-bam", str(actual_bc_uncorrected_file)]
 
@@ -59,8 +50,8 @@ def test_correct(tmpdir, input_sam, expected_bc_corrected_sam, expected_bc_uncor
     os.system(f"cp -v {str(actual_bc_corrected_file)} .")
 
     # Equal files result as True:
-    assert_bam_files_equal(actual_bc_corrected_file, expected_bc_corrected_bam, order_matters=True)
-    assert_bam_files_equal(actual_bc_uncorrected_file, expected_bc_uncorrected_sam, order_matters=True)
+    assert_reads_files_equal(actual_bc_corrected_file, expected_bc_corrected_bam, order_matters=True)
+    assert_reads_files_equal(actual_bc_uncorrected_file, expected_bc_uncorrected_sam, order_matters=True)
 
 
 @pytest.mark.skip(reason="`correct` command currently does not accept data from a pipe")
