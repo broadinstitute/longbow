@@ -139,17 +139,17 @@
             "MARS"
         ],
         "MARS": [
-            "R",
-            "O",
-            "D",
-            "C",
-            "I",
-            "Q",
-            "K",
-            "B",
             "J",
+            "O",
+            "R",
+            "I",
             "M",
-            "H"
+            "C",
+            "K",
+            "D",
+            "H",
+            "Q",
+            "B"
         ],
         "B": [
             "VENUS"
@@ -205,13 +205,13 @@
         "VENUS"
     ],
     "end_element_names": [
-        "Poly_A",
-        "R"
+        "R",
+        "Poly_A"
     ],
     "named_random_segments": [
         "cDNA",
-        "UMI",
-        "CBC"
+        "CBC",
+        "UMI"
     ],
     "coding_region": "cDNA",
     "annotation_segments": {
