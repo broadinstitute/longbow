@@ -25,7 +25,7 @@ START_STATE_INDICATOR = "-start"
 END_STATE_INDICATOR = "-end"
 
 BAKE_MERGE_STRATEGY = "None"
-MAS_SCAFFOLD_NAMES = {"MARS", "VENUS", "ZEPHYR", "AUSTER", "BOREAS"}
+MAS_SCAFFOLD_NAMES = {"3p_Adapter", "5p_Adapter", "SLS2", "SLS"}
 
 ################################################################################
 # Constants for barcode labeling / correction

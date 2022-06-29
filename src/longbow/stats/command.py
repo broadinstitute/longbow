@@ -161,7 +161,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
                     len(read_mas_seq_adapters) > 1 and \
                     read_mas_seq_adapters[0] == lb_model.array_element_structure[1][0]:
                 read_mas_seq_adapters.insert(0, lb_model.array_element_structure[0][0])
-            # NOTE: here model.array_element_structure[0][1] corresponds to "VENUS"
+            # NOTE: here model.array_element_structure[0][1] corresponds to "5p_Adapter"
             #       that we use as our second segment in each array element.
 
             # Segment the array into segments using our actual segmentation algorithm so we have accurate counts:
