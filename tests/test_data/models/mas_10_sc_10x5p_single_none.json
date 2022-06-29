@@ -5,116 +5,116 @@
     "array_element_structure": [
         [
             "Q",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "C",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "M",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "I",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "O",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "J",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "B",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "D",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "K",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS"
+            "3p_Adapter"
         ],
         [
             "H",
-            "VENUS",
+            "5p_Adapter",
             "CBC",
             "UMI",
-            "BOREAS",
+            "SLS",
             "cDNA",
             "Poly_A",
-            "MARS",
+            "3p_Adapter",
             "R"
         ]
     ],
     "adapters": {
-        "VENUS": "TCTACACGACGCTCTTCCGATCT",
+        "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
         "Poly_A": {
             "HomopolymerRepeat": [
                 "A",
                 30
             ]
         },
-        "MARS": "GTACTCTGCGTTGATACCACTGCTT",
-        "BOREAS": "TTTCTTATATGGG",
+        "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
+        "SLS": "TTTCTTATATGGG",
         "B": "ACTTGTAAGCTGTCTA",
         "C": "ACTCTGTCAGGTCCGA",
         "D": "ACCTCCTCCTCCAGAA",
@@ -136,64 +136,64 @@
     },
     "direct_connections": {
         "Poly_A": [
-            "MARS"
+            "3p_Adapter"
         ],
-        "MARS": [
+        "3p_Adapter": [
             "J",
             "O",
+            "B",
             "R",
-            "I",
-            "M",
-            "C",
             "K",
-            "D",
-            "H",
             "Q",
-            "B"
+            "D",
+            "C",
+            "M",
+            "H",
+            "I"
         ],
         "B": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "C": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "D": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "H": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "I": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "J": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "K": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "M": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "O": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "Q": [
-            "VENUS"
+            "5p_Adapter"
         ],
         "R": [
-            "VENUS"
+            "5p_Adapter"
         ],
-        "VENUS": [
+        "5p_Adapter": [
             "CBC"
         ],
         "CBC": [
             "UMI"
         ],
         "UMI": [
-            "BOREAS"
+            "SLS"
         ],
-        "BOREAS": [
+        "SLS": [
             "cDNA"
         ],
         "cDNA": [
@@ -202,7 +202,7 @@
     },
     "start_element_names": [
         "Q",
-        "VENUS"
+        "5p_Adapter"
     ],
     "end_element_names": [
         "R",
@@ -210,8 +210,8 @@
     ],
     "named_random_segments": [
         "cDNA",
-        "CBC",
-        "UMI"
+        "UMI",
+        "CBC"
     ],
     "coding_region": "cDNA",
     "annotation_segments": {
