@@ -1,0 +1,314 @@
+{
+    "name": "mas_15_sc_10x5p_single_none",
+    "description": "The standard MAS-seq 15 array element model.",
+    "version": "2.0.1",
+    "array_element_structure": [
+        [
+            "A",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "B",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "C",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "D",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "E",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "F",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "G",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "H",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "I",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "J",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "K",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "L",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "M",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "N",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ],
+        [
+            "O",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter",
+            "P"
+        ]
+    ],
+    "adapters": {
+        "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+        "Poly_A": {
+            "HomopolymerRepeat": [
+                "A",
+                30
+            ]
+        },
+        "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
+        "SLS": "TTTCTTATATGGG",
+        "A": "AGCTTACTTGTGAAGA",
+        "B": "ACTTGTAAGCTGTCTA",
+        "C": "ACTCTGTCAGGTCCGA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "E": "AACCGGACACACTTAG",
+        "F": "AGAGTCCAATTCGCAG",
+        "G": "AATCAAGGCTTAACGG",
+        "H": "ATGTTGAATCCTAGCG",
+        "I": "AGTGCGTTGCGAATTG",
+        "J": "AATTGCGTAGTTGGCC",
+        "K": "ACACTTGGTCGCAATC",
+        "L": "AGTAAGCCTTCGTGTC",
+        "M": "ACCTAGATCAGAGCCT",
+        "N": "AGGTATGCCGGTTAAG",
+        "O": "AAGTCACCGGCACCTT",
+        "P": "ATGAAGTGGCTCGAGA",
+        "CBC": {
+            "FixedLengthRandomBases": 16
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 10
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "Poly_A": [
+            "3p_Adapter"
+        ],
+        "3p_Adapter": [
+            "K",
+            "P",
+            "M",
+            "G",
+            "F",
+            "H",
+            "I",
+            "E",
+            "A",
+            "J",
+            "N",
+            "D",
+            "O",
+            "C",
+            "L",
+            "B"
+        ],
+        "A": [
+            "5p_Adapter"
+        ],
+        "B": [
+            "5p_Adapter"
+        ],
+        "C": [
+            "5p_Adapter"
+        ],
+        "D": [
+            "5p_Adapter"
+        ],
+        "E": [
+            "5p_Adapter"
+        ],
+        "F": [
+            "5p_Adapter"
+        ],
+        "G": [
+            "5p_Adapter"
+        ],
+        "H": [
+            "5p_Adapter"
+        ],
+        "I": [
+            "5p_Adapter"
+        ],
+        "J": [
+            "5p_Adapter"
+        ],
+        "K": [
+            "5p_Adapter"
+        ],
+        "L": [
+            "5p_Adapter"
+        ],
+        "M": [
+            "5p_Adapter"
+        ],
+        "N": [
+            "5p_Adapter"
+        ],
+        "O": [
+            "5p_Adapter"
+        ],
+        "P": [
+            "5p_Adapter"
+        ],
+        "5p_Adapter": [
+            "CBC"
+        ],
+        "CBC": [
+            "UMI"
+        ],
+        "UMI": [
+            "SLS"
+        ],
+        "SLS": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "Poly_A"
+        ]
+    },
+    "start_element_names": [
+        "A",
+        "5p_Adapter"
+    ],
+    "end_element_names": [
+        "P",
+        "Poly_A"
+    ],
+    "named_random_segments": [
+        "CBC",
+        "cDNA",
+        "UMI"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "UMI": [
+            [
+                "ZU",
+                "XU"
+            ],
+            [
+                "XM",
+                "XU"
+            ]
+        ],
+        "CBC": [
+            [
+                "CR",
+                "XB"
+            ],
+            [
+                "XC",
+                "XB"
+            ]
+        ]
+    }
+}

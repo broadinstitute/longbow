@@ -2,10 +2,10 @@
 # General / high-level constants:
 #######################################
 
-DEFAULT_MODEL = "mas15v2"
+DEFAULT_MODEL = "mas_15_sc_10x5p_single_none"
 DEFAULT_MAX_READ_LENGTH = 30000
 
-DEFAULT_DEMULTIPLEX_MODELS = ("mas10", "mas15")
+DEFAULT_DEMULTIPLEX_MODELS = ("mas_10_sc_10x5p_single_none", "mas_15_sc_10x5p_single_none")
 
 BARCODE_CONF_FILE_NAME = "barcode_confidence_scores.txt"
 
@@ -25,7 +25,7 @@ START_STATE_INDICATOR = "-start"
 END_STATE_INDICATOR = "-end"
 
 BAKE_MERGE_STRATEGY = "None"
-MAS_SCAFFOLD_NAMES = {"MARS", "VENUS", "ZEPHYR", "AUSTER", "BOREAS"}
+MAS_SCAFFOLD_NAMES = {"3p_Adapter", "5p_Adapter", "SLS2", "SLS"}
 
 ################################################################################
 # Constants for barcode labeling / correction

@@ -570,9 +570,9 @@ def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_mode
 
             total_segments_seen += 1
 
-        # TODO: Replace all references to "VENUS" with references to the models themselves.
+        # TODO: Replace all references to "5p_Adapter" with references to the models themselves.
         # Add in hashes after the leading structural adapter so we can visually more easily inspect the results:
-        if lbl == "VENUS" or lbl == "10x_Adapter":
+        if lbl == "5p_Adapter":
             for o in range(10, 50, 10):
                 if row_letters_seen + len(base_string) + o < line_length:
                     ax.text(0, rows - row + 1.7, f"{' ' * o}'", transform=t, **kwargs)

@@ -1,0 +1,331 @@
+{
+    "name": "mas_15_spatial_slide-seq_single_none",
+    "description": "The Slide-seq 15 array element model.",
+    "version": "2.0.1",
+    "array_element_structure": [
+        [
+            "A",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "B",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "C",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "D",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "E",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "F",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "G",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "H",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "I",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "J",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "K",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "L",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "M",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "N",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        [
+            "O",
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter",
+            "P"
+        ]
+    ],
+    "adapters": {
+        "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+        "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+        "SLS2": "TCTTCAGCGTTCCCGAGA",
+        "A": "AGCTTACTTGTGAAGA",
+        "B": "ACTTGTAAGCTGTCTA",
+        "C": "ACTCTGTCAGGTCCGA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "E": "AACCGGACACACTTAG",
+        "F": "AGAGTCCAATTCGCAG",
+        "G": "AATCAAGGCTTAACGG",
+        "H": "ATGTTGAATCCTAGCG",
+        "I": "AGTGCGTTGCGAATTG",
+        "J": "AATTGCGTAGTTGGCC",
+        "K": "ACACTTGGTCGCAATC",
+        "L": "AGTAAGCCTTCGTGTC",
+        "M": "ACCTAGATCAGAGCCT",
+        "N": "AGGTATGCCGGTTAAG",
+        "O": "AAGTCACCGGCACCTT",
+        "P": "ATGAAGTGGCTCGAGA",
+        "Poly_T": {
+            "HomopolymerRepeat": [
+                "T",
+                30
+            ]
+        },
+        "SBC1": {
+            "FixedLengthRandomBases": 6
+        },
+        "SBC2": {
+            "FixedLengthRandomBases": 8
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 9
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "3p_Adapter": [
+            "F",
+            "L",
+            "B",
+            "A",
+            "C",
+            "N",
+            "H",
+            "I",
+            "G",
+            "D",
+            "K",
+            "J",
+            "M",
+            "E",
+            "O",
+            "P"
+        ],
+        "A": [
+            "5p_Adapter"
+        ],
+        "B": [
+            "5p_Adapter"
+        ],
+        "C": [
+            "5p_Adapter"
+        ],
+        "D": [
+            "5p_Adapter"
+        ],
+        "E": [
+            "5p_Adapter"
+        ],
+        "F": [
+            "5p_Adapter"
+        ],
+        "G": [
+            "5p_Adapter"
+        ],
+        "H": [
+            "5p_Adapter"
+        ],
+        "I": [
+            "5p_Adapter"
+        ],
+        "J": [
+            "5p_Adapter"
+        ],
+        "K": [
+            "5p_Adapter"
+        ],
+        "L": [
+            "5p_Adapter"
+        ],
+        "M": [
+            "5p_Adapter"
+        ],
+        "N": [
+            "5p_Adapter"
+        ],
+        "O": [
+            "5p_Adapter"
+        ],
+        "5p_Adapter": [
+            "SBC2"
+        ],
+        "SBC2": [
+            "SLS2"
+        ],
+        "SLS2": [
+            "SBC1"
+        ],
+        "SBC1": [
+            "UMI"
+        ],
+        "UMI": [
+            "Poly_T"
+        ],
+        "Poly_T": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "3p_Adapter"
+        ]
+    },
+    "start_element_names": [
+        "5p_Adapter",
+        "A"
+    ],
+    "end_element_names": [
+        "3p_Adapter",
+        "P"
+    ],
+    "named_random_segments": [
+        "cDNA",
+        "SBC1",
+        "UMI",
+        "SBC2"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "UMI": [
+            [
+                "ZU",
+                "XU"
+            ]
+        ],
+        "SBC1": [
+            [
+                "X1",
+                "XP"
+            ]
+        ],
+        "SBC2": [
+            [
+                "X2",
+                "XQ"
+            ]
+        ]
+    }
+}

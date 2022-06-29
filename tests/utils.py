@@ -2,6 +2,15 @@ import sys
 import pysam
 import filecmp
 
+from pathlib import Path
+
+
+def convert_sam_to_bam(sam_path, out_bam_path):
+    with pysam.AlignmentFile(sam_path, "r", check_sq=False, require_index=False) as input_file:
+        with pysam.AlignmentFile(out_bam_path, "wb", header=input_file.header) as out_bam_file:
+            for r in input_file:
+                out_bam_file.write(r)
+
 
 def assert_read_tags_are_equal(actual_read, expected_read):
 
@@ -54,15 +63,21 @@ def assert_reads_are_equal(actual_read, expected_read):
     assert_read_tags_are_equal(actual_read, expected_read)
 
 
-def assert_bam_files_equal(actual_file, expected_file, order_matters=False, compare_header=False):
+def assert_reads_files_equal(actual_file, expected_file, order_matters=False, compare_header=False):
     """Assert that the contents of the two given bam files are equivalent."""
+
+    actual_file = Path(actual_file)
+    expected_file = Path(expected_file)
+
+    actual_file_flags = "rb" if actual_file.resolve().name.endswith(".bam") else "r"
+    expected_file_flags = "rb" if expected_file.resolve().name.endswith(".bam") else "r"
 
     if order_matters and compare_header:
         assert filecmp.cmp(actual_file, expected_file)
         return
 
-    with pysam.AlignmentFile(actual_file, "rb", check_sq=False, require_index=False) as actual_bam, \
-        pysam.AlignmentFile(expected_file, "rb", check_sq=False, require_index=False) as expected_bam:
+    with pysam.AlignmentFile(actual_file, actual_file_flags, check_sq=False, require_index=False) as actual_bam, \
+        pysam.AlignmentFile(expected_file, expected_file_flags, check_sq=False, require_index=False) as expected_bam:
 
         if compare_header:
             assert actual_bam.header == expected_bam.header, "Headers are not equal."

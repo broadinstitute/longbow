@@ -16,8 +16,8 @@ TEST_DATA_FOLDER = path = os.path.abspath(
 
 
 @pytest.fixture(scope="module", params=[
-    (TEST_DATA_FOLDER + "mas15_test_input.bam", "mas15v2"),
-    (TEST_DATA_FOLDER + "mas10_test_input.bam", "mas10v2"),
+    (TEST_DATA_FOLDER + "mas15_test_input.bam", "mas_15_sc_10x5p_single_none"),
+    (TEST_DATA_FOLDER + "mas10_test_input.bam", "mas_10_sc_10x5p_single_none"),
 ])
 def filtered_bam_file_from_pipeline(request):
     input_bam, model_name = request.param

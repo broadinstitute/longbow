@@ -11,7 +11,7 @@ from longbow.utils import model
 
 TEST_DATA_FOLDER = path = os.path.abspath(
     __file__ + os.path.sep + "../../" + os.path.sep + "test_data"
-) + os.path.sep
+)
 
 @pytest.fixture
 def bam_header_without_program_group():
@@ -84,7 +84,7 @@ def bam_header_with_program_group(request):
     return header
 
 
-@pytest.fixture(scope="module", params=list(filter(lambda x: x != "mas15v2", model.LibraryModel.pre_configured_models.keys())))
+@pytest.fixture(scope="module", params=list(filter(lambda x: x != "mas_15_sc_10x5p_single_none", model.LibraryModel.pre_configured_models.keys())))
 def bam_header_with_multiple_program_groups(request):
     rgid = '01234567'
     movie_name = 'm00001e_210000_000000'
@@ -112,7 +112,7 @@ def bam_header_with_multiple_program_groups(request):
         'SQ': []
     }
 
-    for model_name in ['mas15v2', request.param]:
+    for model_name in ['mas_15_sc_10x5p_single_none', request.param]:
         model_json = model.LibraryModel.build_pre_configured_model(model_name).to_json(indent=None)
 
         header_dict['PG'].append({
@@ -189,7 +189,7 @@ def _compare_models(prebuilt_model, stored_model):
                     assert p[k] == s[k]
 
 
-@pytest.mark.parametrize("bam_header_with_multiple_program_groups", ['mas15teloprimev2'], indirect=True)
+@pytest.mark.parametrize("bam_header_with_multiple_program_groups", ['mas_15_bulk_teloprimeV2_single_none'], indirect=True)
 def test_load_models_from_bam_header(bam_header_with_multiple_program_groups):
     with tempfile.NamedTemporaryFile(delete=True) as f:
         with pysam.AlignmentFile(f.name, "wb", header=bam_header_with_multiple_program_groups) as bf:

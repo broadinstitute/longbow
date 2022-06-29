@@ -1,0 +1,88 @@
+{
+    "name": "isoseq_1_sc_10x5p_single_none",
+    "description": "Single-cell RNA (without MAS-seq prep).",
+    "version": "1.0.1",
+    "array_element_structure": [
+        [
+            "V",
+            "CBC",
+            "UMI",
+            "B",
+            "cDNA",
+            "Poly_A",
+            "M"
+        ]
+    ],
+    "adapters": {
+        "V": "TCTACACGACGCTCTTCCGATCT",
+        "Poly_A": {
+            "HomopolymerRepeat": [
+                "A",
+                30
+            ]
+        },
+        "M": "GTACTCTGCGTTGATACCACTGCTT",
+        "B": "TTTCTTATATGGG",
+        "CBC": {
+            "FixedLengthRandomBases": 16
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 10
+        },
+        "cDNA": "random"
+    },
+    "direct_connections": {
+        "V": [
+            "CBC"
+        ],
+        "CBC": [
+            "UMI"
+        ],
+        "UMI": [
+            "B"
+        ],
+        "B": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "Poly_A"
+        ],
+        "Poly_A": [
+            "M"
+        ]
+    },
+    "start_element_names": [
+        "V"
+    ],
+    "end_element_names": [
+        "M"
+    ],
+    "named_random_segments": [
+        "cDNA",
+        "CBC",
+        "UMI"
+    ],
+    "coding_region": "cDNA",
+    "annotation_segments": {
+        "UMI": [
+            [
+                "ZU",
+                "XU"
+            ],
+            [
+                "XM",
+                "XU"
+            ]
+        ],
+        "CBC": [
+            [
+                "CR",
+                "XB"
+            ],
+            [
+                "XC",
+                "XB"
+            ]
+        ]
+    }
+}

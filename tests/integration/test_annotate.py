@@ -8,7 +8,7 @@ from click.testing import CliRunner
 
 from longbow.__main__ import main_entry as longbow
 
-from ..utils import assert_bam_files_equal
+from ..utils import assert_reads_files_equal
 from ..utils import cat_file_to_pipe
 
 ################################################################################
@@ -24,10 +24,8 @@ EXPECTED_DATA_FOLDER = TEST_DATA_FOLDER + TOOL_NAME + os.path.sep
 
 
 @pytest.mark.parametrize("input_bam, expected_bam, model_name", [
-    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15_expected.bam", "mas15"],
-    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10_expected.bam", "mas10"],
-    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15v2_expected.bam", "mas15v2"],
-    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10v2_expected.bam", "mas10v2"],
+    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15v2_expected.bam", "mas_15_sc_10x5p_single_none"],
+    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10v2_expected.bam", "mas_10_sc_10x5p_single_none"],
 ])
 def test_annotate(tmpdir, input_bam, expected_bam, model_name):
 
@@ -40,14 +38,12 @@ def test_annotate(tmpdir, input_bam, expected_bam, model_name):
     os.system(f"cp {str(actual_file)} .")
 
     assert result.exit_code == 0
-    assert_bam_files_equal(actual_file, expected_bam, order_matters=True)
+    assert_reads_files_equal(actual_file, expected_bam, order_matters=True)
 
 
 @pytest.mark.parametrize("input_bam, expected_bam, model_name", [
-    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15_expected.bam", "mas15"],
-    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10_expected.bam", "mas10"],
-    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15v2_expected.bam", "mas15v2"],
-    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10v2_expected.bam", "mas10v2"],
+    [TEST_DATA_FOLDER + "mas15_test_input.bam", EXPECTED_DATA_FOLDER + "mas15v2_expected.bam", "mas_15_sc_10x5p_single_none"],
+    [TEST_DATA_FOLDER + "mas10_test_input.bam", EXPECTED_DATA_FOLDER + "mas10v2_expected.bam", "mas_10_sc_10x5p_single_none"],
 ])
 def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.pipe.bam")
@@ -60,4 +56,4 @@ def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
     cat_file_to_pipe(input_bam, proc)
 
     assert proc.returncode == 0
-    assert_bam_files_equal(actual_bam, expected_bam)
+    assert_reads_files_equal(actual_bam, expected_bam)
