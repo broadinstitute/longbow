@@ -1,5 +1,5 @@
 {
-    "name": "mas_15_bulk_10x5p_single_none",
+    "name": "mas_15_bulk_10x5p_single_internal",
     "description": "A MAS-seq 15 array element model with a 10 base index just before the 3' adapter for bulk sequencing.",
     "version": "1.0.1",
     "array_element_structure": [
@@ -191,22 +191,22 @@
     },
     "direct_connections": {
         "3p_Adapter": [
-            "F",
-            "P",
-            "N",
-            "C",
-            "G",
-            "H",
-            "K",
-            "D",
-            "E",
-            "M",
-            "J",
-            "I",
-            "O",
-            "B",
             "L",
-            "A"
+            "K",
+            "B",
+            "G",
+            "M",
+            "N",
+            "P",
+            "D",
+            "I",
+            "C",
+            "J",
+            "O",
+            "E",
+            "A",
+            "H",
+            "F"
         ],
         "A": [
             "5p_Adapter"
@@ -280,13 +280,13 @@
         "A"
     ],
     "end_element_names": [
-        "P",
-        "Poly_A"
+        "Poly_A",
+        "P"
     ],
     "named_random_segments": [
+        "UMI",
         "sample_index",
-        "cDNA",
-        "UMI"
+        "cDNA"
     ],
     "coding_region": "cDNA",
     "annotation_segments": {

@@ -1517,7 +1517,7 @@ class LibraryModel:
             },
             "deprecated": False,
         },
-        "mas_15_bulk_10x5p_single_none": {
+        "mas_15_bulk_10x5p_single_internal": {
             "description": "A MAS-seq 15 array element model with a 10 base index just before the 3' adapter for bulk "
                            "sequencing.",
             "version": "1.0.1",
