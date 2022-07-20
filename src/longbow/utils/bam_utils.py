@@ -410,8 +410,12 @@ def get_confidence_factor_raw_quals(quals: array.array, scale_factor: float = CO
     )
 
 
-def has_cbc_and_umi(read):
-    return read.has_tag(READ_RAW_BARCODE_TAG) and read.has_tag(READ_RAW_UMI_TAG)
+def has_cbc(read):
+    return read.has_tag(READ_RAW_BARCODE_TAG)
+
+
+def has_umi(read):
+    return read.has_tag(READ_RAW_UMI_TAG)
 
 
 def get_model_name_from_bam_header(header):

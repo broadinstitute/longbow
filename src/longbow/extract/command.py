@@ -185,7 +185,7 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
         # Set up our barcode confidence file here:
         barcode_conf_file = None
         if create_barcode_conf_file:
-            if lb_model.has_barcode_annotation:
+            if lb_model.has_cell_barcode_annotation:
                 logger.info(f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}")
                 barcode_conf_file = open(longbow.utils.constants.BARCODE_CONF_FILE_NAME, 'w')
             else:
@@ -230,6 +230,7 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
                             )
                         )
                 else:
+                    # Read is already segmented, so we don't have to do anything else:
                     segmented_reads = [read]
 
                 extracted_segment = False

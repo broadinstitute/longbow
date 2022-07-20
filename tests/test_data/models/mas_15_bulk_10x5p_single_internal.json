@@ -150,8 +150,8 @@
             "SLS",
             "cDNA",
             "Poly_A",
-            "3p_Adapter",
             "sample_index",
+            "3p_Adapter",
             "P"
         ]
     ],
@@ -191,22 +191,22 @@
     },
     "direct_connections": {
         "3p_Adapter": [
-            "L",
-            "K",
-            "B",
-            "G",
-            "M",
             "N",
             "P",
             "D",
-            "I",
-            "C",
-            "J",
-            "O",
             "E",
-            "A",
+            "C",
+            "F",
+            "M",
+            "O",
+            "B",
             "H",
-            "F"
+            "I",
+            "K",
+            "J",
+            "L",
+            "A",
+            "G"
         ],
         "A": [
             "5p_Adapter"
@@ -276,17 +276,17 @@
         ]
     },
     "start_element_names": [
-        "5p_Adapter",
-        "A"
+        "A",
+        "5p_Adapter"
     ],
     "end_element_names": [
-        "Poly_A",
-        "P"
+        "P",
+        "Poly_A"
     ],
     "named_random_segments": [
-        "UMI",
+        "cDNA",
         "sample_index",
-        "cDNA"
+        "UMI"
     ],
     "coding_region": "cDNA",
     "annotation_segments": {
@@ -294,12 +294,16 @@
             [
                 "ZU",
                 "XU"
+            ],
+            [
+                "XM",
+                "XU"
             ]
         ],
         "sample_index": [
             [
-                "CR",
-                "XB"
+                "id",
+                "ip"
             ]
         ]
     }
