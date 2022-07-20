@@ -100,21 +100,19 @@ class LibraryModel:
 
     @property
     def has_umi_annotation(self):
-        return self._has_annotation(longbow.utils.constants.READ_RAW_UMI_TAG)
+        return self._has_annotation(longbow.utils.constants.READ_RAW_UMI_TAG) or self._has_annotation(longbow.utils.constants.READ_UMI_TAG)
 
     @property
-    def has_barcode_annotation(self):
-        return self._has_annotation(longbow.utils.constants.READ_RAW_BARCODE_TAG)
+    def has_cell_barcode_annotation(self):
+        return self._has_annotation(longbow.utils.constants.READ_RAW_BARCODE_TAG) or self._has_annotation(longbow.utils.constants.READ_BARCODE_TAG)
 
     def _has_annotation(self, annotation_tag):
-        if self.annotation_segments is None:
-            return False
-
-        # Get all annotation tags:
-        for k, tag_tuple_list in self.annotation_segments.items():
-            for tag_tuple in tag_tuple_list:
-                if annotation_tag in tag_tuple:
-                    return True
+        if self.annotation_segments:
+            # Get all annotation tags:
+            for _, tag_tuple_list in self.annotation_segments.items():
+                for tag_tuple in tag_tuple_list:
+                    if annotation_tag in tag_tuple:
+                        return True
 
         # If we're still running, we didn't find our annotation tag.
         # Therefore we don't have the given annotation.
@@ -1308,7 +1306,7 @@ class LibraryModel:
     # Model naming convention:
     #     prefix (mas, isoseq)
     #     modality (bulk, sc, spatial)
-    #     input library type (10x5p, 103p, slideseq)
+    #     input library type (10x5p, 10x3p, slideseq)
     #     umi style (none, single, dual)
     #     plexity (pbkit, internal, none)
     #
@@ -1411,8 +1409,8 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
-                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                 longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
@@ -1510,8 +1508,8 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
-                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                 longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
@@ -1536,7 +1534,7 @@ class LibraryModel:
                 ("L", "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter"),
                 ("M", "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter"),
                 ("N", "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter"),
-                ("O", "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter", "sample_index", "P"),
+                ("O", "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter", "P"),
             ),
             "adapters": {
                 "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
@@ -1610,8 +1608,9 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "sample_index"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
-                "sample_index": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "sample_index": [(longbow.utils.constants.READ_DEMUX_TAG, longbow.utils.constants.READ_DEMUX_POS_TAG)],
             },
             "deprecated": False,
         },
@@ -1688,8 +1687,8 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
-                    longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                     longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },
@@ -1796,7 +1795,8 @@ class LibraryModel:
             "named_random_segments": {"UMI", "SBC2", "SBC1", "cDNA"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
                 "SBC1": [(longbow.utils.constants.READ_SPATIAL_BARCODE1_TAG,
                          longbow.utils.constants.READ_SPATIAL_BARCODE1_POS_TAG)],
                 "SBC2": [(longbow.utils.constants.READ_SPATIAL_BARCODE2_TAG,
@@ -1923,8 +1923,8 @@ class LibraryModel:
             "named_random_segments": {"UMI", "cDNA", "CBC"},
             "coding_region": "cDNA",
             "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG), (
-                longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
                 "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
                 longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
             },

@@ -138,21 +138,20 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
         else:
             # Check to see if the model has a CBC / UMI.  If not, we should turn on this flag
             # and warn the user:
+
             has_cbc_or_umi_annotation = False
-            if lb_model.annotation_segments:
-                for seg_tag_list in lb_model.annotation_segments.values():
-                    for seg_tag, seg_pos_tag in seg_tag_list:
-                        if seg_tag == longbow.utils.constants.READ_UMI_TAG or \
-                                seg_tag == longbow.utils.constants.READ_BARCODE_TAG or \
-                                seg_tag == longbow.utils.constants.READ_RAW_UMI_TAG or \
-                                seg_tag == longbow.utils.constants.READ_RAW_BARCODE_TAG:
-                            has_cbc_or_umi_annotation = True
-                            break
-                    if has_cbc_or_umi_annotation:
-                        break
+            if lb_model.has_umi_annotation:
+                logger.info("Model has UMI annotation.")
+            else:
+                has_cbc_or_umi_annotation = True
+
+            if lb_model.has_cell_barcode_annotation:
+                logger.info("Model has Cell Barcode annotation.")
+            else:
+                has_cbc_or_umi_annotation = True
 
             if not has_cbc_or_umi_annotation:
-                logger.warning("Model does not have CBC or UMI tags.  All segments will be emitted.")
+                logger.warning("Model does not have Cell Barcode or UMI tags.  All segments will be emitted.")
                 ignore_cbc_and_umi = True
 
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
@@ -241,12 +240,15 @@ def _sub_process_write_fn(
 
     barcode_conf_file = None
     if create_barcode_conf_file:
-        if model.has_barcode_annotation:
+        if model.has_cell_barcode_annotation:
             logger.info(f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}")
             barcode_conf_file = open(longbow.utils.constants.BARCODE_CONF_FILE_NAME, 'w')
         else:
             logger.warning(f"Model does not have a barcode output, but barcode creation flag was given.  "
                            f"Barcode confidence file will NOT be created.")
+
+    model_annotates_cbc = model.has_cell_barcode_annotation
+    model_annotates_umi = model.has_umi_annotation
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
@@ -280,6 +282,8 @@ def _sub_process_write_fn(
                 out_bam_file,
                 barcode_conf_file,
                 ignore_cbc_and_umi,
+                model_annotates_cbc,
+                model_annotates_umi
             )
 
             # Increment our counters:
@@ -514,7 +518,7 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
 
 
 def _write_segmented_read(
-    model, read, segments, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi
+    model, read, segments, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi, model_annotates_cbc, model_annotates_umi
 ):
     """Split and write out the segments of each read to the given bam output file.
 
@@ -546,6 +550,8 @@ def _write_segmented_read(
             delim_name,
             prev_delim_name,
             ignore_cbc_and_umi,
+            model_annotates_cbc,
+            model_annotates_umi,
             sri
         )
 
@@ -570,6 +576,8 @@ def _write_split_array_element(
     delim_name,
     prev_delim_name,
     ignore_cbc_and_umi,
+    model_annotates_cbc,
+    model_annotates_umi,
     split_read_index
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
@@ -579,10 +587,24 @@ def _write_split_array_element(
     if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
         barcode_conf_file.write(f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n")
 
-    has_cbc_and_umi = bam_utils.has_cbc_and_umi(a)
-
-    if has_cbc_and_umi or ignore_cbc_and_umi:
+    if ignore_cbc_and_umi:
         bam_out.write(a)
+        return True
+    else:
+        # We have to check the CBC and UMI:
+        # TODO: Expand this for other annotation segments.
+        cbc_ok = (not model_annotates_cbc) or bam_utils.has_cbc(a)
+        umi_ok = (not model_annotates_umi) or bam_utils.has_umi(a)
+
+        if not cbc_ok:
+            logger.warning(f"Read {a.query_name} has no CBC.  Ignoring.")
+            return False
+        elif not umi_ok:
+            logger.warning(f"Read {a.query_name} has no UMI.  Ignoring.")
+            return False
+        else:
+            bam_out.write(a)
+            return True
 
 
 def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord, split_read_index):
@@ -659,7 +681,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
                 a.set_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
 
     # Set IsoSeq3-compatible tags:
-    a.set_tag(longbow.utils.constants.READ_CLIPPED_SEQS_LIST_TAG, ','.join(clipped_tags))
+    a.set_tag(longbow.utils.constants.READ_CLIPPED_SEQS_LIST_TAG, ','.join(sorted(clipped_tags)))
     a.set_tag(longbow.utils.constants.READ_NUM_CONSENSUS_PASSES_TAG, 1)
     a.set_tag(longbow.utils.constants.READ_ZMW_NAMES_TAG, read.query_name)
     a.set_tag(longbow.utils.constants.READ_NUM_ZMWS_TAG, 1)
