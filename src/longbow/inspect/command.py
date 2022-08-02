@@ -258,7 +258,7 @@ def annotate_read(read, m, max_length, min_rq):
     fppath = []
 
     if read.has_tag(longbow.utils.constants.SEGMENTS_TAG):
-        tag = re.split(",", read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
+        tag = re.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER, read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
 
         for e in tag:
             state, rrange = re.split(":", e)

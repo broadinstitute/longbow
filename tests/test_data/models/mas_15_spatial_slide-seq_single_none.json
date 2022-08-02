@@ -1,7 +1,7 @@
 {
     "name": "mas_15_spatial_slide-seq_single_none",
     "description": "The Slide-seq 15 array element model.",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "array_element_structure": [
         [
             "A",

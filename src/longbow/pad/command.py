@@ -258,7 +258,7 @@ def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_m
                                 # No need to continue here:
                                 break
 
-            # Write our our read:
+            # Write out our read:
             out_bam_file.write(read)
 
             # Increment our counters:

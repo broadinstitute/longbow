@@ -1338,10 +1338,9 @@ class LibraryModel:
             ),
             "adapters": {
                 "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
-                # "Poly_A": "A" * 30,
                 "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
                 "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
-                "SLS": "TTTCTTATATGGG",
+                "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
                 "A": "AGCTTACTTGTGAAGA",
                 "B": "ACTTGTAAGCTGTCTA",
                 "C": "ACTCTGTCAGGTCCGA",
@@ -1540,7 +1539,7 @@ class LibraryModel:
                 "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                 "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
                 "3p_Adapter": "CTCTGCGTTGATACCACTGCTT",
-                "SLS": "TTTCTTATATGGG",
+                "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
                 "A": "AGCTTACTTGTGAAGA",
                 "B": "ACTTGTAAGCTGTCTA",
                 "C": "ACTCTGTCAGGTCCGA",
@@ -1634,7 +1633,7 @@ class LibraryModel:
                 "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                 "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
                 "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
-                "SLS": "TTTCTTATATGGG",
+                "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
                 "B": "ACTTGTAAGCTGTCTA",
                 "C": "ACTCTGTCAGGTCCGA",
                 "D": "ACCTCCTCCTCCAGAA",
@@ -1703,7 +1702,7 @@ class LibraryModel:
             #                                          V                           V
             #                                    Spatial Barcode 2         Spatial Barcode 1
             "description": "The Slide-seq 15 array element model.",
-            "version": "2.0.1",
+            "version": "2.0.2",
             "array_element_structure": (
                 ("A", "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter"),
                 ("B", "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter"),
@@ -1724,7 +1723,7 @@ class LibraryModel:
             "adapters": {
                 "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                 "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
-                "SLS2": "TCTTCAGCGTTCCCGAGA",
+                "SLS2": "TCTTCAGCGTTCCCGAGA",  # Switch Leader Seq
                 "A": "AGCTTACTTGTGAAGA",
                 "B": "ACTTGTAAGCTGTCTA",
                 "C": "ACTCTGTCAGGTCCGA",

@@ -33,6 +33,7 @@ Commands:
   scsplit      Create files for use in `alevin` for single-cell analysis.
   segment      Segment pre-annotated reads from an input BAM file.
   stats        Calculate and produce stats on the given input bam file.
+  tagfix       Update longbow read tags after alignment.
   train        Train transition and emission probabilities on real data.
   version      Print the version of longbow.
 ```

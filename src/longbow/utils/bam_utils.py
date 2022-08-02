@@ -446,10 +446,25 @@ def get_models_from_bam_header(header):
 
 
 def bam_header_has_model(header):
-    if 'PG' in header.as_dict():
-        for pg in header.as_dict()['PG']:
-            if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
-                return True
+    try:
+        if 'PG' in header.as_dict():
+            for pg in header.as_dict()['PG']:
+                if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
+                    return True
+    except KeyError:
+        pass
+
+    return False
+
+
+def bam_header_has_longbow_command_program_group(header, command):
+    try:
+        if 'PG' in header.as_dict():
+            for pg in header.as_dict()['PG']:
+                if pg['PN'] == 'longbow' and f"-{command}-" in pg['ID']:
+                    return True
+    except KeyError:
+        pass
 
     return False
 
