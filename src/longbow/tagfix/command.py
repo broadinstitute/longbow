@@ -153,13 +153,10 @@ def _output_writer_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
             # Check for exit sentinel:
             if raw_data is None:
                 break
-            # Should really never be None, but just in case:
-            elif raw_data is None:
-                continue
 
             # Unpack data:
             read = raw_data
-            read = pysam.AlignedSegment.fromstring(read, out_bam_header)
+            read = pysam.AlignedSegment.from_dict(read, out_bam_header)
 
             # Write out our read:
             out_bam_file.write(read)
@@ -211,5 +208,5 @@ def _correct_read_tags(in_queue, out_queue, bam_header, res):
             # Increment our counter:
             res["num_tags_corrected"] += 1
 
-        out_queue.put(read.to_string())
+        out_queue.put(read.to_dict())
         res["num_reads"] += 1
