@@ -260,6 +260,41 @@ class LibraryModel:
         # Finalze our HMM:
         self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
 
+    def build_forward_connected(self):
+        """Build the forward-connected HMM underlying this model given our cDNA information."""
+
+        # Warn if model is deprecated
+        try:
+            if self.pre_configured_models[self.name]['deprecated']:
+                logger.warning(f"Model {self.name} is deprecated.")
+        except KeyError:
+            # This is OK - it may be the user specifying a model that is not in our preconfigured set.
+            pass
+
+        # Validate our model here so we can go through and just worry about creating it:
+        self.validate_model()
+
+        # Initialize the states in our model:
+        self._initialize_hmm_states()
+
+        # Initialize the transitions in our model:
+        # self._initialize_hmm_transitions()
+        self._initialize_hmm_transitions_fwd()
+
+        # DEBUGGING:
+        if logger.isEnabledFor(logging.DEBUG):
+            self.dump_as_dotfile(do_subgraphs=False)
+            self.dump_as_dotfile_simple()
+            self.to_json(f"longbow_model_{self.name}.v{self.version}.json")
+
+            with open(f"longbow_model_{self.name}.v{self.version}.dense_transition_matrix.pickle", 'wb') as f:
+                pickle.dump(self.hmm.dense_transition_matrix(), f)
+            with open(f"longbow_model_{self.name}.v{self.version}.emission_distributions.txt", 'w') as f:
+                print(self.hmm, file=f, flush=True)
+
+        # Finalze our HMM:
+        self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
+
     def _get_segment_start_end_rda_and_rdb_nodes(self):
         """Create a Dictionary of model segment starting states, random start, and random end"""
         segment_starts = {}
@@ -428,6 +463,71 @@ class LibraryModel:
                 #         logger.debug(
                 #             f"    Adding transition (no rand connections): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
                 #     self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+            # If we have no direct connections from this state, we add in a transition from this
+            # state to the silent random B state:
+            else:
+                # Verify this probability is the notional equivalent:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"    Adding transition (no DCs): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
+                self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+        logger.debug("Adding transitions for short-circuit terminations...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            self._create_sudden_end_transitions(s)
+
+    def _initialize_hmm_transitions_fwd(self):
+        logger.debug("Identifying actionable nodes from model...")
+        segment_starts, segment_ends, rda, rdb = self._get_segment_start_end_rda_and_rdb_nodes()
+
+        # Create transitions for the array start and array end:
+        logger.debug("Creating start/end library model transitions...")
+        self._create_array_start_and_end_transitions(segment_starts, rda)
+
+        # Create transitions from RDA to segment starts:
+        # NOTE: This will NOT create transitions to start nodes of named random segments.
+        logger.debug("Creating random -> segment start node transitions...")
+        self._create_random_to_segment_start_transitions(segment_starts, rda)
+
+        # Weakly link all adapter ends to all adapter starts
+        for i in range(len(self.array_element_structure[0])):
+            adapter_name1 = self.array_element_structure[0][i]
+
+            for j in range(i+2, len(self.array_element_structure[0])):
+                adapter_name2 = self.array_element_structure[0][j]
+
+                if adapter_name1 not in self.named_random_segments and \
+                   adapter_name2 not in self.named_random_segments:
+
+                    for se in segment_ends:
+                        for ss in segment_starts:
+                            (l, r) = re.split("[:-]", se)
+                            if adapter_name1 == l and adapter_name2 == ss:
+                                # print(f'{adapter_name1} {se} {adapter_name2} {ss}')
+                                self.hmm.add_transition(segment_ends[se], segment_starts[ss], 0.05)
+
+        # link up adapter final states according to our direct connections dictionary
+        logger.debug("Adding transitions for direct connections...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            sname = LibraryModel._get_state_base_name(s)
+
+            # If we have direct connections from this state to some other states then we add
+            # them into the model:
+            if sname in self.direct_connections_dict:
+                for dcname in self.direct_connections_dict[sname]:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            f"    Adding transition: {s.name} -> {segment_starts[dcname].name} @ {(1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname]):.3f}")
+                    self.hmm.add_transition(
+                        s, segment_starts[dcname],
+                        # Original transition prob:
+                        0.9 / len(self.direct_connections_dict[sname])
+                        # Attempted new transition prob:
+                        # (1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname])
+                    )
 
             # If we have no direct connections from this state, we add in a transition from this
             # state to the silent random B state:
