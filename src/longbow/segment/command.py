@@ -581,11 +581,13 @@ def _write_split_array_element(
     split_read_index
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
-    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord, split_read_index)
+    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord,
+                                          split_read_index)
 
     # Write our barcode confidence to the file if we have to:
     if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
-        barcode_conf_file.write(f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n")
+        barcode_conf_file.write(f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t"
+                                f"{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n")
 
     if ignore_cbc_and_umi:
         bam_out.write(a)
@@ -607,7 +609,8 @@ def _write_split_array_element(
             return True
 
 
-def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord, split_read_index):
+def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord,
+                                      split_read_index):
     """Package an array element into an AlignedSegment from the results of simple splitting rules."""
 
     # Add one to end_coord because coordinates are inclusive:
@@ -621,26 +624,40 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     # Reset read name (we need a unique name for each read that's also compatible with IsoSeq3)
     movie_name = read.query_name.split("/")[0]
     a.query_name = bam_utils.generate_read_name(movie_name, read.get_tag("zm"), split_read_index)
-    a.set_tag(longbow.utils.constants.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
+    a.set_tag(longbow.utils.constants.READ_ALTERED_NAME_TAG,
+              f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}")
 
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
     out_segments = []
+    out_seg_model_quals = []
     segments_to_annotate = []
-    for s in segments:
+
+    # Create an array for our segment quality scores so we can index them below:
+    read_seg_quals = read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG).strip().split(
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER)
+
+    for i, s in enumerate(segments):
         if start_coord <= s.start <= end_coord:
             seg_info = SegmentInfo(s.name, s.start - start_coord, s.end - start_coord)
             out_segments.append(seg_info)
+
+            out_seg_model_quals.append(read_seg_quals[i])
 
             # If we have to annotate this segment, store it here for annotation later:
             if (model.annotation_segments is not None) and (s.name in model.annotation_segments.keys()):
                 segments_to_annotate.append(seg_info)
 
-
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         longbow.utils.constants.SEGMENTS_TAG,
         longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
+    )
+
+    # Set our segment quality score tag to only include the segments in this read:
+    a.set_tag(
+        longbow.utils.constants.SEGMENTS_QUAL_TAG,
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_seg_model_quals),
     )
 
     # Store tags where we'll record a refined tag instead of extracting query subsequence
