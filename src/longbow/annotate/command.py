@@ -283,7 +283,8 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
                 )
 
                 # Write our our read:
-                bam_utils.write_annotated_read(read, segments, is_rc, logp, lb_models_dict[model_name], ssw_aligner, out_bam_file)
+                bam_utils.write_annotated_read(read, segments, is_rc, logp, lb_models_dict[model_name], ssw_aligner,
+                                               out_bam_file)
 
                 # Increment our counters:
                 res["num_reads_annotated"] += 1
