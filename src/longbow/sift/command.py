@@ -134,7 +134,7 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, inp
             sub_model = LibraryModel.build_pre_configured_model(validation_model)
             sub_model.build_forward_connected()
 
-            stats_file.write('\t'.join(['read_name', '5p_Adapter', 'CBC', 'UMI', 'SLS', 'cDNA', 'Poly_A', '3p_Adapter', 'SG']) + '\n')
+            stats_file.write('\t'.join(['read_name', 'rq', '5p_Adapter', 'CBC', 'UMI', 'SLS', 'cDNA', 'Poly_A', '3p_Adapter', 'SG']) + '\n')
 
             for read in bam_file:
                 # Get our read segments:
@@ -183,6 +183,7 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, inp
 
                     stats_file.write('\t'.join([
                         read.query_name,
+                        str(read.get_tag("rq")),
                         str(counts['5p_Adapter']),
                         str(counts['CBC']),
                         str(counts['UMI']),
