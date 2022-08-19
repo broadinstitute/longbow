@@ -10,6 +10,7 @@ import click_log
 import tqdm
 import pysam
 from construct import *
+from collections import Counter
 
 import longbow.utils.constants
 from ..utils import bam_utils
@@ -56,6 +57,12 @@ click_log.basic_config(logger)
          "LibraryModel.to_json()."
 )
 @click.option(
+    "-v",
+    "--validation-model",
+    default="10x_sc_10x5p_single_none",
+    help="The model to use for cDNA validation."
+)
+@click.option(
     '-f',
     '--force',
     is_flag=True,
@@ -63,8 +70,15 @@ click_log.basic_config(logger)
     show_default=True,
     help="Force overwrite of the output files if they exist."
 )
+@click.option(
+    "-s",
+    "--stats",
+    default="/dev/null",
+    type=click.Path(exists=False),
+    help="Table describing the ways in which the reads do not conform to expectation (failing reads only)  [default: /dev/null]",
+)
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, output_bam, reject_bam, model, force, input_bam):
+def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, input_bam):
     """Filter segmented reads by conformation to expected cDNA design."""
 
     t_start = time.time()
@@ -105,20 +119,22 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
 
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
-        # logger.info(f"Filtering according to {lb_model.name} model ordered key adapters: "
-        #             f"{', '.join(lb_model.key_adapters)}")
-
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
         # Setup output files:
         with pysam.AlignmentFile(output_bam, "wb", header=out_header) as passing_bam_file, \
-                pysam.AlignmentFile(reject_bam, "wb", header=out_header) as failing_bam_file:
+                pysam.AlignmentFile(reject_bam, "wb", header=out_header) as failing_bam_file, \
+                open(stats, 'w') as stats_file:
 
             num_passed = 0
             num_failed = 0
 
-            cached_models = {}
+            # Create the forward-connected model of just this section of the read
+            sub_model = LibraryModel.build_pre_configured_model(validation_model)
+            sub_model.build_forward_connected()
+
+            stats_file.write('\t'.join(['read_name', '5p_Adapter', 'CBC', 'UMI', 'SLS', 'cDNA', 'Poly_A', '3p_Adapter', 'SG']) + '\n')
 
             for read in bam_file:
                 # Get our read segments:
@@ -130,42 +146,20 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                     sys.exit(1)
 
                 # Annotate the read with the model that was used in its validation:
-                read.set_tag(longbow.utils.constants.READ_MODEL_NAME_TAG, lb_model.name)
-
-                # Create (or retrieve from cache) the forward-connected model of just this section of the read
-                segment_names = [s.name for s in segments]
-                sub_model_name = "model_" + "_".join(segment_names)
-
-                if sub_model_name not in cached_models:
-                    direct_connections = {}
-                    for i in range(len(segment_names)-1):
-                        direct_connections[segment_names[i]] = [segment_names[i+1]]
-
-                    sub_model = LibraryModel.from_json_obj({
-                        "name": "model_" + "_".join(segment_names),
-                        "description": "model_" + "_".join(segment_names),
-                        "version": "0.0.1",
-                        "array_element_structure": [segment_names],
-                        "adapters": {key: lb_model.adapter_dict[key] for key in segment_names},
-                        "direct_connections" : direct_connections,
-                        "start_element_names": [s.name for s in segments if s.name not in lb_model.named_random_segments],
-                        "end_element_names": [s.name for s in segments if s.name not in lb_model.named_random_segments],
-                        "named_random_segments": lb_model.named_random_segments,
-                        "coding_region": lb_model.coding_region,
-                        "annotation_segments": lb_model.annotation_segments
-                    })
-
-                    sub_model.build_forward_connected()
-
-                    cached_models[sub_model_name] = sub_model
-
-                sub_model = cached_models[sub_model_name]
-
                 logp, ppath = sub_model.annotate(read.query_sequence)
                 qpath = bam_utils.collapse_annotations(ppath)
 
-                is_valid = len(segment_names) == len(qpath)
+                counts = Counter([q.to_tag().split(":")[0] for q in qpath])
 
+                is_valid = (counts['5p_Adapter'] == 1 and
+                            counts['CBC'] == 1 and
+                            counts['UMI'] == 1 and
+                            counts['SLS'] == 1 and
+                            counts['cDNA'] == 1 and
+                            counts['Poly_A'] == 1 and
+                            counts['3p_Adapter'] == 1)
+
+                read.set_tag(longbow.utils.constants.READ_MODEL_NAME_TAG, lb_model.name)
                 read.set_tag(longbow.utils.constants.SEGMENTS_TAG, longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([q.to_tag() for q in qpath]))
                 read.set_tag(longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, is_valid)
 
@@ -186,6 +180,19 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
 
                     failing_bam_file.write(read)
                     num_failed += 1
+
+                    stats_file.write('\t'.join([
+                        read.query_name,
+                        str(counts['5p_Adapter']),
+                        str(counts['CBC']),
+                        str(counts['UMI']),
+                        str(counts['SLS']),
+                        str(counts['cDNA']),
+                        str(counts['Poly_A']),
+                        str(counts['3p_Adapter']),
+                        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([q.to_tag() for q in qpath])
+                        ]) + '\n'
+                    )
 
                 pbar.update(1)
 

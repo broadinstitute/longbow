@@ -743,21 +743,22 @@ class LibraryModel:
     def validate_model(self):
         """Ensure that the configuration of this model is well-formed and conforms to the semantics that we require."""
 
-        # Ensure that our model does not start with a named random segment:
-        for name in self.start_element_names:
-            if self.has_named_random_segments and (name in self.named_random_segments):
-                message = f"ERROR: start segment name is a named random segment: {name}.  " \
-                          f"Start segments cannot be named random segments."
-                logger.critical(message)
-                raise RuntimeError(message)
+        # if strict_stringency:
+        #     # Ensure that our model does not start with a named random segment:
+        #     for name in self.start_element_names:
+        #         if self.has_named_random_segments and (name in self.named_random_segments):
+        #             message = f"ERROR: start segment name is a named random segment: {name}.  " \
+        #                     f"Start segments cannot be named random segments."
+        #             logger.critical(message)
+        #             raise RuntimeError(message)
 
-        # Ensure that our model does not end with a named random segment:
-        for name in self.end_element_names:
-            if self.has_named_random_segments and (name in self.named_random_segments):
-                message = f"ERROR: end segment name is a named random segment: {name}.  " \
-                          f"End segments cannot be named random segments."
-                logger.critical(message)
-                raise RuntimeError(message)
+        #     # Ensure that our model does not end with a named random segment:
+        #     for name in self.end_element_names:
+        #         if self.has_named_random_segments and (name in self.named_random_segments):
+        #             message = f"ERROR: end segment name is a named random segment: {name}.  " \
+        #                     f"End segments cannot be named random segments."
+        #             logger.critical(message)
+        #             raise RuntimeError(message)
 
         # Ensure all named random segments have direct connections:
         if self.has_named_random_segments:
@@ -1404,7 +1405,7 @@ class LibraryModel:
 
     # TODO: Make an enum for this...
     # Model naming convention:
-    #     prefix (mas, isoseq)
+    #     prefix (mas, isoseq, 10x)
     #     modality (bulk, sc, spatial)
     #     input library type (10x5p, 10x3p, slideseq)
     #     umi style (none, single, dual)
@@ -1414,6 +1415,43 @@ class LibraryModel:
     #
     # e.g.: mas_15_sc_10x5p_single_none
     pre_configured_models = {
+        "10x_sc_10x5p_single_none": {
+            "description": "Model for a single cDNA sequence from the 10x 5' kit",
+            "version": "1.0.0",
+            "array_element_structure": (
+                ("random", "5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter"),
+            ),
+            "adapters": {
+                "random": RANDOM_SEGMENT_NAME,
+                "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
+                "cDNA": RANDOM_SEGMENT_NAME,
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
+            },
+            "direct_connections": {
+                "random": {"5p_Adapter"},
+                "5p_Adapter": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"SLS"},
+                "SLS": {"cDNA"},
+                "cDNA": {"Poly_A"},
+                "Poly_A": {"3p_Adapter"},
+            },
+            "start_element_names": {"random", "5p_Adapter", "SLS", "5p_Adapter", "Poly_A", "3p_Adapter"},
+            "end_element_names": {"random", "5p_Adapter", "SLS", "5p_Adapter", "Poly_A", "3p_Adapter"},
+            "named_random_segments": {"random", "UMI", "cDNA", "CBC"},
+            "coding_region": "cDNA",
+            "annotation_segments": {
+                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG), (
+                longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+            },
+            "deprecated": False,
+        },
         "mas_15_sc_10x5p_single_none": {
             "description": "The standard MAS-seq 15 array element model.",
             "version": "2.0.1",
