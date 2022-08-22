@@ -142,12 +142,10 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
             has_cbc_or_umi_annotation = False
             if lb_model.has_umi_annotation:
                 logger.info("Model has UMI annotation.")
-            else:
                 has_cbc_or_umi_annotation = True
 
             if lb_model.has_cell_barcode_annotation:
                 logger.info("Model has Cell Barcode annotation.")
-            else:
                 has_cbc_or_umi_annotation = True
 
             if not has_cbc_or_umi_annotation:

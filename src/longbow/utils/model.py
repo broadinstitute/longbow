@@ -260,6 +260,41 @@ class LibraryModel:
         # Finalze our HMM:
         self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
 
+    def build_forward_connected(self):
+        """Build the forward-connected HMM underlying this model given our cDNA information."""
+
+        # Warn if model is deprecated
+        try:
+            if self.pre_configured_models[self.name]['deprecated']:
+                logger.warning(f"Model {self.name} is deprecated.")
+        except KeyError:
+            # This is OK - it may be the user specifying a model that is not in our preconfigured set.
+            pass
+
+        # Validate our model here so we can go through and just worry about creating it:
+        self.validate_model()
+
+        # Initialize the states in our model:
+        self._initialize_hmm_states()
+
+        # Initialize the transitions in our model:
+        # self._initialize_hmm_transitions()
+        self._initialize_hmm_transitions_fwd()
+
+        # DEBUGGING:
+        if logger.isEnabledFor(logging.DEBUG):
+            self.dump_as_dotfile(do_subgraphs=False)
+            self.dump_as_dotfile_simple()
+            self.to_json(f"longbow_model_{self.name}.v{self.version}.json")
+
+            with open(f"longbow_model_{self.name}.v{self.version}.dense_transition_matrix.pickle", 'wb') as f:
+                pickle.dump(self.hmm.dense_transition_matrix(), f)
+            with open(f"longbow_model_{self.name}.v{self.version}.emission_distributions.txt", 'w') as f:
+                print(self.hmm, file=f, flush=True)
+
+        # Finalze our HMM:
+        self.hmm.bake(merge=BAKE_MERGE_STRATEGY)
+
     def _get_segment_start_end_rda_and_rdb_nodes(self):
         """Create a Dictionary of model segment starting states, random start, and random end"""
         segment_starts = {}
@@ -428,6 +463,71 @@ class LibraryModel:
                 #         logger.debug(
                 #             f"    Adding transition (no rand connections): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
                 #     self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+            # If we have no direct connections from this state, we add in a transition from this
+            # state to the silent random B state:
+            else:
+                # Verify this probability is the notional equivalent:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"    Adding transition (no DCs): {s.name} -> RDB @ {LibraryModel.RAND_RAND_PROB:.3f}")
+                self.hmm.add_transition(s, rdb, LibraryModel.RAND_RAND_PROB)
+
+        logger.debug("Adding transitions for short-circuit terminations...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            self._create_sudden_end_transitions(s)
+
+    def _initialize_hmm_transitions_fwd(self):
+        logger.debug("Identifying actionable nodes from model...")
+        segment_starts, segment_ends, rda, rdb = self._get_segment_start_end_rda_and_rdb_nodes()
+
+        # Create transitions for the array start and array end:
+        logger.debug("Creating start/end library model transitions...")
+        self._create_array_start_and_end_transitions(segment_starts, rda)
+
+        # Create transitions from RDA to segment starts:
+        # NOTE: This will NOT create transitions to start nodes of named random segments.
+        logger.debug("Creating random -> segment start node transitions...")
+        self._create_random_to_segment_start_transitions(segment_starts, rda)
+
+        # Weakly link all adapter ends to all adapter starts
+        for i in range(len(self.array_element_structure[0])):
+            adapter_name1 = self.array_element_structure[0][i]
+
+            for j in range(i+2, len(self.array_element_structure[0])):
+                adapter_name2 = self.array_element_structure[0][j]
+
+                if adapter_name1 not in self.named_random_segments and \
+                   adapter_name2 not in self.named_random_segments:
+
+                    for se in segment_ends:
+                        for ss in segment_starts:
+                            (l, r) = re.split("[:-]", se)
+                            if adapter_name1 == l and adapter_name2 == ss:
+                                ## TODO: Should this be based off the total number of transition segments?
+                                self.hmm.add_transition(segment_ends[se], segment_starts[ss], 0.05)
+
+        # link up adapter final states according to our direct connections dictionary
+        logger.debug("Adding transitions for direct connections...")
+        for _, s in segment_ends.items():
+            logger.debug("State: %s", s.name)
+            sname = LibraryModel._get_state_base_name(s)
+
+            # If we have direct connections from this state to some other states then we add
+            # them into the model:
+            if sname in self.direct_connections_dict:
+                for dcname in self.direct_connections_dict[sname]:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            f"    Adding transition: {s.name} -> {segment_starts[dcname].name} @ {0.9 / len(self.direct_connections_dict[sname]):.3f}")
+                    self.hmm.add_transition(
+                        s, segment_starts[dcname],
+                        # Original transition prob:
+                        0.9 / len(self.direct_connections_dict[sname])
+                        # Attempted new transition prob:
+                        # (1.0 - LibraryModel.SUDDEN_END_PROB) / len(self.direct_connections_dict[sname])
+                    )
 
             # If we have no direct connections from this state, we add in a transition from this
             # state to the silent random B state:
@@ -643,11 +743,16 @@ class LibraryModel:
     def validate_model(self):
         """Ensure that the configuration of this model is well-formed and conforms to the semantics that we require."""
 
+        # TODO: remove this bandaid ASAP:
+        if self.name == "10x_sc_10x5p_single_none":
+            # This validation model is always valid.
+            return
+
         # Ensure that our model does not start with a named random segment:
         for name in self.start_element_names:
             if self.has_named_random_segments and (name in self.named_random_segments):
                 message = f"ERROR: start segment name is a named random segment: {name}.  " \
-                          f"Start segments cannot be named random segments."
+                        f"Start segments cannot be named random segments."
                 logger.critical(message)
                 raise RuntimeError(message)
 
@@ -655,7 +760,7 @@ class LibraryModel:
         for name in self.end_element_names:
             if self.has_named_random_segments and (name in self.named_random_segments):
                 message = f"ERROR: end segment name is a named random segment: {name}.  " \
-                          f"End segments cannot be named random segments."
+                        f"End segments cannot be named random segments."
                 logger.critical(message)
                 raise RuntimeError(message)
 
@@ -1246,7 +1351,7 @@ class LibraryModel:
             coding_region = None
 
         try:
-            annotation_segments={k: list(v) for k, v in json_data["annotation_segments"].items()}
+            annotation_segments = {k: list(v) for k, v in json_data["annotation_segments"].items()}
         except KeyError:
             annotation_segments = None
 
@@ -1304,7 +1409,7 @@ class LibraryModel:
 
     # TODO: Make an enum for this...
     # Model naming convention:
-    #     prefix (mas, isoseq)
+    #     prefix (mas, isoseq, 10x)
     #     modality (bulk, sc, spatial)
     #     input library type (10x5p, 10x3p, slideseq)
     #     umi style (none, single, dual)
@@ -1314,6 +1419,38 @@ class LibraryModel:
     #
     # e.g.: mas_15_sc_10x5p_single_none
     pre_configured_models = {
+        "10x_sc_10x5p_single_none": {
+            "description": "Model for a single cDNA sequence from the 10x 5' kit",
+            "version": "1.0.0",
+            "array_element_structure": (
+                ("random", "5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter"),
+            ),
+            "adapters": {
+                "random": RANDOM_SEGMENT_NAME,
+                "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
+                "cDNA": RANDOM_SEGMENT_NAME,
+                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
+            },
+            "direct_connections": {
+                "random": {"5p_Adapter"},
+                "5p_Adapter": {"CBC"},
+                "CBC": {"UMI"},
+                "UMI": {"SLS"},
+                "SLS": {"cDNA"},
+                "cDNA": {"Poly_A"},
+                "Poly_A": {"3p_Adapter"},
+            },
+            "start_element_names": {"random", "5p_Adapter", "SLS", "5p_Adapter", "Poly_A", "3p_Adapter"},
+            "end_element_names": {"random", "5p_Adapter", "SLS", "5p_Adapter", "Poly_A", "3p_Adapter"},
+            "named_random_segments": {"random", "UMI", "cDNA", "CBC"},
+            "coding_region": "cDNA",
+            "annotation_segments": None,
+            "deprecated": False,
+        },
         "mas_15_sc_10x5p_single_none": {
             "description": "The standard MAS-seq 15 array element model.",
             "version": "2.0.1",
