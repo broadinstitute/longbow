@@ -57,7 +57,7 @@ click_log.basic_config(logger)
          "LibraryModel.to_json()."
 )
 @click.option(
-    "-v",
+    "-l",
     "--validation-model",
     default="10x_sc_10x5p_single_none",
     help="The model to use for cDNA validation."
@@ -75,10 +75,19 @@ click_log.basic_config(logger)
     "--stats",
     default="/dev/null",
     type=click.Path(exists=False),
-    help="Table describing the ways in which the reads do not conform to expectation (failing reads only)  [default: /dev/null]",
+    help="Table describing the ways in which the reads do not conform to expectation (failing reads only)"
+         "[default: /dev/null]",
+)
+@click.option(
+    "-u",
+    "--summary-stats",
+    default="/dev/null",
+    type=click.Path(exists=False),
+    help="Table containing summary statistics for the sifted reads that are output."
+         "[default: /dev/null]",
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, input_bam):
+def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, summary_stats, input_bam):
     """Filter segmented reads by conformation to expected cDNA design."""
 
     t_start = time.time()
@@ -116,6 +125,16 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, inp
             lb_model = LibraryModel.build_pre_configured_model(model)
         else:
             lb_model = LibraryModel.from_json_file(model)
+
+        # TODO: Currently only one model works.  FIX THIS.
+        # Make sure we've specified the model that works:
+        if validation_model != "10x_sc_10x5p_single_none":
+            logger.error(f"Given validation model is not yet implemented with `longbow sift`: {validation_model}")
+            sys.exit(1)
+
+        if lb_model.name != "mas_15_sc_10x5p_single_none":
+            logger.error(f"Given model is not yet implemented with `longbow sift`: {lb_model.name}")
+            sys.exit(1)
 
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
@@ -201,8 +220,18 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, inp
     pct_reads_passing = 100 * num_passed / (num_passed + num_failed) if (num_passed + num_failed) > 0 else 0
     pct_reads_failing = 100 * num_failed / (num_passed + num_failed) if (num_passed + num_failed) > 0 else 0
 
-    # Yell at the user:
+    # Yell at the user / write out summary stats:
+    with open(summary_stats, 'w') as f:
+        message = f"Total Reads Processed:\t{num_passed + num_failed:d}"
+        f.write(f"{message}\n")
+        logger.info(message)
+
+        message = f"# Reads Passing Model Filter:\t{num_passed:d}\t{pct_reads_passing:02.4f}"
+        f.write(f"{message}\n")
+        logger.info(message)
+
+        message = f"# Reads Failing Model Filter:\t{num_failed:d}\t{pct_reads_failing:02.4f}"
+        f.write(f"{message}\n")
+        logger.info(message)
+
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
-    logger.info(f"Total Reads Processed: %d", num_passed + num_failed)
-    logger.info(f"# Reads Passing Model Filter: %d (%2.2f%%)", num_passed, pct_reads_passing)
-    logger.info(f"# Reads Failing Model Filter: %d (%2.2f%%)", num_failed, pct_reads_failing)
