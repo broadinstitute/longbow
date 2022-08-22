@@ -1,0 +1,80 @@
+{
+    "name": "10x_sc_10x5p_single_none",
+    "description": "Model for a single cDNA sequence from the 10x 5' kit",
+    "version": "1.0.0",
+    "array_element_structure": [
+        [
+            "random",
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "3p_Adapter"
+        ]
+    ],
+    "adapters": {
+        "random": "random",
+        "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+        "CBC": {
+            "FixedLengthRandomBases": 16
+        },
+        "UMI": {
+            "FixedLengthRandomBases": 10
+        },
+        "SLS": "TTTCTTATATGGG",
+        "cDNA": "random",
+        "Poly_A": {
+            "HomopolymerRepeat": [
+                "A",
+                30
+            ]
+        },
+        "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT"
+    },
+    "direct_connections": {
+        "random": [
+            "5p_Adapter"
+        ],
+        "5p_Adapter": [
+            "CBC"
+        ],
+        "CBC": [
+            "UMI"
+        ],
+        "UMI": [
+            "SLS"
+        ],
+        "SLS": [
+            "cDNA"
+        ],
+        "cDNA": [
+            "Poly_A"
+        ],
+        "Poly_A": [
+            "3p_Adapter"
+        ]
+    },
+    "start_element_names": [
+        "Poly_A",
+        "random",
+        "5p_Adapter",
+        "3p_Adapter",
+        "SLS"
+    ],
+    "end_element_names": [
+        "Poly_A",
+        "random",
+        "5p_Adapter",
+        "3p_Adapter",
+        "SLS"
+    ],
+    "named_random_segments": [
+        "cDNA",
+        "CBC",
+        "random",
+        "UMI"
+    ],
+    "coding_region": "cDNA"
+}
