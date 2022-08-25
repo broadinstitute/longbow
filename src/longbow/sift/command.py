@@ -112,7 +112,9 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
         logger.info(f"Ingesting read ignore list: {ignore_list}")
         with open(ignore_list, 'r') as f:
             for line in f:
-                reads_to_ignore.add(line.strip())
+                read_name = line.strip()
+                if len(read_name) > 0:
+                    reads_to_ignore.add(read_name)
         logger.info(f"Num reads to ignore: {len(reads_to_ignore)}")
 
     # Check to see if the output files exist:
