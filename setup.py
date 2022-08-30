@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 # following src dir layout according to
 # https://blog.ionelmc.ro/2014/05/25/python-packaging/#the-structure
-version = "0.5.38"
+version = "0.5.39"
 setup(
     name="maslongbow",
     version=version,
