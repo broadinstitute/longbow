@@ -25,7 +25,7 @@ RUN mkdir -p ~/.ssh && touch ~/.ssh/known_hosts
 RUN ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 # Install Longbow
-RUN git clone https://github.com/broadinstitute/longbow.git
+RUN git clone http://github.com/broadinstitute/longbow.git
 RUN cd longbow \
     && git checkout $branch \
     && python3 -mvenv venv \

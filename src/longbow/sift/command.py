@@ -202,15 +202,15 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
                             counts['Poly_A'] == 1 and
                             counts['3p_Adapter'] == 1)
 
-                read.set_tag(longbow.utils.constants.READ_MODEL_NAME_TAG, lb_model.name)
-                read.set_tag(longbow.utils.constants.SEGMENTS_TAG, longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([q.to_tag() for q in qpath]))
-                read.set_tag(longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, is_valid)
+                # Store our adapter pattern for future use:
+                # TODO: When this tool is fixed for arbitrary models, this should be added to the read as a separate tag
+                adapter_pattern = longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([q.to_tag() for q in qpath])
 
                 if is_valid:
                     logger.debug("Read is %s valid: %s: adapter pattern: %s",
                                  lb_model.name,
                                  read.query_name,
-                                 read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
+                                 adapter_pattern)
 
                     passing_bam_file.write(read)
                     num_passed += 1
@@ -219,7 +219,7 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
                         logger.debug("Read is not %s valid: %s: adapter pattern: %s",
                                      lb_model.name,
                                      read.query_name,
-                                     read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
+                                     adapter_pattern)
 
                     failing_bam_file.write(read)
                     num_failed += 1
@@ -234,7 +234,7 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
                         str(counts['cDNA']),
                         str(counts['Poly_A']),
                         str(counts['3p_Adapter']),
-                        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([q.to_tag() for q in qpath])
+                        adapter_pattern
                         ]) + '\n'
                     )
 
