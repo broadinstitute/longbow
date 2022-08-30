@@ -210,7 +210,7 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
                     logger.debug("Read is %s valid: %s: adapter pattern: %s",
                                  lb_model.name,
                                  read.query_name,
-                                 read.get_tag(adapter_pattern))
+                                 adapter_pattern)
 
                     passing_bam_file.write(read)
                     num_passed += 1
@@ -219,7 +219,7 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
                         logger.debug("Read is not %s valid: %s: adapter pattern: %s",
                                      lb_model.name,
                                      read.query_name,
-                                     read.get_tag(adapter_pattern))
+                                     adapter_pattern)
 
                     failing_bam_file.write(read)
                     num_failed += 1
