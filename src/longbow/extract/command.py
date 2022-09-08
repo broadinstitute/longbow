@@ -135,18 +135,14 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
         logger.info("About to Extract segments from %d reads", read_count)
+    if not read_count:
+        read_count = bam_utils.get_read_count_from_bam_index(input_bam)
+        if read_count:
+            logger.info("About to Extract segments from %d reads", read_count)
 
     # Open our input bam file:
     pysam.set_verbosity(0)
-    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file, \
-            tqdm.tqdm(
-            desc="Progress",
-            unit=" read",
-            colour="green",
-            file=sys.stderr,
-            disable=not sys.stdin.isatty(),
-            total=read_count
-            ) as pbar:
+    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
 
         # Get our model:
         if model is None:
@@ -206,7 +202,8 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
             num_segments_extracted = 0
             num_segments_skipped = 0
 
-            for read in bam_file:
+            for read in tqdm.tqdm(bam_file, desc="Progress", unit=" read", colour="green", file=sys.stderr,
+                                  disable=not sys.stdin.isatty(), total=read_count):
 
                 # Get our read segments:
                 try:
@@ -253,8 +250,6 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
                 num_reads += 1
                 if extracted_segment:
                     num_reads_with_extracted_segments += 1
-
-                pbar.update(1)
 
     # Close our barcode file if it was opened:
     if barcode_conf_file is not None:

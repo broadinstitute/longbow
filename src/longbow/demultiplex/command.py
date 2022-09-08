@@ -77,6 +77,10 @@ def main(pbi, threads, out_base_name, demux_on_tag, input_bam):
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
         logger.info("Processing %d reads", read_count)
+    else:
+        read_count = bam_utils.get_read_count_from_bam_index(input_bam)
+        if read_count:
+            logger.info("Processing %d reads", read_count)
 
     # Create queues for data:
     queue_size = threads * 2 if threads < 10 else 20

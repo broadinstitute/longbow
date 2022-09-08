@@ -1,5 +1,6 @@
 import logging
 import sys
+import os
 import itertools
 import re
 
@@ -96,6 +97,14 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
 
     logger.info("Using simple splitting mode.")
 
+    # Load number of reads, if pbi exists:
+    pbi = f"{input_bam.name}.pbi"
+    total_reads = bam_utils.load_read_count(pbi) if os.path.exists(pbi) else None
+    if not total_reads:
+        total_reads = bam_utils.get_read_count_from_bam_index(input_bam)
+    if total_reads:
+        logger.info(f"About to segment %d reads.", total_reads)
+
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -119,6 +128,7 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
         unit=" read",
         colour="green",
         file=sys.stderr,
+        total=total_reads,
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:

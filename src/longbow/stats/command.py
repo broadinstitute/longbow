@@ -81,6 +81,9 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     read_count = None
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
+    if not read_count:
+        read_count = bam_utils.get_read_count_from_bam_index(input_bam)
+    if read_count:
         logger.info("Annotating %d reads", read_count)
 
     if do_simple_splitting:
