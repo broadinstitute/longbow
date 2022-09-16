@@ -17,10 +17,10 @@ from ..utils.model import LibraryModel
 
 from ..utils.bam_utils import SegmentInfo
 
-from ..annotate.command import get_segments
-from ..segment.command import create_simple_delimiters
-from ..segment.command import segment_read_with_simple_splitting
-from ..segment.command import create_simple_split_array_element
+from .annotate import get_segments
+from .segment import create_simple_delimiters
+from .segment import segment_read_with_simple_splitting
+from .segment import create_simple_split_array_element
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("extract")

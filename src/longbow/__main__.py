@@ -3,10 +3,12 @@ import logging
 import click
 import click_log
 
+import importlib
 import sys
 import pkgutil
 
 import longbow
+import longbow.commands
 from .meta import VERSION
 
 
@@ -30,11 +32,9 @@ def version():
 
 
 # Dynamically find and import sub-commands (allows for plugins at run-time):
-# An alternative would be to iterate through the following:
-# pkgutil.iter_modules([os.path.dirname((inspect.getmodule(sys.modules[__name__]).__file__))])
-for p in [p for p in pkgutil.iter_modules(longbow.__path__) if p.ispkg]:
-    exec(f"from .{p.name} import command as {p.name}")
-    exec(f"main_entry.add_command({p.name}.main)")
+for p in pkgutil.iter_modules(longbow.commands.__path__):
+    mod = importlib.import_module(f".{p.name}", longbow.commands.__name__)
+    main_entry.add_command(getattr(mod, "main"))
 
 
 if __name__ == "__main__":
