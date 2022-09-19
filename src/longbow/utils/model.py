@@ -1554,7 +1554,7 @@ class LibraryModel:
         },
         "mas_15_sc_10x3p_single_none": {
             "description": "The 3' kit MAS-seq 15 array element model.",
-            "version": "2.0.1",
+            "version": "2.0.2",
             "array_element_structure": (
                 # NOTE: the first element doesn't currently have the "A" adapter in this version of the library.
                 ("A", "5p_Adapter", "CBC", "UMI", "Poly_T", "cDNA", "3p_Adapter"),
@@ -1595,7 +1595,7 @@ class LibraryModel:
                 "P": "ATGAAGTGGCTCGAGA",
                 "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
                 "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
-                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 12},
                 "cDNA": RANDOM_SEGMENT_NAME,
             },
             "direct_connections": {
