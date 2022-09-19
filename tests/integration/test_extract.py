@@ -28,13 +28,13 @@ def segmented_bam_file_from_pipeline(request):
 
         runner = CliRunner()
 
-        result_annotate = runner.invoke(longbow, ["annotate", "-m", model_name, "-f", "-o", annotate_bam.name, input_bam])
+        result_annotate = runner.invoke(longbow, ["annotate", "-t", 1, "-m", model_name, "-f", "-o", annotate_bam.name, input_bam])
         assert result_annotate.exit_code == 0
 
-        result_filter = runner.invoke(longbow, ["filter",   "-m", model_name, "-f", "-o", filter_bam.name,   annotate_bam.name])
+        result_filter = runner.invoke(longbow, ["filter", "-m", model_name, "-f", "-o", filter_bam.name, annotate_bam.name])
         assert result_filter.exit_code == 0
 
-        result_segment = runner.invoke(longbow, ["segment",  "-m", model_name, "-f", "-o", segment_bam.name,  filter_bam.name])
+        result_segment = runner.invoke(longbow, ["segment", "-t", 1, "-m", model_name, "-f", "-o", segment_bam.name,  filter_bam.name])
         assert result_segment.exit_code == 0
 
         # Yield file here so that when we return, we get to clean up automatically
@@ -55,7 +55,7 @@ def test_extract_from_pipe(tmpdir, segmented_bam_file_from_pipeline):
     actual_file = tmpdir.join(f"extract_actual_out.pipe.bam")
 
     proc = subprocess.Popen(
-        [ sys.executable, "-m", "longbow", "extract", "-f", "-o", actual_file ],
+        [ sys.executable, "-m", "longbow", "extract", "-t", 1, "-f", "-o", actual_file ],
         stdin=subprocess.PIPE
     )
 

@@ -49,7 +49,7 @@ def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.pipe.bam")
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "longbow", "annotate", "-m", model_name, "-f", "-o", actual_bam],
+        [sys.executable, "-m", "longbow", "annotate", "-t", 1, "-m", model_name, "-f", "-o", actual_bam],
         stdin=subprocess.PIPE
     )
 
