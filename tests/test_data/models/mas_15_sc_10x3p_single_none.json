@@ -1,7 +1,7 @@
 {
     "name": "mas_15_sc_10x3p_single_none",
     "description": "The 3' kit MAS-seq 15 array element model.",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "array_element_structure": [
         [
             "A",
@@ -169,28 +169,28 @@
             "FixedLengthRandomBases": 16
         },
         "UMI": {
-            "FixedLengthRandomBases": 10
+            "FixedLengthRandomBases": 12
         },
         "cDNA": "random"
     },
     "direct_connections": {
         "3p_Adapter": [
-            "C",
-            "P",
-            "K",
-            "M",
-            "I",
-            "G",
-            "H",
             "O",
+            "B",
             "N",
+            "A",
+            "F",
+            "H",
+            "M",
+            "C",
+            "I",
             "J",
             "D",
-            "F",
-            "L",
-            "A",
             "E",
-            "B"
+            "L",
+            "P",
+            "G",
+            "K"
         ],
         "A": [
             "5p_Adapter"
@@ -257,15 +257,15 @@
         ]
     },
     "start_element_names": [
-        "A",
-        "5p_Adapter"
+        "5p_Adapter",
+        "A"
     ],
     "end_element_names": [
         "P"
     ],
     "named_random_segments": [
-        "UMI",
         "cDNA",
+        "UMI",
         "CBC"
     ],
     "coding_region": "cDNA",
