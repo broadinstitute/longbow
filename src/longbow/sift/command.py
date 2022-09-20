@@ -105,7 +105,11 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
     read_count = None
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
-        logger.info("About to Filter %d reads", read_count)
+        logger.info("About to Sift %d reads", read_count)
+    else:
+        read_count = bam_utils.get_read_count_from_bam_index(input_bam)
+        if read_count:
+            logger.info("About to Sift %d reads", read_count)
 
     reads_to_ignore = set()
     if ignore_list and os.path.exists(ignore_list):
@@ -125,15 +129,7 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
 
     # Open our input bam file:
     pysam.set_verbosity(0)
-    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file, \
-            tqdm.tqdm(
-            desc="Progress",
-            unit=" read",
-            colour="green",
-            file=sys.stderr,
-            disable=not sys.stdin.isatty(),
-            total=read_count
-            ) as pbar:
+    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
 
         # Get our model:
         if model is None:
@@ -158,6 +154,12 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
 
+        # Define a hard print interval that will periodically let the user know something is going on:
+        if read_count:
+            hard_print_interval = int(read_count * 0.1)
+        else:
+            hard_print_interval = 100000
+
         # Setup output files:
         with pysam.AlignmentFile(output_bam, "wb", header=out_header) as passing_bam_file, \
                 pysam.AlignmentFile(reject_bam, "wb", header=out_header) as failing_bam_file, \
@@ -173,7 +175,7 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
 
             stats_file.write('\t'.join(['read_name', 'rq', '5p_Adapter', 'CBC', 'UMI', 'SLS', 'cDNA', 'Poly_A', '3p_Adapter', 'SG']) + '\n')
 
-            for read in bam_file:
+            for i, read in enumerate(tqdm.tqdm(bam_file, desc="Progress", unit=" read", colour="green", file=sys.stderr, disable=not sys.stdin.isatty(), total=read_count)):
 
                 if read.query_name in reads_to_ignore:
                     logger.debug(f"Ignoring read: {read.query_name}")
@@ -238,7 +240,11 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
                         ]) + '\n'
                     )
 
-                pbar.update(1)
+                if (i % hard_print_interval) == 0:
+                    if read_count:
+                        logger.info("Sifted %d/%d (%2.2f%%) reads.", i, read_count, 100*(i/read_count))
+                    else:
+                        logger.info("Sifted %d reads.", i)
 
     # Calc some stats:
     tot_reads = num_passed + num_failed + num_ignored

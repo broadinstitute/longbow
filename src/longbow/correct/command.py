@@ -175,6 +175,10 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
     # Load number of reads, if pbi exists:
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     num_reads = bam_utils.load_read_count(pbi) if os.path.exists(pbi) else None
+    if not num_reads:
+        num_reads = bam_utils.get_read_count_from_bam_index(input_bam)
+    if num_reads:
+        logger.info(f"About to correct {num_reads} reads.")
 
     # Create queues for data:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.

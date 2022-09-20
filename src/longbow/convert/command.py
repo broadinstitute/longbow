@@ -89,8 +89,8 @@ def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_len
     h = bam_utils.create_bam_header_with_program_group(
         logger.name,
         pysam.AlignmentHeader().from_dict({ 
-            "HD": { "VN": "1.0" }, 
-            "RG": [{ "ID": read_group_id, "SM": sample_name }],
+            "HD": {"VN": "1.0"},
+            "RG": [{"ID": read_group_id, "SM": sample_name}],
         })
     )
 

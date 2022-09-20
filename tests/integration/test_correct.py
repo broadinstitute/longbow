@@ -59,7 +59,7 @@ def test_correct_from_pipe(tmpdir, extracted_bam_file_from_pipeline):
     actual_file = tmpdir.join(f"correct_actual_out.pipe.bam")
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "longbow", "correct", "-f", "-o", actual_file],
+        [sys.executable, "-m", "longbow", "correct", "-t", 1, "-f", "-o", actual_file],
         stdin=subprocess.PIPE
     )
 

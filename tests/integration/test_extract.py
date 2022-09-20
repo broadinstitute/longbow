@@ -28,13 +28,13 @@ def segmented_bam_file_from_pipeline(request):
 
         runner = CliRunner()
 
-        result_annotate = runner.invoke(longbow, ["annotate", "-m", model_name, "-f", "-o", annotate_bam.name, input_bam])
+        result_annotate = runner.invoke(longbow, ["annotate", "-t", 1, "-m", model_name, "-f", "-o", annotate_bam.name, input_bam])
         assert result_annotate.exit_code == 0
 
-        result_filter = runner.invoke(longbow, ["filter",   "-m", model_name, "-f", "-o", filter_bam.name,   annotate_bam.name])
+        result_filter = runner.invoke(longbow, ["filter", "-m", model_name, "-f", "-o", filter_bam.name, annotate_bam.name])
         assert result_filter.exit_code == 0
 
-        result_segment = runner.invoke(longbow, ["segment",  "-m", model_name, "-f", "-o", segment_bam.name,  filter_bam.name])
+        result_segment = runner.invoke(longbow, ["segment", "-t", 1, "-m", model_name, "-f", "-o", segment_bam.name,  filter_bam.name])
         assert result_segment.exit_code == 0
 
         # Yield file here so that when we return, we get to clean up automatically
@@ -42,7 +42,7 @@ def segmented_bam_file_from_pipeline(request):
 
 
 def test_extract_from_file(tmpdir, segmented_bam_file_from_pipeline):
-    actual_file = tmpdir.join(f"extract_actual_out.bam")
+    actual_file = tmpdir.join("extract_actual_out.bam")
     args = ["extract", "-f", "-o", actual_file, segmented_bam_file_from_pipeline]
 
     runner = CliRunner()
@@ -52,13 +52,12 @@ def test_extract_from_file(tmpdir, segmented_bam_file_from_pipeline):
 
 
 def test_extract_from_pipe(tmpdir, segmented_bam_file_from_pipeline):
-    actual_file = tmpdir.join(f"extract_actual_out.pipe.bam")
+    actual_file = tmpdir.join("extract_actual_out.pipe.bam")
 
-    proc = subprocess.Popen(
-        [ sys.executable, "-m", "longbow", "extract", "-f", "-o", actual_file ],
-        stdin=subprocess.PIPE
-    )
+    args = ["extract", "-f", "-o", actual_file]
 
-    cat_file_to_pipe(segmented_bam_file_from_pipeline, proc)
+    runner = CliRunner()
+    with open(segmented_bam_file_from_pipeline, "rb") as fh:
+        result = runner.invoke(longbow, args, input=fh)
 
-    assert proc.returncode == 0
+    assert result.exit_code == 0

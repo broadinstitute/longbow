@@ -1,5 +1,6 @@
 import logging
 import sys
+import os
 import itertools
 
 import time
@@ -132,6 +133,14 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, model, writ
     logger.info(f"Using %s: %s", model, lb_model.description)
     model = lb_model
 
+    # Load number of reads, if pbi exists:
+    pbi = f"{input_bam.name}.pbi"
+    num_reads = bam_utils.load_read_count(pbi) if os.path.exists(pbi) else None
+    if not num_reads:
+        num_reads = bam_utils.get_read_count_from_bam_index(input_bam)
+    if num_reads:
+        logger.info(f"Processing {num_reads} reads.")
+
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -156,6 +165,7 @@ def main(threads, output_base_name, cell_barcode, umi_length, force, model, writ
         colour="green",
         file=sys.stderr,
         leave=False,
+        total=num_reads,
         disable=not sys.stdin.isatty(),
     ) as pbar:
         if force:

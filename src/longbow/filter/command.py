@@ -75,6 +75,10 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
     read_count = None
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
+    if not read_count:
+        read_count = bam_utils.get_read_count_from_bam_index(input_bam)
+
+    if read_count:
         logger.info("About to Filter %d reads", read_count)
 
     # Check to see if the output files exist:
@@ -85,15 +89,7 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
 
     # Open our input bam file:
     pysam.set_verbosity(0)
-    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file, \
-            tqdm.tqdm(
-            desc="Progress",
-            unit=" read",
-            colour="green",
-            file=sys.stderr,
-            disable=not sys.stdin.isatty(),
-            total=read_count
-            ) as pbar:
+    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
 
         # Get our model:
         if model is None:
@@ -121,7 +117,8 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
             tot_num_valid_adapters = 0
             tot_num_failed_adapters = 0
 
-            for read in bam_file:
+            for read in tqdm.tqdm(bam_file, desc="Progress", unit=" read", colour="green", file=sys.stderr,
+                                  disable=not sys.stdin.isatty(), total=read_count):
                 # Get our read segments:
                 try:
                     _, segments = get_segments(read)
@@ -167,8 +164,6 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                     failing_bam_file.write(read)
                     tot_num_failed_adapters += num_valid_adapters
                     num_failed += 1
-
-                pbar.update(1)
 
     # Calc some stats:
     pct_reads_passing = 100 * num_passed / (num_passed + num_failed) if (num_passed + num_failed) > 0 else 0

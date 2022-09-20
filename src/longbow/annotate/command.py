@@ -152,6 +152,10 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
         else:
             read_count = bam_utils.load_read_count(pbi)
             logger.info("Annotating %d reads", read_count)
+    else:
+        read_count = bam_utils.get_read_count_from_bam_index(input_bam)
+        if read_count:
+            logger.info("Annotating %d reads", read_count)
 
     # Create queues for data:
     queue_size = threads * 2 if threads < 10 else 20

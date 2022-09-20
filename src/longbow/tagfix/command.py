@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import time
 import sys
@@ -70,6 +71,14 @@ def main(threads, output_bam, force, input_bam):
     process_input_data_queue = manager.Queue(threads)
     results = manager.Queue()
 
+    # Load number of reads, if pbi exists:
+    pbi = f"{input_bam.name}.pbi"
+    num_reads = bam_utils.load_read_count(pbi) if os.path.exists(pbi) else None
+    if not num_reads:
+        num_reads = bam_utils.get_read_count_from_bam_index(input_bam)
+    if num_reads:
+        logger.info(f"About to tagfix %d reads.", num_reads)
+
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
@@ -78,6 +87,7 @@ def main(threads, output_bam, force, input_bam):
         unit=" read",
         colour="green",
         file=sys.stderr,
+        total=num_reads,
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:

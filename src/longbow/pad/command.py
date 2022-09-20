@@ -104,6 +104,14 @@ def main(threads, output_bam, model, force, barcode_tag, new_barcode_tag, expand
     logger.info(f"Expanding tag {barcode_tag} by {expand} bases")
     logger.info(f"Writing expanded tag to: {new_barcode_tag}")
 
+    # Load number of reads, if pbi exists:
+    pbi = f"{input_bam.name}.pbi"
+    num_reads = bam_utils.load_read_count(pbi) if os.path.exists(pbi) else None
+    if not num_reads:
+        num_reads = bam_utils.get_read_count_from_bam_index(input_bam)
+    if num_reads:
+        logger.info(f"About to pad %d reads.", num_reads)
+
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -127,6 +135,7 @@ def main(threads, output_bam, model, force, barcode_tag, new_barcode_tag, expand
         unit=" read",
         colour="green",
         file=sys.stderr,
+        total=num_reads,
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
