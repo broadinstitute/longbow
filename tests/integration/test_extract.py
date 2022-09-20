@@ -42,7 +42,7 @@ def segmented_bam_file_from_pipeline(request):
 
 
 def test_extract_from_file(tmpdir, segmented_bam_file_from_pipeline):
-    actual_file = tmpdir.join(f"extract_actual_out.bam")
+    actual_file = tmpdir.join("extract_actual_out.bam")
     args = ["extract", "-f", "-o", actual_file, segmented_bam_file_from_pipeline]
 
     runner = CliRunner()
@@ -52,13 +52,12 @@ def test_extract_from_file(tmpdir, segmented_bam_file_from_pipeline):
 
 
 def test_extract_from_pipe(tmpdir, segmented_bam_file_from_pipeline):
-    actual_file = tmpdir.join(f"extract_actual_out.pipe.bam")
+    actual_file = tmpdir.join("extract_actual_out.pipe.bam")
 
-    proc = subprocess.Popen(
-        [ sys.executable, "-m", "longbow", "extract", "-t", 1, "-f", "-o", actual_file ],
-        stdin=subprocess.PIPE
-    )
+    args = ["extract", "-f", "-o", actual_file]
 
-    cat_file_to_pipe(segmented_bam_file_from_pipeline, proc)
+    runner = CliRunner()
+    with open(segmented_bam_file_from_pipeline, "rb") as fh:
+        result = runner.invoke(longbow, args, input=fh)
 
-    assert proc.returncode == 0
+    assert result.exit_code == 0
