@@ -17,6 +17,8 @@ from collections import OrderedDict
 from construct import *
 from inspect import currentframe, getdoc
 
+import ssw
+
 from ..meta import VERSION
 
 from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_QUAL_TAG, SEGMENTS_RC_TAG, \
@@ -55,17 +57,26 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
         return SegmentInfo(match[1], int(match[2]), int(match[3]))
 
 
-def get_read_count_from_bam_index(bam_file_path):
-    """Return the number of reads in the given bam file if a bam index is present.  Otherwise returns `None`."""
+def get_read_count_from_bam_index(bam_file_handle):
+    """Return the number of reads in the given bam file if a bam index is present.
+
+    Input should be a file-like object. If no index is present or input is not seekable, returns `None`.
+    """
 
     total_reads = None
-    with pysam.AlignmentFile(bam_file_path, "rb", check_sq=False, require_index=False) as bam_file:
+    if not bam_file_handle.seekable():
+        return total_reads
+
+    with pysam.AlignmentFile(bam_file_handle, "rb", check_sq=False, require_index=False) as bam_file:
         # Get total number of reads if we have an index:
         if bam_file.has_index():
             idx_stats = bam_file.get_index_statistics()
             unaligned_reads = bam_file.nocoordinate
             aligned_reads = reduce(lambda a, b: a + b, [x.total for x in idx_stats]) if len(idx_stats) > 0 else 0
             total_reads = unaligned_reads + aligned_reads
+
+    bam_file_handle.seek(0)
+
     return total_reads
 
 

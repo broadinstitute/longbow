@@ -48,12 +48,11 @@ def test_annotate(tmpdir, input_bam, expected_bam, model_name):
 def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.pipe.bam")
 
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "longbow", "annotate", "-t", 1, "-m", model_name, "-f", "-o", actual_bam],
-        stdin=subprocess.PIPE
-    )
+    args = ["annotate", "-t", 1, "-v", "INFO", "-m", model_name, "-f", "-o", str(actual_bam), "-"]
 
-    cat_file_to_pipe(input_bam, proc)
+    runner = CliRunner()
+    with open(input_bam, "rb") as fh:
+        result = runner.invoke(longbow, args, input=fh)
 
-    assert proc.returncode == 0
+    assert result.exit_code == 0
     assert_reads_files_equal(actual_bam, expected_bam)
