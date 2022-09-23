@@ -17,7 +17,8 @@ def test_demultiplex_from_file(tmpdir, input_bam):
     args = ["demultiplex", "-d", "YN", "-o", "demux", str(input_bam)]
 
     runner = CliRunner()
-    result = runner.invoke(longbow, args)
+    with runner.isolated_filesystem():
+        result = runner.invoke(longbow, args)
 
     assert result.exit_code == 0
 
@@ -27,7 +28,7 @@ def test_demultiplex_from_pipe(tmpdir, input_bam):
     args = ["demultiplex", "-d", "YN", "-o" "demux"]
 
     runner = CliRunner()
-    with open(input_bam, "rb") as fh:
+    with runner.isolated_filesystem(), open(input_bam, "rb") as fh:
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0

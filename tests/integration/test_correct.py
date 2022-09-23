@@ -41,7 +41,8 @@ def test_correct(tmpdir, input_sam, expected_bc_corrected_sam, expected_bc_uncor
             "--barcode-uncorrectable-bam", str(actual_bc_uncorrected_file)]
 
     runner = CliRunner(mix_stderr=False)
-    result = runner.invoke(longbow, args)
+    with runner.isolated_filesystem():
+        result = runner.invoke(longbow, args)
 
     assert result.exit_code == 0
 
@@ -57,7 +58,7 @@ def test_correct_from_pipe(tmpdir, extracted_bam_file_from_pipeline):
     args = ["correct", "-t", 1, "-f", "-o", str(actual_file)]
 
     runner = CliRunner()
-    with open(extracted_bam_file_from_pipeline, "rb") as fh:
+    with runner.isolated_filesystem(), open(extracted_bam_file_from_pipeline, "rb") as fh:
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0
