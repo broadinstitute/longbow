@@ -1,23 +1,18 @@
 import pytest
-import os
-import sys
-import subprocess
+import pathlib
 import tempfile
 
 from click.testing import CliRunner
 
 from longbow.__main__ import main_entry as longbow
 
-from ..utils import cat_file_to_pipe
 
-TEST_DATA_FOLDER = path = os.path.abspath(
-    __file__ + os.path.sep + "../../" + os.path.sep + "test_data"
-) + os.path.sep
+TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 
 
 @pytest.fixture(scope="module", params=[
-    (TEST_DATA_FOLDER + "mas15_test_input.bam", "mas_15_sc_10x5p_single_none"),
-    (TEST_DATA_FOLDER + "mas10_test_input.bam", "mas_10_sc_10x5p_single_none"),
+    (TEST_DATA_FOLDER / "mas15_test_input.bam", "mas_15_sc_10x5p_single_none"),
+    (TEST_DATA_FOLDER / "mas10_test_input.bam", "mas_10_sc_10x5p_single_none"),
 ])
 def segmented_bam_file_from_pipeline(request):
     input_bam, model_name = request.param
@@ -28,7 +23,7 @@ def segmented_bam_file_from_pipeline(request):
 
         runner = CliRunner()
 
-        result_annotate = runner.invoke(longbow, ["annotate", "-t", 1, "-m", model_name, "-f", "-o", annotate_bam.name, input_bam])
+        result_annotate = runner.invoke(longbow, ["annotate", "-t", 1, "-m", model_name, "-f", "-o", annotate_bam.name, str(input_bam)])
         assert result_annotate.exit_code == 0
 
         result_filter = runner.invoke(longbow, ["filter", "-m", model_name, "-f", "-o", filter_bam.name, annotate_bam.name])

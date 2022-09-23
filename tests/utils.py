@@ -172,14 +172,3 @@ def assert_text_files_equal(actual_file, expected_file, header_prefix="#", order
                         print(f"ERROR: number of lines is different in actual and expected files.",
                               file=sys.stderr)
                     assert not has_lines_remaining
-
-
-def cat_file_to_pipe(filename, proc):
-    with open(filename, "rb") as input_file:
-        input_bytes = input_file.read()
-
-        proc.stdin.write(input_bytes)
-        proc.stdin.flush()
-
-    proc.stdin.close()
-    proc.wait()

@@ -1,17 +1,6 @@
 import pytest
 
-import pysam
-import tempfile
-import os
-import json
-
-from longbow.utils import bam_utils
 from longbow.utils import model
-
-
-TEST_DATA_FOLDER = path = os.path.abspath(
-    __file__ + os.path.sep + "../../" + os.path.sep + "test_data"
-)
 
 
 @pytest.mark.parametrize("model_name, expected_value", [
