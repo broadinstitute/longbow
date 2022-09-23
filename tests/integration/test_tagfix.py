@@ -8,22 +8,18 @@ from longbow.__main__ import main_entry as longbow
 from ..utils import assert_reads_files_equal
 from ..utils import convert_sam_to_bam
 
-################################################################################
 
 TOOL_NAME = "tagfix"
-
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / TOOL_NAME
-
-
-################################################################################
-
-
-@pytest.mark.parametrize("input_sam, expected_sam", [
+TEST_PARAMS = [
     [
         TEST_DATA_FOLDER / "tagfix_test_data.sam",
-        TEST_DATA_FOLDER / "tagfix_test_data.expected.sam"
+        TEST_DATA_FOLDER / "tagfix_test_data.expected.sam",
     ],
-])
+]
+
+
+@pytest.mark.parametrize("input_sam, expected_sam", TEST_PARAMS)
 def test_tagfix(tmpdir, input_sam, expected_sam):
 
     # Convert test files to bam:
@@ -44,12 +40,7 @@ def test_tagfix(tmpdir, input_sam, expected_sam):
     assert_reads_files_equal(actual_bam_out, expected_bam, order_matters=True)
 
 
-@pytest.mark.parametrize("input_sam, expected_sam", [
-    [
-        TEST_DATA_FOLDER / "tagfix_test_data.sam",
-        TEST_DATA_FOLDER / "tagfix_test_data.expected.sam"
-    ],
-])
+@pytest.mark.parametrize("input_sam, expected_sam", TEST_PARAMS)
 def test_tagfix_from_pipe(tmpdir, input_sam, expected_sam):
 
     # Convert test files to bam:
