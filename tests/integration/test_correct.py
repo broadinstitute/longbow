@@ -11,19 +11,17 @@ from ..utils import convert_sam_to_bam
 
 TOOL_NAME = "correct"
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / TOOL_NAME
-TEST_PARAMS = [
-    [
+
+
+@pytest.fixture(scope="function", params=[
+    (
         TEST_DATA_FOLDER / "correct_test_data.sam",
         TEST_DATA_FOLDER / "correct_expected_corrected_data.sam",
         TEST_DATA_FOLDER / "correct_expected_uncorrected_data.sam",
-    ],
-]
-
-
-@pytest.mark.parametrize(
-    "input_sam, expected_bc_corrected_sam, expected_bc_uncorrected_sam", TEST_PARAMS
-)
-def test_correct(tmpdir, input_sam, expected_bc_corrected_sam, expected_bc_uncorrected_sam):
+    )
+])
+def input_data_files(tmpdir, request):
+    input_sam, expected_bc_corrected_sam, expected_bc_uncorrected_sam = request.param
 
     # Convert test files to bam:
     input_bam = tmpdir.join("input.bam")
@@ -32,13 +30,23 @@ def test_correct(tmpdir, input_sam, expected_bc_corrected_sam, expected_bc_uncor
     expected_bc_corrected_bam = tmpdir.join("expected.bam")
     convert_sam_to_bam(expected_bc_corrected_sam, expected_bc_corrected_bam)
 
+    return input_bam, expected_bc_corrected_bam, expected_bc_uncorrected_sam
+
+
+def test_correct(tmpdir, input_data_files):
+    input_bam, expected_bc_corrected_bam, expected_bc_uncorrected_sam = input_data_files
+
     actual_bc_corrected_file = tmpdir.join(f"{TOOL_NAME}_actual_out.mas15.bam")
     actual_bc_uncorrected_file = tmpdir.join(f"{TOOL_NAME}_actual_bc_uncorrected_out.mas15.bam")
-    args = ["correct", "-t", 1, "-m", "mas_15_sc_10x5p_single_none", "-v", "INFO",
-            "-a", str(TEST_DATA_FOLDER / "barcode_allow_list.txt"),
-            str(input_bam),
-            "-o", str(actual_bc_corrected_file),
-            "--barcode-uncorrectable-bam", str(actual_bc_uncorrected_file)]
+    args = [
+        "correct",
+        "-t", 1,
+        "-m", "mas_15_sc_10x5p_single_none",
+        "-a", str(TEST_DATA_FOLDER / "barcode_allow_list.txt"),
+        str(input_bam),
+        "-o", str(actual_bc_corrected_file),
+        "--barcode-uncorrectable-bam", str(actual_bc_uncorrected_file)
+    ]
 
     runner = CliRunner(mix_stderr=False)
     with runner.isolated_filesystem():
@@ -51,14 +59,27 @@ def test_correct(tmpdir, input_sam, expected_bc_corrected_sam, expected_bc_uncor
     assert_reads_files_equal(actual_bc_uncorrected_file, expected_bc_uncorrected_sam, order_matters=True)
 
 
-@pytest.mark.skip(reason="`correct` command currently does not accept data from a pipe")
-def test_correct_from_pipe(tmpdir, extracted_bam_file_from_pipeline):
-    actual_file = tmpdir.join(f"correct_actual_out.pipe.bam")
+def test_correct_from_pipe(tmpdir, input_data_files):
+    input_bam, expected_bc_corrected_bam, expected_bc_uncorrected_sam = input_data_files
 
-    args = ["correct", "-t", 1, "-f", "-o", str(actual_file)]
+    actual_bc_corrected_file = tmpdir.join(f"{TOOL_NAME}_actual_out.mas15.pipe.bam")
+    actual_bc_uncorrected_file = tmpdir.join(f"{TOOL_NAME}_actual_bc_uncorrected_out.mas15.pipe.bam")
+
+    args = [
+        "correct",
+        "-t", 1,
+        "-m", "mas_15_sc_10x5p_single_none",
+        "-a", str(TEST_DATA_FOLDER / "barcode_allow_list.txt"),
+        "-o", str(actual_bc_corrected_file),
+        "--barcode-uncorrectable-bam", str(actual_bc_uncorrected_file)
+    ]
 
     runner = CliRunner()
-    with runner.isolated_filesystem(), open(extracted_bam_file_from_pipeline, "rb") as fh:
+    with runner.isolated_filesystem(), open(input_bam, "rb") as fh:
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0
+
+    # Equal files result as True:
+    assert_reads_files_equal(actual_bc_corrected_file, expected_bc_corrected_bam, order_matters=True)
+    assert_reads_files_equal(actual_bc_uncorrected_file, expected_bc_uncorrected_sam, order_matters=True)
