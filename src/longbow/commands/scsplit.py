@@ -19,7 +19,7 @@ from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
-from ..annotate.command import get_segments
+from .annotate import get_segments
 
 from ..meta import VERSION
 

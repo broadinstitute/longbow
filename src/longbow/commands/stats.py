@@ -21,9 +21,9 @@ from ..utils import plot_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
-from ..segment import command as segment
+from . import segment
 
-from ..annotate.command import get_segments
+from .annotate import get_segments
 
 
 plot_title_path_regex = re.compile(r".*/([^/].*?)/*$")
