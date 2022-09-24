@@ -2,16 +2,15 @@ import pytest
 
 import pysam
 import tempfile
-import os
+import pathlib
 import json
 
 from longbow.utils import bam_utils
 from longbow.utils import model
 
 
-TEST_DATA_FOLDER = path = os.path.abspath(
-    __file__ + os.path.sep + "../../" + os.path.sep + "test_data"
-)
+TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / "models"
+
 
 @pytest.fixture
 def bam_header_without_program_group():
@@ -200,7 +199,7 @@ def test_load_models_from_bam_header(bam_header_with_multiple_program_groups):
         assert len(lb_models) == 2
 
         for lb_model in lb_models:
-            stored_model = model.LibraryModel.from_json_file(f'{TEST_DATA_FOLDER}/models/{lb_model.name}.json')
+            stored_model = model.LibraryModel.from_json_file(TEST_DATA_FOLDER / f"{lb_model.name}.json")
 
             _compare_models(lb_model, stored_model)
 
@@ -209,7 +208,7 @@ def test_load_model_from_name():
     for model_name in list(model.LibraryModel.pre_configured_models.keys()):
         lb_models = bam_utils.load_models([model_name])
 
-        stored_model = model.LibraryModel.from_json_file(f'{TEST_DATA_FOLDER}/models/{model_name}.json')
+        stored_model = model.LibraryModel.from_json_file(TEST_DATA_FOLDER / f"{model_name}.json")
 
         _compare_models(lb_models[0], stored_model)
 
