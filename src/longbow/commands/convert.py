@@ -86,12 +86,14 @@ def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_len
     files = _get_files(input_spec)
 
     # Create header for the output bam file:
-    h = bam_utils.create_bam_header_with_program_group(
-        logger.name,
-        pysam.AlignmentHeader().from_dict({ 
-            "HD": {"VN": "1.0"},
-            "RG": [{"ID": read_group_id, "SM": sample_name}],
-        })
+    h = pysam.AlignmentHeader.from_dict(
+        bam_utils.create_bam_header_with_program_group(
+            logger.name,
+            pysam.AlignmentHeader().from_dict({
+                "HD": {"VN": "1.0"},
+                "RG": [{"ID": read_group_id, "SM": sample_name}],
+            })
+        )
     )
 
     num_reads_seen, num_reads_written = 0, 0

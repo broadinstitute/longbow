@@ -357,6 +357,7 @@ def _sub_process_write_fn(
     out_bam_header
 ):
     """Thread / process fn to write out all our data."""
+    out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     try:
         if do_bam_out:

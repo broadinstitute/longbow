@@ -152,6 +152,7 @@ def main(threads, output_bam, force, input_bam):
 
 def _output_writer_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
     """Thread / process fn to write out all our data."""
+    out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header

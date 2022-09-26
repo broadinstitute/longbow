@@ -211,6 +211,7 @@ def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_m
     # Get the segment to pad out:
     # NOTE: by now we know this tag is in the model:
     barcode_seg_name = lb_model.get_segment_name_for_annotation_tag(barcode_tag)
+    out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header

@@ -148,6 +148,7 @@ def main(pbi, threads, out_base_name, demux_on_tag, input_bam):
 
 def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, res, read_count):
     """Thread / process fn to write out all our data."""
+    out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     try:
         out_file_dict = {}

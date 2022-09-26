@@ -173,7 +173,8 @@ def compute_shard_offsets(pbi_file, num_shards):
 
 
 def create_bam_header_with_program_group(command_name, base_bam_header, description=None, models=None):
-    """Create a pysam.AlignmentHeader object with program group (PG) information populated by the given arguments.
+    """Create a dictionary with program group (PG) information populated by the given arguments, suitable for
+    converting into a pysam.AlignmentHeader object.
 
     This function is intended to be called from the 'main' function of a longbow subcommand because it uses reflection
     to pull in the first line of the docstring from the main function as the description (DS field)."""
@@ -201,9 +202,8 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
         bam_header_dict["PG"].append(pg_dict)
     else:
         bam_header_dict["PG"] = [pg_dict]
-    out_header = pysam.AlignmentHeader.from_dict(bam_header_dict)
 
-    return out_header
+    return bam_header_dict
 
 
 def check_for_preexisting_files(file_list, exist_ok=False):

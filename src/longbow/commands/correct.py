@@ -365,6 +365,7 @@ def _get_field_count_and_percent_string(count, total):
 def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, barcode_uncorrectable_bam,
                      barcode_tag, corrected_tag, ccs_corrected_rq_threshold, num_reads, disable_pbar, res):
     """Thread / process fn to write out all our data."""
+    out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     with pysam.AlignmentFile(out_bam_file_name, "wb", header=out_bam_header) as out_bam_file, \
         pysam.AlignmentFile(barcode_uncorrectable_bam, "wb", header=out_bam_header) as barcode_uncorrectable_bam, \

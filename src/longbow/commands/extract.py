@@ -192,7 +192,9 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
         delimiters = create_simple_delimiters(lb_model)
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
+        out_header = pysam.AlignmentHeader.from_dict(
+            bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
+        )
 
         # Setup output files:
         with pysam.AlignmentFile(output_bam, "wb", header=out_header) as extracted_bam_file:
