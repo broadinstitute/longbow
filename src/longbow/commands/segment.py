@@ -245,6 +245,7 @@ def _sub_process_write_fn(
 
     delimiters = create_simple_delimiters(model)
     logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
+    out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     barcode_conf_file = None
     if create_barcode_conf_file:

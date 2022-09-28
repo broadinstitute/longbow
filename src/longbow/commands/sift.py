@@ -152,7 +152,9 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
+        out_header = pysam.AlignmentHeader.from_dict(
+            bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
+        )
 
         # Define a hard print interval that will periodically let the user know something is going on:
         if read_count:
