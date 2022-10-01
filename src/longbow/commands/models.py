@@ -77,16 +77,20 @@ def main(list_models, dump):
 
         lb = LibraryModel(
             array_model=ModelBuilder.pre_configured_array_models[array_model_name], 
-            cdna_model=ModelBuilder.pre_configured_cdna_models[cdna_model_name]
+            cdna_model=ModelBuilder.pre_configured_cdna_models[cdna_model_name],
+            model_name=model_name
         )
 
         labelsdict = {}
         for s in lb.hmm.states:
-            labelsdict[s] = s.name
+            if s.name.endswith('-start') or s.name.endswith('-end'):
+                labelsdict[s] = s.name
+            else:
+                labelsdict[s] = ''
 
-        # layout = nx.spring_layout(lb.hmm.graph)
-        # nx.draw(lb.hmm.graph, with_labels=True, labels=labelsdict, pos=layout)
-        # plt.savefig('plotgraph.png', dpi=300, bbox_inches='tight')
+        layout = nx.spring_layout(lb.hmm.graph)
+        nx.draw(lb.hmm.graph, with_labels=True, labels=labelsdict, pos=layout)
+        plt.savefig('plotgraph.png', dpi=300, bbox_inches='tight')
         # plt.show()
 
         # Get out model:

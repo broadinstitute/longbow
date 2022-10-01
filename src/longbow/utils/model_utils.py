@@ -266,6 +266,41 @@ class ModelBuilder:
         return model
 
     @staticmethod
+    def make_random_repeat_model():
+        logger.debug(f"Making Model: RANDOM REPEAT")
+        model = HiddenMarkovModel(name=RANDOM_SEGMENT_NAME)
+
+        # add states
+        ri = State(
+            DiscreteDistribution({
+                "A": ModelBuilder.RANDOM_BASE_PROB,
+                "C": ModelBuilder.RANDOM_BASE_PROB,
+                "G": ModelBuilder.RANDOM_BASE_PROB,
+                "T": ModelBuilder.RANDOM_BASE_PROB
+            }),
+            name=f"{RANDOM_SEGMENT_NAME}:{RANDOM_BASE_STATE}",
+        )
+        rda = State(None, name=f"{RANDOM_SEGMENT_NAME}:{RANDOM_SILENT_STATE_A}")
+        rdb = State(None, name=f"{RANDOM_SEGMENT_NAME}:{RANDOM_SILENT_STATE_B}")
+
+        model.add_states([ri, rda, rdb])
+
+        # add transitions
+        model.add_transition(model.start, rda, ModelBuilder.START_AND_END_RANDOM_PROB)
+        model.add_transition(model.start, ri, ModelBuilder.START_AND_END_RANDOM_PROB)
+
+        model.add_transition(ri, ri, ModelBuilder.RAND_INS_CONTINUATION_PROB)
+        model.add_transition(ri, rda, ModelBuilder.RAND_INS_TO_DEL_PROB)
+        model.add_transition(ri, model.end, ModelBuilder.RAND_INS_END_PROB)
+
+        model.add_transition(rdb, ri, ModelBuilder.RAND_RAND_PROB)
+        model.add_transition(rdb, model.end, ModelBuilder.START_AND_END_RANDOM_PROB)
+
+        model.bake(merge=BAKE_MERGE_STRATEGY)
+
+        return model
+
+    @staticmethod
     def make_fixed_length_random_segment(name, length):
         logger.debug("Making Model: FIXED_LENGTH_RANDOM (%s:%d)", name, length)
         model = HiddenMarkovModel(name=name)
@@ -306,12 +341,6 @@ class ModelBuilder:
 
         return None
 
-    # @staticmethod
-    # def insert_model(base_hmm, base_prev_model_name, base_next_model_name, insert_hmm, insert_prev_model_name, insert_next_model_name, transition_probability=1.0):
-    #     base_hmm.add_model(insert_hmm)
-
-    #     return ModelBuilder.connect_terminals(base_hmm, prev_model_name, next_model_name, transition_probability)
-
     @staticmethod
     def connect_terminals(base_hmm, adapter_name_i, adapter_name_j, transition_probability=1.0):
         prev_state = ModelBuilder.find_state(base_hmm, f'{adapter_name_i}-end')
@@ -325,12 +354,14 @@ class ModelBuilder:
 
     pre_configured_array_models = {
         "play_3": {
-            "description": "3-element test model",
+            "description": "3-element toy array",
             "version": "3.0.0",
-            "structure": [ "A", "B" ],
+            "structure": [ "A", "B", "C", "D" ],
             "adapters": {
                 "A": "A",
                 "B": "C",
+                "C": "G",
+                "D": "T",
             },
             "deprecated": False,
         },
@@ -394,19 +425,17 @@ class ModelBuilder:
 
     pre_configured_cdna_models = {
         "play_10x3p": {
-            "description": "single-cell 10x 3' kit",
+            "description": "toy 3' model",
             "version": "3.0.0",
-            "structure": [ "5p_Adapter", "cDNA", "3p_Adapter", "FakeAdapter1", "FakeAdapter2", "FakeAdapter3" ],
+            "structure": [ "5p_Adapter", "cDNA", "3p_Adapter" ],
             "adapters": {
                 "5p_Adapter": "T",
                 "cDNA": RANDOM_SEGMENT_NAME,
                 "3p_Adapter": "G",
-                "FakeAdapter1": "C",
-                "FakeAdapter2": "T",
-                "FakeAdapter3": "A",
             },
             "named_random_segments": {"cDNA"},
             "coding_region": "cDNA",
+            "annotation_segments": {},
             "deprecated": False,
         },
 
