@@ -355,20 +355,20 @@ def write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_ba
         read.query_qualities = quals
 
     # Get our segment scores and set them:
-    total_score = 0
-    total_max_score = 0
-    score_strings = []
-    for s in segments:
-        score, max_score = get_segment_score(read.query_sequence, s, model, ssw_aligner)
-        score_strings.append(f"{score}/{max_score}")
-        total_score += score
-        total_max_score += max_score
+    # total_score = 0
+    # total_max_score = 0
+    # score_strings = []
+    # for s in segments:
+        # score, max_score = get_segment_score(read.query_sequence, s, model, ssw_aligner)
+        # score_strings.append(f"{score}/{max_score}")
+        # total_score += score
+        # total_max_score += max_score
 
-    read.set_tag(SEGMENTS_QUAL_TAG, SEGMENT_TAG_DELIMITER.join(score_strings))
-    if total_max_score != 0:
-        read.set_tag(READ_APPROX_QUAL_TAG, f"{total_score / total_max_score:.4f}")
-    else:
-        read.set_tag(READ_APPROX_QUAL_TAG, f"0.0")
+    # read.set_tag(SEGMENTS_QUAL_TAG, SEGMENT_TAG_DELIMITER.join(score_strings))
+    # if total_max_score != 0:
+        # read.set_tag(READ_APPROX_QUAL_TAG, f"{total_score / total_max_score:.4f}")
+    # else:
+        # read.set_tag(READ_APPROX_QUAL_TAG, f"0.0")
 
     out_bam_file.write(read)
 
