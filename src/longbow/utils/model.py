@@ -200,7 +200,7 @@ class LibraryModel:
                 1.0/(len(self.array_model['structure'])-1)
             )
 
-        self.hmm.bake()
+        self.hmm.bake(merge="None")
 
     def _create_random_repeat_model(self):
         model = ModelBuilder.make_random_repeat_model()
@@ -231,7 +231,8 @@ class LibraryModel:
         return states, model
 
     def _create_cdna_model(self):
-        model = HiddenMarkovModel(name='cdna-model')
+        # model = HiddenMarkovModel(name='cdna-model')
+        model = None
 
         # Make the individual adapter models
         for adapter_name, adapter_def in self.cdna_model['adapters'].items():
@@ -276,8 +277,8 @@ class LibraryModel:
         send = ModelBuilder.find_state(model, f'{self.cdna_model["structure"][-1]}-end')
         cend = ModelBuilder.find_state(model, 'cdna-model-end')
 
-        model.add_transition(cstart, sstart, 1.0)
-        model.add_transition(send, cend, 1.0)
+        # model.add_transition(cstart, sstart, 1.0)
+        # model.add_transition(send, cend, 1.0)
 
         model.bake(merge="None")
 

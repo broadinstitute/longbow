@@ -125,6 +125,12 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
     # Get our model(s):
     lb_models = bam_utils.load_models(model, input_bam)
 
+    with open("new_hmm.txt", "w") as nt:
+        a = lb_models[0].hmm.to_dict()
+
+        for e in a['edges']:
+            nt.write(f"{a['states'][e[0]]['name']} {a['states'][e[1]]['name']} {e[2]} {e[3]} {e[4]}\n")
+
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
     read_num = 0
