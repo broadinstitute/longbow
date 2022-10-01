@@ -327,11 +327,10 @@ class ModelBuilder:
         "play_3": {
             "description": "3-element test model",
             "version": "3.0.0",
-            "structure": [ "A", "B", "C" ],
+            "structure": [ "A", "B" ],
             "adapters": {
                 "A": "A",
                 "B": "C",
-                "C": "T",
             },
             "deprecated": False,
         },
@@ -397,11 +396,14 @@ class ModelBuilder:
         "play_10x3p": {
             "description": "single-cell 10x 3' kit",
             "version": "3.0.0",
-            "structure": [ "5p_Adapter", "cDNA", "3p_Adapter" ],
+            "structure": [ "5p_Adapter", "cDNA", "3p_Adapter", "FakeAdapter1", "FakeAdapter2", "FakeAdapter3" ],
             "adapters": {
                 "5p_Adapter": "T",
                 "cDNA": RANDOM_SEGMENT_NAME,
-                "3p_Adapter": "C",
+                "3p_Adapter": "G",
+                "FakeAdapter1": "C",
+                "FakeAdapter2": "T",
+                "FakeAdapter3": "A",
             },
             "named_random_segments": {"cDNA"},
             "coding_region": "cDNA",

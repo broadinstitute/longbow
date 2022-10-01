@@ -11,8 +11,9 @@ import click_log
 import multiprocessing as mp
 
 import networkx as nx
-import matplotlib.pyplot as plt
+from networkx.drawing.nx_pydot import write_dot
 
+import matplotlib.pyplot as plt
 
 # from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
@@ -79,18 +80,14 @@ def main(list_models, dump):
             cdna_model=ModelBuilder.pre_configured_cdna_models[cdna_model_name]
         )
 
-        print(lb.hmm)
-
         labelsdict = {}
         for s in lb.hmm.states:
             labelsdict[s] = s.name
 
-        # nx.draw_networkx_nodes(lb.hmm.graph)
-        nx.draw(lb.hmm.graph, with_labels=True, labels=labelsdict, pos=nx.spring_layout(lb.hmm.graph))
-        plt.savefig('plotgraph.png', dpi=300, bbox_inches='tight')
-        plt.show()
-
-        # lb.hmm.plot()
+        # layout = nx.spring_layout(lb.hmm.graph)
+        # nx.draw(lb.hmm.graph, with_labels=True, labels=labelsdict, pos=layout)
+        # plt.savefig('plotgraph.png', dpi=300, bbox_inches='tight')
+        # plt.show()
 
         # Get out model:
         # if LibraryModel.has_prebuilt_model(model_name):

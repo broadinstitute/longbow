@@ -42,19 +42,8 @@ class LibraryModel:
         self.hmm.bake(merge="None")
 
         for i in range(len(self.array_model['structure'])-1):
-            ModelBuilder.connect_terminals(self.hmm, self.array_model['structure'][i], self.cdna_model['structure'][0], 0.1)
-            ModelBuilder.connect_terminals(self.hmm, self.cdna_model['structure'][-1], self.array_model['structure'][i+1], 0.1)
-
-        # for i in range(len(self.array_model['structure'])-1):
-        #     # Initiate cDNA models
-
-        #     # Attact each cDNA model in between array elements
-        #     self.hmm = ModelBuilder.insert_model(
-        #         self.hmm, self.array_model['structure'][i], self.array_model['structure'][i+1],
-        #         cdna_hmm, self.cdna_model['structure'][0], self.cdna_model['structure'][-1]
-        #     )
-
-        # self.hmm.bake(merge="None")
+            ModelBuilder.connect_terminals(self.hmm, self.array_model['structure'][i], 'cdna-model', 0.1)
+            ModelBuilder.connect_terminals(self.hmm, 'cdna-model', self.array_model['structure'][i+1], 0.1)
 
     def _create_array_model(self):
         model = None
@@ -94,7 +83,6 @@ class LibraryModel:
                 else:
                     raise RuntimeError(f"Unknown special model type: {segment_type}")
 
-            # model.add_model(adapter_hmm)
             if model is None:
                 model = adapter_hmm
             else:
@@ -108,10 +96,8 @@ class LibraryModel:
                 adapter_name_i = self.cdna_model['structure'][i]
                 adapter_name_j = self.cdna_model['structure'][j]
 
-                if j - i == 1:
-                    ModelBuilder.connect_terminals(model, adapter_name_i, adapter_name_j, 0.9)
-                else:
-                    ModelBuilder.connect_terminals(model, adapter_name_i, adapter_name_j, 0.1)
+                prob = 0.9 if j - i == 1 else 0.1 / (len(self.cdna_model['structure']) - i - 2)
+                ModelBuilder.connect_terminals(model, adapter_name_i, adapter_name_j, prob)
 
         cstart = ModelBuilder.find_state(model, 'cdna-model-start')
         sstart = ModelBuilder.find_state(model, f'{self.cdna_model["structure"][0]}-start')
