@@ -245,12 +245,6 @@ class LibraryModel:
                         if next_adapter_name is not None:
                             self.hmm.add_transition(all_states[f'{adapter_name}:{op}{hpr_length}'], all_states[f'{next_adapter_name}-start'], 1.0)
 
-        # Connect the cDNA adapter ends to next adapter start
-        # for i in range(len(self.cdna_model['structure'])-1):
-        #     adapter_name_1 = self.cdna_model['structure'][i]
-        #     adapter_name_2 = self.cdna_model['structure'][i+1]
-
-
         self.hmm.bake(merge="None")
 
     def _create_random_repeat_model(self):
