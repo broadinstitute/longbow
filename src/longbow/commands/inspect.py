@@ -98,8 +98,16 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     required=False,
     help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].  If the input file has already been annotated, this parameter is ignored."
 )
+@click.option(
+    '-q',
+    '--quick',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Create quick (simplified) inspection figures."
+)
 @click.argument("input-bam", type=click.Path(exists=True))
-def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min_rq, input_bam):
+def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min_rq, quick, input_bam):
     """Inspect the classification results on specified reads."""
 
     t_start = time.time()
@@ -121,12 +129,13 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
             lb_model = LibraryModel.from_json_file(model)
 
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+        logger.info(f"Figure drawing mode: %s", 'simplified' if quick else 'extended')
 
-        with open("new_hmm.txt", "w") as nt:
-            a = lb_model.hmm.to_dict()
+        # with open("new_hmm.txt", "w") as nt:
+        #     a = lb_model.hmm.to_dict()
 
-            for e in a['edges']:
-                nt.write(f"{a['states'][e[0]]['name']} {a['states'][e[1]]['name']} {e[2]} {e[3]} {e[4]}\n")
+        #     for e in a['edges']:
+        #         nt.write(f"{a['states'][e[0]]['name']} {a['states'][e[1]]['name']} {e[2]} {e[3]} {e[4]}\n")
 
         # If we have read names, we should use them to inspect the file:
         if len(read_names) > 0:
@@ -137,7 +146,7 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
                 logger.info("No .pbi file available. Inspecting whole input bam file until we find specified reads.")
                 for read in bam_file:
                     if read.query_name in read_names:
-                        __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
+                        __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick)
             else:
                 file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
@@ -149,17 +158,17 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
                     bam_file.seek(file_offsets[z]["offset"])
                     read = bam_file.__next__()
-                    __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
+                    __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick)
         else:
             # Without read names we just inspect every read in the file:
             logger.info("No read names given. Inspecting every read in the input bam file.")
             for read in bam_file:
-                __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq)
+                __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq):
+def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick):
     """Create a figure for the given read."""
 
     out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
@@ -168,7 +177,11 @@ def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_len
 
     if seq is not None:
         logger.info("Drawing read '%s' to '%s'", read.query_name, out)
-        draw_state_sequence(seq, path, logp, read, out, seg_score, lb_model, size=13, family="monospace")
+
+        if quick:
+            draw_simplified_state_sequence(seq, path, logp, read, out, seg_score, lb_model, size=13, family="monospace")
+        else:
+            draw_extended_state_sequence(seq, path, logp, read, out, seg_score, lb_model, size=13, family="monospace")
 
 
 def load_read_names(read_name_args):
@@ -287,7 +300,7 @@ def annotate_read(read, m, max_length, min_rq):
                            f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
             return [None] * 3
         for seq in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
-            logp, ppath = m.annotate(seq)
+            logp, ppath = m.annotate(seq, cigar=True)
 
             if logp > flogp:
                 fseq = seq
@@ -388,6 +401,74 @@ def adjust_color_for_existing_colors(color, existing_color_strings, color_step, 
     return color
 
 
+def make_aligned_state_sequence(seq, path, library_model):
+    a = []
+    t = []
+    b = []
+    c = []
+
+    cur_state = ''
+    cur_adapter = None
+    cur_pos = 0
+    for i, (base, p) in enumerate(zip(seq, path)):
+        state, op = re.split(":", p)
+
+        if state != cur_state:
+            cur_state = state
+            cur_pos = 0
+            cur_adapter = None
+
+            if cur_state in library_model.adapter_dict and \
+                cur_state not in library_model.annotation_segments and \
+                type(library_model.adapter_dict[cur_state]) == str:
+                cur_adapter = library_model.adapter_dict[cur_state]
+
+        if op == 'M':
+            c.append(state)
+            a.append(base)
+
+            if cur_adapter is not None:
+                b.append(cur_adapter[cur_pos])
+
+                if cur_adapter[cur_pos] == base:
+                    t.append('|')
+                else:
+                    t.append(' ')
+
+                cur_pos += 1
+            else:
+                b.append(' ')
+                t.append(' ')
+        elif op == 'D':
+            c.append(state)
+            a.append('-')
+
+            if cur_adapter is not None:
+                b.append(cur_adapter[cur_pos])
+                t.append(' ')
+                cur_pos += 1
+            else:
+                b.append(' ')
+                t.append(' ')
+        elif op == 'I':
+            c.append(state)
+            a.append(base)
+
+            if cur_adapter is not None:
+                b.append('-')
+                t.append(' ')
+            else:
+                b.append(' ')
+                t.append(' ')
+        elif op == 'RI':
+            c.append(state)
+            a.append(base)
+            b.append(' ')
+            t.append(' ')
+
+    return a, t, b, c
+
+
 def format_state_sequence(seq, path, library_model, line_length=150):
     color_map = create_colormap_for_model(library_model)
 
@@ -397,11 +478,11 @@ def format_state_sequence(seq, path, library_model, line_length=150):
 
     for i in range(0, len(path), line_length):
         bases = []
-        label = path[i]
+        label = re.split(":", path[i])[0]
 
         for j in range(i, min(i + line_length, len(path))):
             a = seq[j]
-            b = path[j]
+            b = re.split(":", path[j])[0]
 
             # Handle the line breaks:
             if label == b:
@@ -430,7 +511,146 @@ def format_state_sequence(seq, path, library_model, line_length=150):
     return labelled_bases, state_colors, state_labels
 
 
-def draw_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, **kwargs):
+def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, **kwargs):
+
+    line_length = 150
+
+    observed_track, mismatch_track, expected_track, classification_track = make_aligned_state_sequence(seq, path, library_model)
+
+    f = plt.figure(figsize=(24, 24))
+
+    ax = plt.gca()
+    t = ax.transData
+    canvas = ax.figure.canvas
+
+    qual_string = f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    " if read.has_tag("rq") else ""
+    np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
+    is_rc_string = "[Direction: RC]" if read.has_tag("RC") and read.get_tag("RC") == 1 else "[Direction: Forward]"
+
+    segment_order_valid = True
+
+    collapsed_annotations = bam_utils.collapse_annotations(path)
+    read_mas_adapters = [s.name for s in collapsed_annotations if len(s.name) == 1]
+    segment_order_valid, key_adapters_found, first_key_adapter_indx = \
+        library_model.validate_segment_order([s.name for s in collapsed_annotations])
+
+    valid_library_order_string = f"[{library_model.name} adapters: {' '.join(library_model.key_adapters)}]"
+    is_valid_order_string = "[Segment order: Valid]" if segment_order_valid else "[Segment order: INVALID]"
+    read_mas_adapter_string = f"[Key adapters: {' '.join(read_mas_adapters)}]"
+
+    f.suptitle(
+        r"$\bf{" + read.query_name.replace("_", "\\_") + "}$" + f"\n{qual_string}{np_string}"
+        f"[{len(read.query_sequence)} bp]    {is_rc_string}    "
+        r"[$\bf{" + library_model.name.replace("_", "\\_") + "}$" + f" model score: {logp:.2f}]\n"
+        f"{is_valid_order_string}    {read_mas_adapter_string}    {valid_library_order_string}",
+        fontsize=16
+    )
+
+    f.patch.set_visible(False)
+    ax.axis("off")
+
+    columns = line_length
+    rows = 4 * 80
+
+    plt.xlim([0, columns])
+    plt.ylim([0, rows])
+
+    row = 0
+    column = 0
+    total_bases_seen = 0
+
+    color_map = create_colormap_for_model(library_model)
+
+    last_label = ''
+    for i, (o, m, e, c) in enumerate(zip(observed_track, mismatch_track, expected_track, classification_track)):
+        color = color_map[c]
+
+        if column == 0:
+            pos1 = ax.text(
+                column - 1,
+                rows - row,
+                total_bases_seen,
+                color='#000000',
+                transform=t,
+                va="bottom",
+                ha="right",
+                #fontsize=8,
+            )
+            pos1.draw(canvas.get_renderer())
+
+        if i == len(observed_track) - 1:
+            pos2 = ax.text(
+                column + 2,
+                rows - row,
+                len(read.query_sequence),
+                color='#000000',
+                transform=t,
+                va="bottom",
+                ha="left",
+                #fontsize=8,
+            )
+            pos2.draw(canvas.get_renderer())
+
+
+        observed_base = ax.text(
+            column,
+            rows - row,
+            o,
+            color=color,
+            transform=t,
+            bbox=dict(facecolor=f"{color}22", edgecolor=f"{color}22", pad=0),
+            **kwargs,
+        )
+        observed_base.draw(canvas.get_renderer())
+        # ex = observed_base.get_window_extent()
+
+        mismatch_indicator = ax.text(
+            column,
+            rows - row - 4,
+            m,
+            transform=t,
+            **kwargs,
+        )
+        mismatch_indicator.draw(canvas.get_renderer())
+
+        if e != ' ':
+            expected_base = ax.text(
+                column,
+                rows - row - 8,
+                e,
+                color=color,
+                transform=t,
+                bbox=dict(facecolor=f"{color}22", edgecolor=f"{color}22", pad=0),
+                **kwargs,
+            )
+            expected_base.draw(canvas.get_renderer())
+
+        if c != last_label:
+            last_label = c
+
+            label = ax.text(
+                column,
+                rows - row + 4,
+                c,
+                transform=t,
+                va="bottom",
+                ha="left",
+                fontsize=8,
+                bbox=dict(facecolor="white", edgecolor="black"),
+            )
+            label.draw(canvas.get_renderer())
+
+        total_bases_seen += 1
+        column += 1
+        if column >= columns:
+            column = 0
+            row += 15
+
+    plt.savefig(out, bbox_inches="tight")
+
+    plt.close()
+
+def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, **kwargs):
 
     line_length = 150
 
