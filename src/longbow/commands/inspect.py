@@ -122,6 +122,12 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
+        with open("new_hmm.txt", "w") as nt:
+            a = lb_model.hmm.to_dict()
+
+            for e in a['edges']:
+                nt.write(f"{a['states'][e[0]]['name']} {a['states'][e[1]]['name']} {e[2]} {e[3]} {e[4]}\n")
+
         # If we have read names, we should use them to inspect the file:
         if len(read_names) > 0:
 

@@ -10,7 +10,7 @@ import longbow.utils.model_utils
 from .model_utils import ModelBuilder
 
 import longbow.utils.constants
-from .constants import FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME, HPR_SEGMENT_TYPE_NAME, START_STATE_INDICATOR, END_STATE_INDICATOR
+from .constants import FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME, HPR_SEGMENT_TYPE_NAME, RANDOM_SEGMENT_NAME, START_STATE_INDICATOR, END_STATE_INDICATOR
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger(__name__)
@@ -178,27 +178,78 @@ class LibraryModel:
         # Make a dict of all available states for easy lookup and connection
         all_states = {**random_states, **cdna_states, **array_states}
 
-        # Connect to model start and stop states
-        terminal_states = self.array_model['structure'] + self.cdna_model['structure']
-        for terminal_state in terminal_states:
-            self.hmm.add_transition(self.hmm.start, all_states[f'{terminal_state}-start'], 1.0/len(terminal_states))
-            self.hmm.add_transition(all_states[f'{terminal_state}-end'], self.hmm.end, 1.0/len(terminal_states))
+        # Connect random start to array start and cDNA start
+        self.hmm.add_transition(all_states['random-start'], all_states[f"{self.cdna_model['structure'][0]}-start"], 0.5)
+        self.hmm.add_transition(all_states['random-start'], all_states[f"{self.array_model['structure'][0]}-start"], 0.5)
 
-        # Connect array end states to random model
-        for i in range(len(self.array_model['structure'])-1):
-            self.hmm.add_transition(
-                all_states[f'{self.array_model["structure"][i]}-end'],
-                all_states['random:RDA'],
-                1.0
-            )
+        # Connect random:RDA to appropriate array starts
+        for array_state in self.array_model['structure'][1:len(self.array_model['structure'])]:
+            self.hmm.add_transition(all_states['random:RDA'], all_states[f'{array_state}-start'], 0.05)
 
-        # Connect random model to array start states
-        for i in range(1, len(self.array_model['structure'])):
-            self.hmm.add_transition(
-                all_states['random:RDB'],
-                all_states[f'{self.array_model["structure"][i]}-start'],
-                1.0/(len(self.array_model['structure'])-1)
-            )
+        # Connect random:RDA to non-random cDNA starts
+        for cdna_state in self.cdna_model['structure'][1:len(self.cdna_model['structure'])]:
+            if cdna_state not in self.cdna_model['named_random_segments']:
+                self.hmm.add_transition(all_states['random:RDA'], all_states[f'{cdna_state}-start'], 0.05)
+
+        # Connect all array ends to random end and cDNA start
+        for array_state in self.array_model['structure']:
+            l = len(self.array_model['adapters'][array_state])
+
+            for op in ['M', 'I', 'D']:
+                self.hmm.add_transition(all_states[f'{array_state}:{op}{l}'], all_states['random-end'], 0.01)
+                self.hmm.add_transition(all_states[f'{array_state}:{op}{l}'], all_states[f'{self.cdna_model["structure"][0]}-start'], 1.0)
+
+        # Connect all cDNA ends to array starts
+        for array_state in self.array_model['structure']:
+            cdna_state = self.cdna_model['structure'][-1]
+            l = len(self.cdna_model['adapters'][cdna_state])
+
+            for op in ['M', 'I', 'D']:
+                self.hmm.add_transition(all_states[f'{cdna_state}:{op}{l}'], all_states[f'{array_state}-start'], 1.0/(len(self.array_model['structure'])))
+
+        # Connect the cDNA adapter ends to random end
+        for i in range(len(self.cdna_model['structure'])):
+            adapter_name = self.cdna_model['structure'][i]
+            adapter_def = self.cdna_model['adapters'][adapter_name]
+
+            next_adapter_name = None if i == len(self.cdna_model['structure'])-1 else self.cdna_model['structure'][i+1]
+
+            if type(adapter_def) is str:
+                if adapter_def == RANDOM_SEGMENT_NAME:
+                    self.hmm.add_transition(all_states[f'{adapter_name}-end'], all_states['random-end'], 0.01)
+
+                    if next_adapter_name is not None:
+                        self.hmm.add_transition(all_states[f'{adapter_name}-end'], all_states[f'{next_adapter_name}-start'], 1.0)
+                else:
+                    for op in ['M', 'I', 'D']:
+                        l = len(self.cdna_model['adapters'][adapter_name])
+                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'], all_states['random-end'], 0.01)
+
+                        if next_adapter_name is not None:
+                            self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'], all_states[f'{next_adapter_name}-start'], 1.0)
+
+            elif type(adapter_def) is dict:
+                segment_type = list(adapter_def.keys())[0]
+
+                if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                    l = list(adapter_def.values())[0]
+                    self.hmm.add_transition(all_states[f'{adapter_name}:M{l}'], all_states['random-end'], 0.01)
+
+                    if next_adapter_name is not None:
+                        self.hmm.add_transition(all_states[f'{adapter_name}:M{l}'], all_states[f'{next_adapter_name}-start'], 1.0)
+                elif segment_type == HPR_SEGMENT_TYPE_NAME:
+                    base, hpr_length = list(adapter_def.values())[0]
+                    for op in ['M', 'I']:
+                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{hpr_length}'], all_states['random-end'], 0.01)
+
+                        if next_adapter_name is not None:
+                            self.hmm.add_transition(all_states[f'{adapter_name}:{op}{hpr_length}'], all_states[f'{next_adapter_name}-start'], 1.0)
+
+        # Connect the cDNA adapter ends to next adapter start
+        # for i in range(len(self.cdna_model['structure'])-1):
+        #     adapter_name_1 = self.cdna_model['structure'][i]
+        #     adapter_name_2 = self.cdna_model['structure'][i+1]
+
 
         self.hmm.bake(merge="None")
 
@@ -263,28 +314,45 @@ class LibraryModel:
         # Intermediate bake to facilitate searching for states in the model.
         model.bake(merge="None")
 
+        states = dict()
+        for s in model.states:
+            states[s.name] = s
+
         # Connect components
         for i in range(0, len(self.cdna_model['structure'])-1):
-            for j in range(i+1, len(self.cdna_model['structure'])):
-                adapter_name_i = self.cdna_model['structure'][i]
-                adapter_name_j = self.cdna_model['structure'][j]
+            adapter_name_i = self.cdna_model['structure'][i]
+            adapter_name_j = self.cdna_model['structure'][i+1]
 
-                prob = 0.9 if j - i == 1 else 0.1 / (len(self.cdna_model['structure']) - i - 2)
-                ModelBuilder.connect_terminals(model, adapter_name_i, adapter_name_j, prob)
+            # prob = 0.99 if j - i == 1 else 0.01 / (len(self.cdna_model['structure']) - i - 2)
+            #ModelBuilder.connect_terminals(model, adapter_name_i, adapter_name_j, 1.0)
 
-        cstart = ModelBuilder.find_state(model, 'cdna-model-start')
-        sstart = ModelBuilder.find_state(model, f'{self.cdna_model["structure"][0]}-start')
-        send = ModelBuilder.find_state(model, f'{self.cdna_model["structure"][-1]}-end')
-        cend = ModelBuilder.find_state(model, 'cdna-model-end')
+            adapter_def = self.cdna_model['adapters'][adapter_name_i]
+
+            if type(adapter_def) is dict:
+                if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                    l = list(adapter_def.values())[0]
+                    model.add_transition(states[f'{adapter_name_i}:M{l}'], states[f'{adapter_name_j}-start'], 1.0)
+            else:
+                l = len(adapter_def)
+                #model.add_transition(states[f'{adapter_name_i}:M{l}'], states[f'{adapter_name_j}-start'], 1.0)
+
+        # for i in range(0, len(self.cdna_model['structure'])-1):
+        #     for j in range(i+1, len(self.cdna_model['structure'])):
+        #         adapter_name_i = self.cdna_model['structure'][i]
+        #         adapter_name_j = self.cdna_model['structure'][j]
+
+        #         prob = 0.99 if j - i == 1 else 0.01 / (len(self.cdna_model['structure']) - i - 2)
+        #         ModelBuilder.connect_terminals(model, adapter_name_i, adapter_name_j, prob)
+
+        # cstart = ModelBuilder.find_state(model, 'cdna-model-start')
+        # sstart = ModelBuilder.find_state(model, f'{self.cdna_model["structure"][0]}-start')
+        # send = ModelBuilder.find_state(model, f'{self.cdna_model["structure"][-1]}-end')
+        # cend = ModelBuilder.find_state(model, 'cdna-model-end')
 
         # model.add_transition(cstart, sstart, 1.0)
         # model.add_transition(send, cend, 1.0)
 
         model.bake(merge="None")
-
-        states = dict()
-        for s in model.states:
-            states[s.name] = s
 
         return states, model
 
