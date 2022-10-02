@@ -80,19 +80,22 @@ class LibraryModel:
     def num_array_elements(self):
         return len(self.array_model['structure'])
 
-    def annotate(self, seq):
+    def annotate(self, seq, cigar=False):
         """Annotate the given segment using this model."""
         logp, path = self.hmm.viterbi(seq)
 
         ppath = []
         for p, (idx, state) in enumerate(path[1:-1]):
             if (
-                    not state.name.endswith(START_STATE_INDICATOR)
-                    and not state.name.endswith(END_STATE_INDICATOR)
-                    and ":RD" not in state.name
-                    and ":D" not in state.name
+                not state.name.endswith(START_STATE_INDICATOR)
+                and not state.name.endswith(END_STATE_INDICATOR)
+                and ":RD" not in state.name
+                and ":D" not in state.name
             ):
-                ppath.append(f"{re.split(':', state.name)[0]}")
+                if cigar:
+                    ppath.append(re.sub(r'\d+$', '', state.name))
+                else:
+                    ppath.append(f"{re.split(':', state.name)[0]}")
 
         return logp, ppath
 
