@@ -45,25 +45,7 @@ class LibraryModel:
         self.key_adapters = self.array_model['structure']
         self.key_adapter_set = set(self.key_adapters)
 
-        # self.array_element_structure = self.array_model['structure']
-        # "array_element_structure": (
-        #         ("A", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("B", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("C", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("D", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("E", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("F", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("G", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("H", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("I", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("J", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("K", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("L", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("M", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("N", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"),
-        #         ("O", "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind", "P"),
-        #     ),
-
+        # Reconstruct array element structure in a way that's compatible with the segment tool
         l1 = []
         for i in range(len(self.array_model['structure']) - 1):
             ae = self.array_model['structure'][i]
