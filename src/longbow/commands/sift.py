@@ -3,6 +3,7 @@ import logging
 import time
 import os
 import sys
+from collections import Counter
 
 import click
 import click_log
@@ -233,5 +234,11 @@ def check_validity(lb_model, segments):
 
         for j in range(len(expected_elements)):
             valid &= i+j < len(actual_elements) and expected_elements[j] == actual_elements[i+j]
+
+    valid &= 'random' not in actual_elements
+
+    c = Counter(actual_elements)
+    for e in expected_elements:
+        valid &= c[e] == 1
 
     return valid
