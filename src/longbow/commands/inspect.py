@@ -17,6 +17,8 @@ import pysam
 import editdistance
 
 from collections import OrderedDict
+from collections import Counter
+
 from construct import *
 
 import matplotlib.pyplot as plt
@@ -401,7 +403,7 @@ def adjust_color_for_existing_colors(color, existing_color_strings, color_step, 
     return color
 
 
-def make_aligned_state_sequence(seq, path, library_model):
+def _make_aligned_state_sequence(seq, path, library_model):
     a = []
     t = []
     b = []
@@ -410,8 +412,21 @@ def make_aligned_state_sequence(seq, path, library_model):
     cur_state = ''
     cur_adapter = None
     cur_pos = 0
-    for i, (base, p) in enumerate(zip(seq, path)):
-        state, op = re.split(":", p)
+
+    p_obs = dict()
+
+    seq_pos = 0
+    for p in path:
+        state, op = re.split(r"[:-]", p)
+
+        if op not in p_obs:
+            p_obs[op] = 0
+        p_obs[op] += 1
+
+        if op not in ['M', 'I', 'D', 'RI', 'RD']:
+            continue
+
+        base = seq[seq_pos] if seq_pos < len(seq) else ' '
 
         if state != cur_state:
             cur_state = state
@@ -466,6 +481,11 @@ def make_aligned_state_sequence(seq, path, library_model):
             b.append(' ')
             t.append(' ')
 
+        if op not in ['D', 'RD']:
+            seq_pos += 1
+
+    print(p_obs)
+
     return a, t, b, c
 
 
@@ -515,7 +535,7 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
 
     line_length = 150
 
-    observed_track, mismatch_track, expected_track, classification_track = make_aligned_state_sequence(seq, path, library_model)
+    observed_track, mismatch_track, expected_track, classification_track = _make_aligned_state_sequence(seq, path, library_model)
 
     f = plt.figure(figsize=(24, 24))
 

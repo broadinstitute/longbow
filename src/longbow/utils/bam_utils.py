@@ -315,7 +315,9 @@ def collapse_annotations(path):
     segments = []
     i = 0
     for i, seg in enumerate(path):
-        seg, op = re.split(":", seg)
+        if ":" in seg:
+            seg, op = re.split(":", seg)
+
         if seg != last:
             if i != 0:
                 segments.append(SegmentInfo(last, start, i - 1))
