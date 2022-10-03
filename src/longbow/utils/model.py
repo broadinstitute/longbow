@@ -85,16 +85,17 @@ class LibraryModel:
         logp, path = self.hmm.viterbi(seq)
 
         ppath = []
-        for p, (idx, state) in enumerate(path[1:-1]):
-            if (
-                not state.name.endswith(START_STATE_INDICATOR)
-                and not state.name.endswith(END_STATE_INDICATOR)
-                and ":RD" not in state.name
-                and ":D" not in state.name
-            ):
-                if cigar:
-                    ppath.append(re.sub(r'\d+$', '', state.name))
-                else:
+        # for p, (idx, state) in enumerate(path[1:-1]):
+        for p, (idx, state) in enumerate(path):
+            if cigar:
+                ppath.append(re.sub(r'\d+$', '', state.name))
+            else:
+                if (
+                    not state.name.endswith(START_STATE_INDICATOR)
+                    and not state.name.endswith(END_STATE_INDICATOR)
+                    and ":RD" not in state.name
+                    # and ":D" not in state.name
+                ):
                     ppath.append(f"{re.split(':', state.name)[0]}")
 
         return logp, ppath
@@ -199,6 +200,7 @@ class LibraryModel:
             l = len(self.array_model['adapters'][array_state])
 
             for op in ['M', 'I', 'D']:
+                self.hmm.add_transition(all_states[f'{array_state}:{op}{l}'], all_states['random:RDB'], 0.01)
                 self.hmm.add_transition(all_states[f'{array_state}:{op}{l}'], all_states['random-end'], 0.01)
                 self.hmm.add_transition(all_states[f'{array_state}:{op}{l}'], all_states[f'{self.cdna_model["structure"][0]}-start'], 1.0)
 
@@ -247,6 +249,10 @@ class LibraryModel:
 
                         if next_adapter_name is not None:
                             self.hmm.add_transition(all_states[f'{adapter_name}:{op}{hpr_length}'], all_states[f'{next_adapter_name}-start'], 1.0)
+
+        # Cross connect cDNA adapters
+        #for i in range(len(self.cdna_model['sequence']) - 2):
+            
 
         self.hmm.bake(merge="None")
 

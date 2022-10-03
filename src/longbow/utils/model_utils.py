@@ -353,19 +353,6 @@ class ModelBuilder:
         return base_hmm
 
     pre_configured_array_models = {
-        "play_3": {
-            "description": "3-element toy array",
-            "version": "3.0.0",
-            "structure": [ "A", "B", "C", "D" ],
-            "adapters": {
-                "A": "A",
-                "B": "C",
-                "C": "G",
-                "D": "T",
-            },
-            "deprecated": False,
-        },
-
         "mas_15": {
             "description": "15-element MAS-ISO-seq array",
             "version": "3.0.0",
@@ -424,21 +411,6 @@ class ModelBuilder:
     }
 
     pre_configured_cdna_models = {
-        "play_10x3p": {
-            "description": "toy 3' model",
-            "version": "3.0.0",
-            "structure": [ "5p_Adapter", "cDNA", "3p_Adapter" ],
-            "adapters": {
-                "5p_Adapter": "T",
-                "cDNA": RANDOM_SEGMENT_NAME,
-                "3p_Adapter": "G",
-            },
-            "named_random_segments": {"cDNA"},
-            "coding_region": "cDNA",
-            "annotation_segments": {},
-            "deprecated": False,
-        },
-
         "sc_10x3p": {
             "description": "single-cell 10x 3' kit",
             "version": "3.0.0",
