@@ -484,8 +484,6 @@ def _make_aligned_state_sequence(seq, path, library_model):
         if op not in ['D', 'RD']:
             seq_pos += 1
 
-    print(p_obs)
-
     return a, t, b, c
 
 
