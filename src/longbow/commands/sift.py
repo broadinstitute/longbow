@@ -10,7 +10,6 @@ import click_log
 import tqdm
 import pysam
 from construct import *
-from collections import Counter
 
 import longbow.utils.constants
 from ..utils import bam_utils
@@ -57,12 +56,6 @@ click_log.basic_config(logger)
          "LibraryModel.to_json()."
 )
 @click.option(
-    "-l",
-    "--validation-model",
-    default="10x_sc_10x5p_single_none",
-    help="The model to use for cDNA validation."
-)
-@click.option(
     '-f',
     '--force',
     is_flag=True,
@@ -94,7 +87,7 @@ click_log.basic_config(logger)
     help="Txt file containing a list of read names to ignore.",
 )
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, summary_stats, ignore_list, input_bam):
+def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore_list, input_bam):
     """Filter segmented reads by conformation to expected cDNA design."""
 
     t_start = time.time()
@@ -139,16 +132,6 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
         else:
             lb_model = LibraryModel.from_json_file(model)
 
-        # TODO: Currently only one model works.  FIX THIS.
-        # Make sure we've specified the model that works:
-        if validation_model != "10x_sc_10x5p_single_none":
-            logger.error(f"Given validation model is not yet implemented with `longbow sift`: {validation_model}")
-            sys.exit(1)
-
-        if lb_model.name != "mas_15_sc_10x5p_single_none":
-            logger.error(f"Given model is not yet implemented with `longbow sift`: {lb_model.name}")
-            sys.exit(1)
-
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         # Get our header from the input bam file:
@@ -169,10 +152,6 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
             num_failed = 0
             num_ignored = 0
 
-            # Create the forward-connected model of just this section of the read
-            sub_model = LibraryModel.build_pre_configured_model(validation_model)
-            sub_model.build_forward_connected()
-
             stats_file.write('\t'.join(['read_name', 'rq', '5p_Adapter', 'CBC', 'UMI', 'SLS', 'cDNA', 'Poly_A', '3p_Adapter', 'SG']) + '\n')
 
             for i, read in enumerate(tqdm.tqdm(bam_file, desc="Progress", unit=" read", colour="green", file=sys.stderr, disable=not sys.stdin.isatty(), total=read_count)):
@@ -190,55 +169,23 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
                                  f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
                     sys.exit(1)
 
-                # Annotate the read with the model that was used in its validation:
-                logp, ppath = sub_model.annotate(read.query_sequence)
-                qpath = bam_utils.collapse_annotations(ppath)
-
-                counts = Counter([q.to_tag().split(":")[0] for q in qpath])
-
-                is_valid = (counts['5p_Adapter'] == 1 and
-                            counts['CBC'] == 1 and
-                            counts['UMI'] == 1 and
-                            counts['SLS'] == 1 and
-                            counts['cDNA'] == 1 and
-                            counts['Poly_A'] == 1 and
-                            counts['3p_Adapter'] == 1)
-
-                # Store our adapter pattern for future use:
-                # TODO: When this tool is fixed for arbitrary models, this should be added to the read as a separate tag
-                adapter_pattern = longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([q.to_tag() for q in qpath])
+                is_valid = check_validity(lb_model, segments)
 
                 if is_valid:
-                    logger.debug("Read is %s valid: %s: adapter pattern: %s",
+                    logger.debug("Read is %s valid: %s",
                                  lb_model.name,
-                                 read.query_name,
-                                 adapter_pattern)
+                                 read.query_name)
 
                     passing_bam_file.write(read)
                     num_passed += 1
                 else:
                     if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug("Read is not %s valid: %s: adapter pattern: %s",
+                        logger.debug("Read is not %s valid: %s",
                                      lb_model.name,
-                                     read.query_name,
-                                     adapter_pattern)
+                                     read.query_name)
 
                     failing_bam_file.write(read)
                     num_failed += 1
-
-                    stats_file.write('\t'.join([
-                        read.query_name,
-                        str(read.get_tag("rq")),
-                        str(counts['5p_Adapter']),
-                        str(counts['CBC']),
-                        str(counts['UMI']),
-                        str(counts['SLS']),
-                        str(counts['cDNA']),
-                        str(counts['Poly_A']),
-                        str(counts['3p_Adapter']),
-                        adapter_pattern
-                        ]) + '\n'
-                    )
 
                 if (i % hard_print_interval) == 0:
                     if read_count:
@@ -271,3 +218,20 @@ def main(pbi, output_bam, reject_bam, model, validation_model, force, stats, sum
         logger.info(message)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+
+
+def check_validity(lb_model, segments):
+    expected_elements = lb_model.cdna_model['structure'][1:len(lb_model.cdna_model['structure'])-1]
+
+    actual_elements = []
+    for s in segments:
+        actual_elements.append(s.name)
+
+    valid = True
+    if expected_elements[0] in actual_elements:
+        i = actual_elements.index(expected_elements[0])
+
+        for j in range(len(expected_elements)):
+            valid &= i+j < len(actual_elements) and expected_elements[j] == actual_elements[i+j]
+
+    return valid
