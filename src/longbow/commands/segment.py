@@ -638,19 +638,19 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
     out_segments = []
-    out_seg_model_quals = []
+    # out_seg_model_quals = []
     segments_to_annotate = []
 
     # Create an array for our segment quality scores so we can index them below:
-    read_seg_quals = read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG).strip().split(
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER)
+    # read_seg_quals = read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG).strip().split(
+    #     longbow.utils.constants.SEGMENT_TAG_DELIMITER)
 
     for i, s in enumerate(segments):
         if start_coord <= s.start <= end_coord:
             seg_info = SegmentInfo(s.name, s.start - start_coord, s.end - start_coord)
             out_segments.append(seg_info)
 
-            out_seg_model_quals.append(read_seg_quals[i])
+            # out_seg_model_quals.append(read_seg_quals[i])
 
             # If we have to annotate this segment, store it here for annotation later:
             if (model.annotation_segments is not None) and (s.name in model.annotation_segments.keys()):
@@ -663,10 +663,10 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     )
 
     # Set our segment quality score tag to only include the segments in this read:
-    a.set_tag(
-        longbow.utils.constants.SEGMENTS_QUAL_TAG,
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_seg_model_quals),
-    )
+    # a.set_tag(
+    #     longbow.utils.constants.SEGMENTS_QUAL_TAG,
+    #     longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_seg_model_quals),
+    # )
 
     # Store tags where we'll record a refined tag instead of extracting query subsequence
     ba_tags = {}

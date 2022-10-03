@@ -123,12 +123,14 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
         # Get our model:
-        if model is None:
-            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        elif model is not None and LibraryModel.has_prebuilt_model(model):
-            lb_model = LibraryModel.build_pre_configured_model(model)
-        else:
-            lb_model = LibraryModel.from_json_file(model)
+        # if model is None:
+        #     lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
+        # elif model is not None and LibraryModel.has_prebuilt_model(model):
+        #     lb_model = LibraryModel.build_pre_configured_model(model)
+        # else:
+        #     lb_model = LibraryModel.from_json_file(model)
+
+        lb_model = LibraryModel.build_pre_configured_model(model)
 
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
         logger.info(f"Figure drawing mode: %s", 'simplified' if quick else 'extended')
@@ -278,7 +280,7 @@ def annotate_read(read, m, max_length, min_rq):
     fseq = read.query_sequence
     fppath = []
 
-    if read.has_tag(longbow.utils.constants.SEGMENTS_TAG):
+    if False: # read.has_tag(longbow.utils.constants.SEGMENTS_TAG):
         tag = re.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER, read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
 
         for e in tag:
@@ -418,10 +420,6 @@ def _make_aligned_state_sequence(seq, path, library_model):
     seq_pos = 0
     for p in path:
         state, op = re.split(r"[:-]", p)
-
-        if op not in p_obs:
-            p_obs[op] = 0
-        p_obs[op] += 1
 
         if op not in ['M', 'I', 'D', 'RI', 'RD']:
             continue
