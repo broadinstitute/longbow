@@ -222,7 +222,7 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
 
 
 def check_validity(lb_model, segments):
-    expected_elements = lb_model.cdna_model['structure'][1:len(lb_model.cdna_model['structure'])-1]
+    expected_elements = lb_model.cdna_model['structure']
 
     actual_elements = []
     for s in segments:
