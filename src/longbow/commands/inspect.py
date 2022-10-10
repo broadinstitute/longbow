@@ -123,23 +123,15 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
         # Get our model:
-        # if model is None:
-        #     lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        # elif model is not None and LibraryModel.has_prebuilt_model(model):
-        #     lb_model = LibraryModel.build_pre_configured_model(model)
-        # else:
-        #     lb_model = LibraryModel.from_json_file(model)
-
-        lb_model = LibraryModel.build_pre_configured_model(model)
+        if model is None:
+            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
+        elif model is not None and LibraryModel.has_prebuilt_model(model):
+            lb_model = LibraryModel.build_pre_configured_model(model)
+        else:
+            lb_model = LibraryModel.from_json_file(model)
 
         logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
         logger.info(f"Figure drawing mode: %s", 'simplified' if quick else 'extended')
-
-        # with open("new_hmm.txt", "w") as nt:
-        #     a = lb_model.hmm.to_dict()
-
-        #     for e in a['edges']:
-        #         nt.write(f"{a['states'][e[0]]['name']} {a['states'][e[1]]['name']} {e[2]} {e[3]} {e[4]}\n")
 
         # If we have read names, we should use them to inspect the file:
         if len(read_names) > 0:
