@@ -304,7 +304,7 @@ def annotate_read(read, m, max_length, min_rq):
                            f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
             return [None] * 3
         for seq in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
-            logp, ppath = m.annotate(seq, cigar=True)
+            logp, ppath = m.annotate(seq)
 
             if logp > flogp:
                 fseq = seq
@@ -406,84 +406,80 @@ def adjust_color_for_existing_colors(color, existing_color_strings, color_step, 
 
 
 def _make_aligned_state_sequence(seq, path, library_model):
-    a = []
-    t = []
-    b = []
-    c = []
+    observed_track = []
+    mismatch_track = []
+    expected_track = []
+    classification_track = []
 
     cur_state = ''
     cur_adapter = None
     cur_pos = 0
 
-    p_obs = dict()
-
     seq_pos = 0
     for p in path:
-        state, op = re.split(r"[:-]", p)
+        state, ops = re.split(":", p)
 
-        if op not in ['M', 'I', 'D', 'RI', 'RD']:
-            continue
+        for opgroup in list(filter(None, re.split(r'(R?[MID]\d+)', ops))):
+            q = re.match(r'(R?[MID])(\d+)', opgroup)
+            op = q.group(1)
+            oplen = int(q.group(2))
 
-        base = seq[seq_pos] if seq_pos < len(seq) else ' '
+            if state != cur_state:
+                cur_state = state
+                cur_pos = 0
+                cur_adapter = None
 
-        if state != cur_state:
-            cur_state = state
-            cur_pos = 0
-            cur_adapter = None
+                if cur_state in library_model.adapter_dict and \
+                    cur_state not in library_model.annotation_segments and \
+                    type(library_model.adapter_dict[cur_state]) == str:
+                    cur_adapter = library_model.adapter_dict[cur_state]
 
-            if cur_state in library_model.adapter_dict and \
-                cur_state not in library_model.annotation_segments and \
-                type(library_model.adapter_dict[cur_state]) == str:
-                cur_adapter = library_model.adapter_dict[cur_state]
+            for _ in range(oplen):
+                base = seq[seq_pos] if seq_pos < len(seq) else ' '
 
-        if op == 'M':
-            c.append(state)
-            a.append(base)
+                if op == 'M':
+                    classification_track.append(state)
+                    observed_track.append(base)
 
-            if cur_adapter is not None:
-                b.append(cur_adapter[cur_pos])
+                    if cur_adapter is not None:
+                        expected_track.append(cur_adapter[cur_pos])
 
-                if cur_adapter[cur_pos] == base:
-                    t.append('|')
-                else:
-                    t.append(' ')
+                        if cur_adapter[cur_pos] == base:
+                            mismatch_track.append('|')
+                        else:
+                            mismatch_track.append(' ')
 
-                cur_pos += 1
-            else:
-                b.append(' ')
-                t.append(' ')
-        elif op == 'D':
-            c.append(state)
-            a.append('-')
+                        cur_pos += 1
+                    else:
+                        expected_track.append(' ')
+                        mismatch_track.append(' ')
 
-            if cur_adapter is not None:
-                b.append(cur_adapter[cur_pos])
-                t.append(' ')
-                cur_pos += 1
-            else:
-                b.append(' ')
-                t.append(' ')
-        elif op == 'I':
-            c.append(state)
-            a.append(base)
+                    seq_pos += 1
+                elif op == 'D' or op == 'RD':
+                    classification_track.append(state)
+                    observed_track.append('-' if op == 'D' else ' ')
 
-            if cur_adapter is not None:
-                b.append('-')
-                t.append(' ')
-            else:
-                b.append(' ')
-                t.append(' ')
-        elif op == 'RI':
-            c.append(state)
-            a.append(base)
-            b.append(' ')
-            t.append(' ')
+                    if cur_adapter is not None:
+                        expected_track.append(cur_adapter[cur_pos])
+                        mismatch_track.append(' ')
+                        cur_pos += 1
+                    else:
+                        expected_track.append(' ')
+                        mismatch_track.append(' ')
+                elif op == 'I' or op == 'RI':
+                    classification_track.append(state)
+                    observed_track.append(base)
 
-        if op not in ['D', 'RD']:
-            seq_pos += 1
+                    if cur_adapter is not None:
+                        expected_track.append('-' if op == 'I' else ' ')
+                        mismatch_track.append(' ')
+                    else:
+                        expected_track.append(' ')
+                        mismatch_track.append(' ')
 
-    return a, t, b, c
+                    seq_pos += 1
 
+    return observed_track, mismatch_track, expected_track, classification_track
 
 def format_state_sequence(seq, path, library_model, line_length=150):
     color_map = create_colormap_for_model(library_model)
@@ -607,7 +603,6 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
             )
             pos2.draw(canvas.get_renderer())
 
-
         observed_base = ax.text(
             column,
             rows - row,
@@ -618,7 +613,6 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
             **kwargs,
         )
         observed_base.draw(canvas.get_renderer())
-        # ex = observed_base.get_window_extent()
 
         mismatch_indicator = ax.text(
             column,

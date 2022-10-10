@@ -95,23 +95,45 @@ class LibraryModel:
     def num_array_elements(self):
         return len(self.array_model['structure'])
 
-    def annotate(self, seq, cigar=False):
+    def annotate(self, seq):
         """Annotate the given segment using this model."""
         logp, path = self.hmm.viterbi(seq)
 
+        apath = []
         ppath = []
-        # for p, (idx, state) in enumerate(path[1:-1]):
-        for p, (idx, state) in enumerate(path):
-            if cigar:
-                ppath.append(re.sub(r'\d+$', '', state.name))
-            else:
-                if (
-                    not state.name.endswith(START_STATE_INDICATOR)
-                    and not state.name.endswith(END_STATE_INDICATOR)
-                    and ":RD" not in state.name
-                    # and ":D" not in state.name
-                ):
-                    ppath.append(f"{re.split(':', state.name)[0]}")
+
+        cigar = []
+        cur_adapter_name = ''
+        cur_op = ''
+        cur_op_len = 0
+
+        for (idx, state) in path:
+            apath.append(re.sub(r'\d+$', '', state.name))
+
+            if (
+                not state.name.endswith(START_STATE_INDICATOR)
+                and not state.name.endswith(END_STATE_INDICATOR)
+            ):
+                adapter_name, op = re.split(r'[:-]', re.sub(r'\d+$', '', state.name), 2)
+
+                if adapter_name != cur_adapter_name:
+                    if cur_adapter_name != '':
+                        cigar.append(f'{cur_op}{cur_op_len}')
+                        ppath.append(f'{cur_adapter_name}:{"".join(cigar)}')
+
+                    cigar = []
+                    cur_adapter_name = adapter_name
+                    cur_op = op
+                    cur_op_len = 0
+
+                if op != cur_op:
+                    if cur_op != '':
+                        cigar.append(f'{cur_op}{cur_op_len}')
+
+                    cur_op = op
+                    cur_op_len = 0
+
+                cur_op_len += 1
 
         return logp, ppath
 
