@@ -352,186 +352,188 @@ class ModelBuilder:
         # base_hmm.bake(merge=BAKE_MERGE_STRATEGY)
         return base_hmm
 
-    pre_configured_array_models = {
-        "mas_15": {
-            "description": "15-element MAS-ISO-seq array",
-            "version": "3.0.0",
-            "structure": [ "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P" ],
-            "adapters": {
-                "A": "AGCTTACTTGTGAAGA",
-                "B": "ACTTGTAAGCTGTCTA",
-                "C": "ACTCTGTCAGGTCCGA",
-                "D": "ACCTCCTCCTCCAGAA",
-                "E": "AACCGGACACACTTAG",
-                "F": "AGAGTCCAATTCGCAG",
-                "G": "AATCAAGGCTTAACGG",
-                "H": "ATGTTGAATCCTAGCG",
-                "I": "AGTGCGTTGCGAATTG",
-                "J": "AATTGCGTAGTTGGCC",
-                "K": "ACACTTGGTCGCAATC",
-                "L": "AGTAAGCCTTCGTGTC",
-                "M": "ACCTAGATCAGAGCCT",
-                "N": "AGGTATGCCGGTTAAG",
-                "O": "AAGTCACCGGCACCTT",
-                "P": "ATGAAGTGGCTCGAGA",
+    pre_configured_models = {
+        'array': {
+            "mas_15": {
+                "description": "15-element MAS-ISO-seq array",
+                "version": "3.0.0",
+                "structure": [ "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P" ],
+                "adapters": {
+                    "A": "AGCTTACTTGTGAAGA",
+                    "B": "ACTTGTAAGCTGTCTA",
+                    "C": "ACTCTGTCAGGTCCGA",
+                    "D": "ACCTCCTCCTCCAGAA",
+                    "E": "AACCGGACACACTTAG",
+                    "F": "AGAGTCCAATTCGCAG",
+                    "G": "AATCAAGGCTTAACGG",
+                    "H": "ATGTTGAATCCTAGCG",
+                    "I": "AGTGCGTTGCGAATTG",
+                    "J": "AATTGCGTAGTTGGCC",
+                    "K": "ACACTTGGTCGCAATC",
+                    "L": "AGTAAGCCTTCGTGTC",
+                    "M": "ACCTAGATCAGAGCCT",
+                    "N": "AGGTATGCCGGTTAAG",
+                    "O": "AAGTCACCGGCACCTT",
+                    "P": "ATGAAGTGGCTCGAGA",
+                },
+                "deprecated": False,
             },
-            "deprecated": False,
+
+            "mas_10": {
+                "description": "10-element MAS-ISO-seq array",
+                "version": "3.0.0",
+                "structure": [ "Q", "C", "M", "I", "O", "J", "B", "D", "K", "H", "R" ],
+                "adapters": {
+                    "Q": "AAGCACCATAATGTGT",
+                    "C": "ACTCTGTCAGGTCCGA",
+                    "M": "ACCTAGATCAGAGCCT",
+                    "I": "AGTGCGTTGCGAATTG",
+                    "O": "AAGTCACCGGCACCTT",
+                    "J": "AATTGCGTAGTTGGCC",
+                    "B": "ACTTGTAAGCTGTCTA",
+                    "D": "ACCTCCTCCTCCAGAA",
+                    "K": "ACACTTGGTCGCAATC",
+                    "H": "ATGTTGAATCCTAGCG",
+                    "R": "AACCGGACACACTTAG",
+                },
+                "deprecated": False,
+            },
+
+            "isoseq": {
+                "description": "PacBio IsoSeq model",
+                "version": "3.0.0",
+                "array_element_structure": [ "V", "M" ],
+                "adapters": {
+                    "V": "TCTACACGACGCTCTTCCGATCT",
+                    "M": "GTACTCTGCGTTGATACCACTGCTT",
+                },
+                "deprecated": False,
+            },
         },
 
-        "mas_10": {
-            "description": "10-element MAS-ISO-seq array",
-            "version": "3.0.0",
-            "structure": [ "Q", "C", "M", "I", "O", "J", "B", "D", "K", "H", "R" ],
-            "adapters": {
-                "Q": "AAGCACCATAATGTGT",
-                "C": "ACTCTGTCAGGTCCGA",
-                "M": "ACCTAGATCAGAGCCT",
-                "I": "AGTGCGTTGCGAATTG",
-                "O": "AAGTCACCGGCACCTT",
-                "J": "AATTGCGTAGTTGGCC",
-                "B": "ACTTGTAAGCTGTCTA",
-                "D": "ACCTCCTCCTCCAGAA",
-                "K": "ACACTTGGTCGCAATC",
-                "H": "ATGTTGAATCCTAGCG",
-                "R": "AACCGGACACACTTAG",
+        'cdna': {
+            "sc_10x3p": {
+                "description": "single-cell 10x 3' kit",
+                "version": "3.0.0",
+                "structure": [ "5p_Adapter", "CBC", "UMI", "Poly_T", "cDNA", "3p_Adapter" ],
+                "adapters": {
+                    "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+                    "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                    "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 12},
+                    "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
+                    "cDNA": RANDOM_SEGMENT_NAME,
+                    "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                },
+                "named_random_segments": ["CBC", "UMI", "cDNA"],
+                "coding_region": "cDNA",
+                "annotation_segments": {
+                    "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                            (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                    "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG),
+                            (longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+                },
+                "deprecated": False,
             },
-            "deprecated": False,
-        },
 
-        "isoseq": {
-            "description": "PacBio IsoSeq model",
-            "version": "3.0.0",
-            "array_element_structure": [ "V", "M" ],
-            "adapters": {
-                "V": "TCTACACGACGCTCTTCCGATCT",
-                "M": "GTACTCTGCGTTGATACCACTGCTT",
+            "sc_10x5p": {
+                "description": "single-cell 10x 5' kit",
+                "version": "3.0.0",
+                "structure": [ "5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter" ],
+                "adapters": {
+                    "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+                    "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
+                    "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                    "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
+                    "cDNA": RANDOM_SEGMENT_NAME,
+                    "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                    "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
+                },
+                "named_random_segments": ["CBC", "UMI", "cDNA"],
+                "coding_region": "cDNA",
+                "annotation_segments": {
+                    "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                            (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                    "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG),
+                            (longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+                },
+                "deprecated": False,
             },
-            "deprecated": False,
-        },
-    }
 
-    pre_configured_cdna_models = {
-        "sc_10x3p": {
-            "description": "single-cell 10x 3' kit",
-            "version": "3.0.0",
-            "structure": [ "5p_Adapter", "CBC", "UMI", "Poly_T", "cDNA", "3p_Adapter" ],
-            "adapters": {
-                "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
-                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
-                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 12},
-                "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
-                "cDNA": RANDOM_SEGMENT_NAME,
-                "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+            "bulk_10x5p": {
+                "description": "bulk 10x 5' kit",
+                "version": "3.0.0",
+                "array_element_structure": [ "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter" ],
+                "adapters": {
+                    "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+                    "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                    "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
+                    "cDNA": RANDOM_SEGMENT_NAME,
+                    "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                    "sample_index": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                    "3p_Adapter": "CTCTGCGTTGATACCACTGCTT",
+                },
+                "named_random_segments": ["UMI", "cDNA", "sample_index"],
+                "coding_region": "cDNA",
+                "annotation_segments": {
+                    "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                            (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                    "sample_index": [(longbow.utils.constants.READ_DEMUX_TAG, longbow.utils.constants.READ_DEMUX_POS_TAG)],
+                },
+                "deprecated": False,
             },
-            "named_random_segments": {"CBC", "UMI", "cDNA"},
-            "coding_region": "cDNA",
-            "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
-                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
-                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG),
-                        (longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
-            },
-            "deprecated": False,
-        },
 
-        "sc_10x5p": {
-            "description": "single-cell 10x 5' kit",
-            "version": "3.0.0",
-            "structure": [ "5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter" ],
-            "adapters": {
-                "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
-                "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
-                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
-                "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
-                "cDNA": RANDOM_SEGMENT_NAME,
-                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
-                "3p_Adapter": "GTACTCTGCGTTGATACCACTGCTT",
+            "bulk_teloprimeV2": {
+                "description": "Lexogen TeloPrime V2 kit",
+                "version": "3.0.0",
+                "array_element_structure": [ "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind" ],
+                "adapters": {
+                    "TPV2_adapter": "CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG",
+                    "cDNA": RANDOM_SEGMENT_NAME,
+                    "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
+                    "idx": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
+                    "rev_bind": "CTCTGCGTTGATACCACTGCTT",
+                },
+                "named_random_segments": ["idx", "cDNA"],
+                "coding_region": "cDNA",
+                "annotation_segments": {
+                    "idx": [(longbow.utils.constants.READ_INDEX_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+                },
+                "deprecated": False,
             },
-            "named_random_segments": {"CBC", "UMI", "cDNA"},
-            "coding_region": "cDNA",
-            "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
-                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
-                "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG),
-                        (longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
-            },
-            "deprecated": False,
-        },
 
-        "bulk_10x5p": {
-            "description": "bulk 10x 5' kit",
-            "version": "3.0.0",
-            "array_element_structure": [ "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter" ],
-            "adapters": {
-                "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
-                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
-                "SLS": "TTTCTTATATGGG",  # Switch Leader Seq
-                "cDNA": RANDOM_SEGMENT_NAME,
-                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
-                "sample_index": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
-                "3p_Adapter": "CTCTGCGTTGATACCACTGCTT",
+            # The slide-seq model is:
+            #
+            #                 |-----5p_Adapter---->        |--splitter------>               |------Poly_T---------------->                  |--------5p_Adapter----------|                     # noqa
+            # AGCTTACTTGTGAAGACTACACGACGCTCTTCCGATCTNNNNNNNNTCTTCAGCGTTCCCGAGANNNNNNNNNNNNNVVTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTVNNNNNNNNNNNNNNNNNCCCATGTACTCTGCGTTGATACCACTGCTTACTTGTAAGCTGTCTA... # noqa
+            # |------A------->                      <------|                  <-----------|                                 <----cDNA-------|                              |-------B------>    # noqa
+            #                                          V                           V
+            #                                    Spatial Barcode 2         Spatial Barcode 1
+            "spatial_slideseq": {
+                "description": "Slide-seq protocol",
+                "version": "3.0.0",
+                "array_element_structure": [ "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter" ],
+                "adapters": {
+                    "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+                    "SBC2": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 8},
+                    "SLS2": "TCTTCAGCGTTCCCGAGA",  # Switch Leader Seq
+                    "SBC1": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 6},
+                    # The UMI might be 7, rather than 9 elements long - not clear from the geneious file.
+                    "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 9},
+                    "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
+                    "cDNA": RANDOM_SEGMENT_NAME,
+                    "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
+                },
+                "named_random_segments": ["UMI", "SBC2", "SBC1", "cDNA"],
+                "coding_region": "cDNA",
+                "annotation_segments": {
+                    "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
+                            (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
+                    "SBC1": [(longbow.utils.constants.READ_SPATIAL_BARCODE1_TAG,
+                            longbow.utils.constants.READ_SPATIAL_BARCODE1_POS_TAG)],
+                    "SBC2": [(longbow.utils.constants.READ_SPATIAL_BARCODE2_TAG,
+                            longbow.utils.constants.READ_SPATIAL_BARCODE2_POS_TAG)],
+                },
+                "deprecated": False,
             },
-            "named_random_segments": {"UMI", "cDNA", "sample_index"},
-            "coding_region": "cDNA",
-            "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
-                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
-                "sample_index": [(longbow.utils.constants.READ_DEMUX_TAG, longbow.utils.constants.READ_DEMUX_POS_TAG)],
-            },
-            "deprecated": False,
-        },
-
-        "bulk_teloprimeV2": {
-            "description": "Lexogen TeloPrime V2 kit",
-            "version": "3.0.0",
-            "array_element_structure": [ "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind" ],
-            "adapters": {
-                "TPV2_adapter": "CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG",
-                "cDNA": RANDOM_SEGMENT_NAME,
-                "Poly_A": {HPR_SEGMENT_TYPE_NAME: ("A", 30)},
-                "idx": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
-                "rev_bind": "CTCTGCGTTGATACCACTGCTT",
-            },
-            "named_random_segments": {"idx", "cDNA"},
-            "coding_region": "cDNA",
-            "annotation_segments": {
-                "idx": [(longbow.utils.constants.READ_INDEX_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
-            },
-            "deprecated": False,
-        },
-
-        # The slide-seq model is:
-        #
-        #                 |-----5p_Adapter---->        |--splitter------>               |------Poly_T---------------->                  |--------5p_Adapter----------|                     # noqa
-        # AGCTTACTTGTGAAGACTACACGACGCTCTTCCGATCTNNNNNNNNTCTTCAGCGTTCCCGAGANNNNNNNNNNNNNVVTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTVNNNNNNNNNNNNNNNNNCCCATGTACTCTGCGTTGATACCACTGCTTACTTGTAAGCTGTCTA... # noqa
-        # |------A------->                      <------|                  <-----------|                                 <----cDNA-------|                              |-------B------>    # noqa
-        #                                          V                           V
-        #                                    Spatial Barcode 2         Spatial Barcode 1
-        "spatial_slideseq": {
-            "description": "Slide-seq protocol",
-            "version": "3.0.0",
-            "array_element_structure": [ "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter" ],
-            "adapters": {
-                "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
-                "SBC2": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 8},
-                "SLS2": "TCTTCAGCGTTCCCGAGA",  # Switch Leader Seq
-                "SBC1": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 6},
-                # The UMI might be 7, rather than 9 elements long - not clear from the geneious file.
-                "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 9},
-                "Poly_T": {HPR_SEGMENT_TYPE_NAME: ("T", 30)},
-                "cDNA": RANDOM_SEGMENT_NAME,
-                "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT",
-            },
-            "named_random_segments": {"UMI", "SBC2", "SBC1", "cDNA"},
-            "coding_region": "cDNA",
-            "annotation_segments": {
-                "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
-                        (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
-                "SBC1": [(longbow.utils.constants.READ_SPATIAL_BARCODE1_TAG,
-                          longbow.utils.constants.READ_SPATIAL_BARCODE1_POS_TAG)],
-                "SBC2": [(longbow.utils.constants.READ_SPATIAL_BARCODE2_TAG,
-                          longbow.utils.constants.READ_SPATIAL_BARCODE2_POS_TAG)],
-            },
-            "deprecated": False,
-        },
+        }
     }

@@ -37,7 +37,7 @@ class LibraryModel:
 
         self.adapter_dict = {**array_model['adapters'], **cdna_model['adapters']}
 
-        self.named_random_segments = cdna_model['named_random_segments']
+        self.named_random_segments = set(cdna_model['named_random_segments'])
         self.coding_region = cdna_model['coding_region']
         self.annotation_segments = cdna_model['annotation_segments']
 
@@ -229,7 +229,7 @@ class LibraryModel:
 
         # Connect random:RDA to non-random cDNA starts
         for cdna_state in self.cdna_model['structure'][1:len(self.cdna_model['structure'])]:
-            if cdna_state not in self.cdna_model['named_random_segments']:
+            if cdna_state not in self.named_random_segments:
                 self.hmm.add_transition(all_states['random:RDA'], all_states[f'{cdna_state}-start'], 0.05)
 
         # Connect all array ends to random end and cDNA start
@@ -292,9 +292,6 @@ class LibraryModel:
                         if next_adapter_name is not None:
                             self.hmm.add_transition(all_states[f'{adapter_name}:{op}{hpr_length}'], all_states[f'{next_adapter_name}-start'], 1.0)
 
-        # Cross connect cDNA adapters
-        #for i in range(len(self.cdna_model['sequence']) - 2):
-
         self.hmm.bake(merge="None")
 
     def _create_random_repeat_model(self):
@@ -334,7 +331,7 @@ class LibraryModel:
             adapter_hmm = None
 
             if type(adapter_def) is str:
-                if adapter_name in self.cdna_model['named_random_segments']:
+                if adapter_name in self.named_random_segments:
                     adapter_hmm = ModelBuilder.make_named_random_model(adapter_name)
                 else:
                     adapter_hmm = ModelBuilder.make_global_alignment_model(self.cdna_model['adapters'][adapter_name], adapter_name)
@@ -436,12 +433,8 @@ class LibraryModel:
         model_data = {
             "name": self.name,
             "description": self.description,
-            # "version": self.version,
-            # "array_element_structure": self.array_element_structure,
-            # "adapters": self.adapter_dict,
-            # "direct_connections": {k: list(v) for k, v in self.direct_connections_dict.items()},
-            # "start_element_names": list(self.start_element_names),
-            # "end_element_names": list(self.end_element_names),
+            "array": self.array_model,
+            "cdna" : self.cdna_model
         }
 
         if outfile:
@@ -454,10 +447,10 @@ class LibraryModel:
     def has_prebuilt_model(model_name):
         (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
 
-        if array_model_name not in ModelBuilder.pre_configured_array_models.keys():
+        if array_model_name not in ModelBuilder.pre_configured_models['array'].keys():
             return False
 
-        if cdna_model_name not in ModelBuilder.pre_configured_cdna_models.keys():
+        if cdna_model_name not in ModelBuilder.pre_configured_models['cdna'].keys():
             return False
 
         return True
@@ -467,8 +460,8 @@ class LibraryModel:
         (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
 
         lb = LibraryModel(
-            array_model=ModelBuilder.pre_configured_array_models[array_model_name], 
-            cdna_model=ModelBuilder.pre_configured_cdna_models[cdna_model_name],
+            array_model=ModelBuilder.pre_configured_models['array'][array_model_name], 
+            cdna_model=ModelBuilder.pre_configured_models['cdna'][cdna_model_name],
             model_name=model_name
         )
 
