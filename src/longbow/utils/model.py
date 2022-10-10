@@ -378,6 +378,31 @@ class LibraryModel:
 
         return states, model
 
+    @staticmethod
+    def from_json_file(json_file):
+        """Create a LibraryModel instance from the given json file.
+        This method will open the file at the given location and use the data in that file to create a LibraryModel."""
+
+        try:
+            with open(json_file) as f:
+                json_data = json.load(f)
+        except FileNotFoundError:
+            logger.error(f"File does not exist: {json_file}")
+            sys.exit(1)
+
+        return LibraryModel.from_json_obj(json_data)
+
+    @staticmethod
+    def from_json_obj(json_data):
+        """Create a LibraryModel instance from the given json data.
+        This method will use the data in the JSON object to create a LibraryModel."""
+
+        return LibraryModel(
+            array_model=json_data['array'], 
+            cdna_model=json_data['cdna'],
+            model_name=json_data['name']
+        )
+
     def has_annotation_tag(self, tag):
         """Returns true if this model has an annotation segment that is written out to the given tag."""
         return self.get_segment_name_for_annotation_tag(tag) is not None
