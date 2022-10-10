@@ -276,24 +276,17 @@ def load_read_offsets(pbi_file, read_names):
 
 
 def annotate_read(read, m, max_length, min_rq):
-    flogp = -math.inf
     fseq = read.query_sequence
     fppath = []
+    flogp = -math.inf
 
-    if False: # read.has_tag(longbow.utils.constants.SEGMENTS_TAG):
-        tag = re.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER, read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
-
-        for e in tag:
-            state, rrange = re.split(":", e)
-            qStart, qEnd = re.split("-", rrange)
-            qLen = int(qEnd) - int(qStart) + 1
-
-            fppath.extend([state] * qLen)
+    if read.has_tag(longbow.utils.constants.SEGMENTS_TAG):
+        # Set our ppath from the bam file:
+        fppath = re.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER, read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
 
         # Set our logp from the bam file:
         flogp = read.get_tag(longbow.utils.constants.READ_MODEL_SCORE_TAG)
     else:
-
         # Check for max length and min quality:
         if len(read.query_sequence) > max_length:
             logger.warning(f"Read is longer than max length.  "
@@ -447,7 +440,7 @@ def _make_aligned_state_sequence(seq, path, library_model):
                         if cur_adapter[cur_pos] == base:
                             mismatch_track.append('|')
                         else:
-                            mismatch_track.append(' ')
+                            mismatch_track.append('.')
 
                         cur_pos += 1
                     else:

@@ -329,7 +329,7 @@ def collapse_annotations(path):
     return segments
 
 
-def write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_bam_file):
+def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file):
     """Write the given pysam.AlignedSegment read object to the given file with the given metadata."""
 
     # Obligatory log message:
@@ -338,11 +338,11 @@ def write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_ba
         read.query_name,
         logp,
         " (RC)" if is_rc else "",
-        segments,
+        ','.join(ppath),
     )
 
     # Set our tag and write out the read to the annotated file:
-    read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
+    read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join(ppath))
 
     # Set the model info tags:
     read.set_tag(READ_MODEL_SCORE_TAG, logp)
