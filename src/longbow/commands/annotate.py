@@ -256,8 +256,6 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
         total=read_count
     ) as pbar:
 
-        ssw_aligner = ssw.Aligner()
-
         while True:
             # Wait for some output data:
             raw_data = out_queue.get()
@@ -273,9 +271,6 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             read, ppath, logp, is_rc, model_name = raw_data
 
             if read is not None:
-                # Condense the output annotations so we can write them out with indices:
-                segments = bam_utils.collapse_annotations(ppath)
-
                 read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
                 # Obligatory log message:
@@ -284,16 +279,15 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
                     read.query_name,
                     logp,
                     " (RC)" if is_rc else "",
-                    segments,
+                    ','.join(ppath)
                 )
 
                 # Write our our read:
-                bam_utils.write_annotated_read(read, segments, is_rc, logp, lb_models_dict[model_name], ssw_aligner,
-                                               out_bam_file)
+                bam_utils.write_annotated_read(read, ppath, is_rc, logp, lb_models_dict[model_name], out_bam_file)
 
                 # Increment our counters:
                 res["num_reads_annotated"] += 1
-                res["num_sections"] += len(segments)
+                res["num_sections"] += len(ppath)
 
             pbar.update(1)
 
