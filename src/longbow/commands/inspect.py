@@ -404,8 +404,8 @@ def _make_aligned_state_sequence(seq, path, library_model):
     for p in path:
         state, ops = re.split(":", p)
 
-        for opgroup in list(filter(None, re.split(r'(R?[MID]\d+)', ops))):
-            q = re.match(r'(R?[MID])(\d+)', opgroup)
+        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
+            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
             op = q.group(1)
             oplen = int(q.group(2))
 
