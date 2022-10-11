@@ -233,10 +233,36 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
 
 def get_segments(read):
     """Get the segments corresponding to a particular read by reading the segments tag information."""
-    return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
-            longbow.utils.constants.SEGMENT_TAG_DELIMITER)
-    ]
+    segment_cigars = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(longbow.utils.constants.SEGMENT_TAG_DELIMITER) 
+    segment_ranges = []
+
+    cur_state = None
+    cur_pos = 0
+    cur_len = 0
+
+    for p in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(longbow.utils.constants.SEGMENT_TAG_DELIMITER):
+        state, ops = re.split(":", p)
+        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
+            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
+            op = q.group(1)
+            oplen = int(q.group(2))
+
+            if cur_state is None:
+                cur_state = state
+
+            if cur_state != state:
+                segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
+                cur_state = state
+                cur_pos += cur_len + 1
+                cur_len = 0
+
+            if cur_state == state:
+                if op in ['M', 'I', 'RI']:
+                    cur_len += oplen
+
+    segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
+
+    return read.to_string(), segment_ranges, segment_cigars
 
 
 def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, lb_models):

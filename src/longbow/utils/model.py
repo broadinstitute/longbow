@@ -137,12 +137,14 @@ class LibraryModel:
 
         return logp, ppath
 
-    def validate_segment_order(self, ordered_segment_names, allow_missing_first_adapter=True):
+    def validate_segment_order(self, segments, allow_missing_first_adapter=True):
         """Validate the order of the given segments against the expected order in this model.
 
         Returns: (True|False, # key adapters found, first key adapter index)"""
 
         # Iterate through our given segment names and check if they occur in order:
+        ordered_segment_names = list(map(lambda x: re.split(":", x)[0], segments))
+
         num_key_adapters_found = 0
         key_adapter_indx = 0
         first_key_adapter_index = 0
