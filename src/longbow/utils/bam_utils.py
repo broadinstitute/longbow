@@ -267,7 +267,7 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     #                         known_segment_seq = base * count
     #                         segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
     #
-    #                         seg_score_string = f" ({len(known_segment_seq) - editdistance.eval(segment_bases, known_segment_seq)}" \
+    #                         seg_score_string = f" ({len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
     #                                            f"/{len(known_segment_seq)})"
 
 
