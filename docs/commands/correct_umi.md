@@ -17,6 +17,9 @@ Corrects all UMIs in the given bam file.
 ### Data Requirements:
 
 - Bam file should be aligned and annotated with genes and transcript equivalence classes prior to running.
+- It is critical that you give the proper input for the `--pre-extracted` flag.
+  - If the file has been run through `longbow extract`, use `--pre-extracted`
+  - If the file has _NOT_ been run through `longbow extract` _DO NOT USE_ `--pre-extracted`
 
 The following tags are required in the input file:
 
@@ -42,7 +45,7 @@ Options:
   -f, --force               Force overwrite of the output files if they exist.
                             [default: False]
   --pre-extracted           Whether the input file has been processed with
-                            `longbow extract`  [default: True]
+                            `longbow extract`  [default: False]
   --help                    Show this message and exit.
 ```
 
