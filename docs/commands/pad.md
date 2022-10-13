@@ -2,7 +2,7 @@
 layout: default
 title: pad
 description: "Pad tag by specified number of adjacent bases from the read."
-nav_order: 9
+nav_order: 10
 parent: Commands
 ---
 

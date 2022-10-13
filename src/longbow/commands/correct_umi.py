@@ -8,6 +8,7 @@ import itertools
 import click
 import click_log
 from tqdm import tqdm
+from enum import Enum
 
 from polyleven import levenshtein
 
@@ -37,8 +38,9 @@ MAX_UMI_DELTA = {"CCS": 3, "CLR": 4}
 MAX_UMI_DELTA_FILTER = {"CCS": 3, "CLR": 3}
 MIN_BACK_ALIGNMENT_SCORE = 10
 
-READ_TYPE = Enum("READ_TYPE", 'CCS '
-                              'CLR ')
+class ReadType(Enum):
+    CCS = 1
+    CLR = 2
 
 UMI_TAG = "JX"  # "ZU"
 FINAL_UMI_TAG = "BX"
@@ -48,6 +50,17 @@ GENE_TAG = "XG"
 CODING_REGION = "cDNA"
 READ_QUALITY_TAG = "rq"
 BACK_ALIGNMENT_SCORE_TAG = "JB"
+
+class ReadSnapshot:
+    def __init__(self, read):
+        self.umi = read.get_tag(UMI_TAG)
+        self.type = get_read_type(read)
+        self.start = read.reference_start
+        self.end = read.reference_end
+        sequence = get_read_seq(read)
+        self.len = len(sequence)
+        self.gc = float(sequence.count('C') + sequence.count('G')) / len(sequence)
+        self.name = read.qname
 
 
 @click.command(name=logger.name)
@@ -65,13 +78,13 @@ BACK_ALIGNMENT_SCORE_TAG = "JB"
     "--output-bam",
     default="-",
     type=click.Path(exists=False),
-    help="annotated bam output  [default: stdout]",
+    help="Corrected UMI bam output [default: stdout].",
 )
 @click.option(
     "-x",
     "--reject-bam",
     type=click.Path(exists=False),
-    help="Filtered bam output (failing reads only)",
+    help="Filtered bam output (failing reads only).",
 )
 @click.option(
     '-f',
@@ -158,7 +171,7 @@ def main(umi_length, output_bam, reject_bam, force, input_bam):
 
 
 def get_read_type(read):
-    return READ_TYPE.CCS if read.get_tag(READ_QUALITY_TAG) != -1 else READ_TYPE.CLR
+    return ReadType.CCS if read.get_tag(READ_QUALITY_TAG) != -1 else ReadType.CLR
 
 
 def get_read_locus(read):
@@ -173,18 +186,6 @@ def get_read_seq(read):
 
 def get_back_aln_score(read):
     return int(read.get_tag(BACK_ALIGNMENT_SCORE_TAG).split("/")[0])
-
-
-class ReadSnapshot:
-    def __init__(self, read):
-        self.umi = read.get_tag(UMI_TAG)
-        self.type = get_read_type(read)
-        self.start = read.reference_start
-        self.end = read.reference_end
-        sequence = get_read_seq(read)
-        self.len = len(sequence)
-        self.gc = float(sequence.count('C') + sequence.count('G')) / len(sequence)
-        self.name = read.qname
 
 
 def valid_umi(read, umi_length):
@@ -234,7 +235,7 @@ def extract_read_groups(input_bam_fname, umi_length):
 
 
 def get_conversion_type(source, target):
-    return "CCS" if ((source.type == target.type) and (source.type == READ_TYPE.CCS)) else "CLR"
+    return "CCS" if ((source.type == target.type) and (source.type == ReadType.CCS)) else "CLR"
 
 
 def can_convert(source, target):
