@@ -90,7 +90,7 @@ def main(umi_length, output_bam, reject_bam, force, input_bam):
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     # Check to see if the output files exist:
-    bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
+    bam_utils.check_for_preexisting_files([output_bam, reject_bam], exist_ok=force)
 
     # Load number of reads, if pbi exists:
     pbi = f"{input_bam.name}.pbi"
@@ -102,6 +102,9 @@ def main(umi_length, output_bam, reject_bam, force, input_bam):
 
     # silence message about the .bai file not being found
     pysam.set_verbosity(0)
+
+    logger.info(f"Writing UMI corrected reads to: {output_bam}")
+    logger.info(f"Writing reads with uncorrectable UMIs to: {reject_bam}")
 
     # split reads into groups by locus
     logger.info("Creating locus -> read map...")
@@ -144,8 +147,10 @@ def main(umi_length, output_bam, reject_bam, force, input_bam):
     t_end = time.time()
     logger.info(f"Done. Elapsed time: {t_end - t_start:2.2f}s. "
                 f"Overall processing rate: {total_reads / (t_end - t_start):2.2f} reads/s.")
-    logger.info(f"Number of reads with corrected UMIs: {num_corrected}/{total_reads} ({100*(num_corrected/total_reads):2.2f}%)")
-    logger.info(f"Number of reads with uncorrectable UMIs: {num_rejected}/{total_reads} ({100 * (num_rejected / total_reads):2.2f}%)")
+    logger.info(f"Number of reads with corrected UMIs: {num_corrected}/{total_reads} "
+                f"({100*(num_corrected/total_reads):2.2f}%)")
+    logger.info(f"Number of reads with uncorrectable UMIs: {num_rejected}/{total_reads} "
+                f"({100 * (num_rejected / total_reads):2.2f}%)")
     logger.info(f"Total Number of reads: {total_reads}")
 
 
@@ -228,15 +233,6 @@ def extract_read_groups(input_bam_fname, umi_length):
     return locus2reads
 
 
-class UMIConfig:
-    def __init__(self, **entries):
-        self.__dict__.update(entries)
-
-    def __str__(self):
-        s = '\n'.join("{}: {}".format(k, v) for k, v in self.__dict__.items())
-        return s
-
-
 def get_conversion_type(source, target):
     return "CCS" if ((source.type == target.type) and (source.type == READ_TYPE.CCS)) else "CLR"
 
@@ -276,7 +272,9 @@ def min_vertex_cover(read_ids, graph, target2umi_counts, target2umi_seq):
     umi_groups = []
     while len(read_ids) > 0:
         # find the largest group, tie breaking: target matching the max support UMI in group
-        max_target_id = max(graph.keys(), key=lambda t: (len(graph[t]), max(target2umi_counts[t], key=target2umi_counts[t].get) == target2umi_seq[t]))
+        max_target_id = max(graph.keys(),
+                            key=lambda t: (len(graph[t]), max(target2umi_counts[t],
+                                                              key=target2umi_counts[t].get) == target2umi_seq[t]))
         max_size = len(graph[max_target_id])
 
         if max_size == 1:
