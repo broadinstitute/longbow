@@ -103,7 +103,7 @@ class ReadSnapshot:
 )
 @click.option('--pre-extracted',
               is_flag=True,
-              default=True,
+              default=False,
               show_default=True,
               help='Whether the input file has been processed with `longbow extract`')
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
