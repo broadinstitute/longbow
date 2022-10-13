@@ -8,7 +8,8 @@ import itertools
 import click
 import click_log
 from tqdm import tqdm
-from enum import Enum
+import enum
+import operator
 
 from polyleven import levenshtein
 
@@ -38,9 +39,14 @@ MAX_UMI_DELTA = {"CCS": 3, "CLR": 4}
 MAX_UMI_DELTA_FILTER = {"CCS": 3, "CLR": 3}
 MIN_BACK_ALIGNMENT_SCORE = 10
 
-class ReadType(Enum):
-    CCS = 1
-    CLR = 2
+MAS_GENE_PREFIX = "MAS"
+GENCODE_GENE_PREFIX = "ENSG"
+
+
+class ReadType(enum.Enum):
+    CCS = enum.auto()
+    CLR = enum.auto()
+
 
 UMI_TAG = "JX"  # "ZU"
 FINAL_UMI_TAG = "BX"
@@ -51,15 +57,16 @@ CODING_REGION = "cDNA"
 READ_QUALITY_TAG = "rq"
 BACK_ALIGNMENT_SCORE_TAG = "JB"
 
+
 class ReadSnapshot:
-    def __init__(self, read):
+    def __init__(self, read, pre_extracted):
         self.umi = read.get_tag(UMI_TAG)
         self.type = get_read_type(read)
         self.start = read.reference_start
         self.end = read.reference_end
-        sequence = get_read_seq(read)
+        sequence = get_read_seq(read, pre_extracted)
         self.len = len(sequence)
-        self.gc = float(sequence.count('C') + sequence.count('G')) / len(sequence)
+        self.gc = float(sequence.count('C') + sequence.count('G'))/len(sequence)
         self.name = read.qname
 
 
@@ -94,8 +101,13 @@ class ReadSnapshot:
     show_default=True,
     help="Force overwrite of the output files if they exist."
 )
+@click.option('--pre-extracted',
+              is_flag=True,
+              default=True,
+              show_default=True,
+              help='Whether the input file has been processed with `longbow extract`')
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(umi_length, output_bam, reject_bam, force, input_bam):
+def main(umi_length, output_bam, reject_bam, force, pre_extracted, input_bam):
     """Correct UMIs with Set Cover algorithm."""
 
     t_start = time.time()
@@ -121,41 +133,45 @@ def main(umi_length, output_bam, reject_bam, force, input_bam):
 
     # split reads into groups by locus
     logger.info("Creating locus -> read map...")
-    locus2reads = extract_read_groups(input_bam, umi_length)
-    logger.info("Number of loci: ", len(locus2reads))
+    locus2reads = extract_read_groups(input_bam, umi_length, pre_extracted)
+    logger.info("Number of loci: %d", len(locus2reads))
 
+    # Reset our position to the start of the input file for our second traversal:
+    input_bam.seek(0)
+
+    # Correct reads at each locus
+    logger.info("Correcting reads at each locus...")
     read2umi = {}
+    for locus in tqdm(locus2reads, desc="Processing each locus", unit=" locus", colour="green",
+                      file=sys.stderr, total=len(locus2reads), leave=False, disable=not sys.stdin.isatty()):
+        process_reads_at_locus(locus2reads[locus], read2umi, umi_length)
 
     num_corrected = 0
     num_rejected = 0
     total_reads = 0
 
-    with pysam.AlignmentFile(output_bam, "wb", template=input_bam) as correct_umi_bam:
-        with pysam.AlignmentFile(reject_bam, "wb", template=input_bam) as rejected_out_umi_bam:
+    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as input_bam_file:
+        with pysam.AlignmentFile(output_bam, "wb", template=input_bam_file) as correct_umi_bam:
+            with pysam.AlignmentFile(reject_bam, "wb", template=input_bam_file) as rejected_out_umi_bam:
 
-            # Correct reads at each locus
-            for locus in tqdm(locus2reads, desc="Processing each locus", unit=" locus", colour="green",
-                              file=sys.stderr, total=len(locus2reads), leave=False, disable=not sys.stdin.isatty()):
-                process_reads_at_locus(locus2reads[locus], read2umi, umi_length)
+                # Output BAM with corrected UMIs
+                for read in tqdm(input_bam_file, desc="Writing out UMI-corrected reads", unit=" read", colour="green",
+                                 file=sys.stderr, total=num_reads, leave=False, disable=not sys.stdin.isatty()):
+                    if read.qname in read2umi:
+                        read.set_tag(FINAL_UMI_TAG, read2umi[read.qname])
+                        read.set_tag(UMI_CORR_TAG, 1)
+                    else:
+                        read.set_tag(FINAL_UMI_TAG, read.get_tag(UMI_TAG))
+                        read.set_tag(UMI_CORR_TAG, 0)
 
-            # Output BAM with corrected UMIs
-            for read in tqdm(input_bam, desc="Writing out UMI-corrected reads", unit=" read", colour="green",
-                             file=sys.stderr, total=num_reads, leave=False, disable=not sys.stdin.isatty()):
-                if read.qname in read2umi:
-                    read.set_tag(FINAL_UMI_TAG, read2umi[read.qname])
-                    read.set_tag(UMI_CORR_TAG, 1)
-                else:
-                    read.set_tag(FINAL_UMI_TAG, read.get_tag(UMI_TAG))
-                    read.set_tag(UMI_CORR_TAG, 0)
+                    if read_passes_filters(read, umi_length):
+                        correct_umi_bam.write(read)
+                        num_corrected += 1
+                    else:
+                        rejected_out_umi_bam.write(read)
+                        num_rejected += 1
 
-                if read_passes_filters(read, umi_length):
-                    correct_umi_bam.write(read)
-                    num_corrected += 1
-                else:
-                    rejected_out_umi_bam.write(read)
-                    num_rejected += 1
-
-                total_reads += 1
+                    total_reads += 1
 
     t_end = time.time()
     logger.info(f"Done. Elapsed time: {t_end - t_start:2.2f}s. "
@@ -178,10 +194,13 @@ def get_read_locus(read):
     return read.get_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG), read.get_tag(EQ_CLASS_TAG)
 
 
-def get_read_seq(read):
-    start, end = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(f"{CODING_REGION}:", 1)[1].split(",")[
-        0].split("-")
-    return read.query_sequence.upper()[int(start):int(end) + 1]
+def get_read_seq(read, pre_extracted):
+    if pre_extracted:
+        return read.query_sequence.upper()
+    else:
+        start, end = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(f"{CODING_REGION}:", 1)[1].split(",")[
+            0].split("-")
+        return read.query_sequence.upper()[int(start):int(end) + 1]
 
 
 def get_back_aln_score(read):
@@ -190,12 +209,12 @@ def get_back_aln_score(read):
 
 def valid_umi(read, umi_length):
     # checks the deviation of the UMI length
-    return abs(len(read.get_tag(UMI_TAG)) - umi_length) <= MAX_UMI_DELTA[get_read_type(read).name]
+    return abs(len(read.get_tag(UMI_TAG)) - umi_length) <= MAX_UMI_DELTA[ReadType(get_read_type(read)).name]
 
 
 def valid_gene(read):
-    # requires either a MAS or ENSG gene tag
-    return ("MAS" in read.get_tag(GENE_TAG)) or ("ENSG" in read.get_tag(GENE_TAG))
+    # requires either a MAS-seq or Gencode gene tag
+    return (MAS_GENE_PREFIX in read.get_tag(GENE_TAG)) or (GENCODE_GENE_PREFIX in read.get_tag(GENE_TAG))
 
 
 def valid_tags(read):
@@ -207,10 +226,10 @@ def valid_tags(read):
 def read_passes_filters(read, umi_length):
     # filters the read based on the final UMI length and back alignment score
     return get_back_aln_score(read) >= MIN_BACK_ALIGNMENT_SCORE and \
-           abs(len(read.get_tag(FINAL_UMI_TAG)) - umi_length) <= MAX_UMI_DELTA_FILTER[get_read_type(read).name]
+           abs(len(read.get_tag(FINAL_UMI_TAG)) - umi_length) <= MAX_UMI_DELTA_FILTER[ReadType(get_read_type(read)).name]
 
 
-def extract_read_groups(input_bam_fname, umi_length):
+def extract_read_groups(input_bam_fname, umi_length, pre_extracted):
     locus2reads = defaultdict(list)
     n_filtered_umi = 0
     n_filtered_gene = 0
@@ -227,10 +246,10 @@ def extract_read_groups(input_bam_fname, umi_length):
                 continue
             n_valid_reads += 1
             locus = get_read_locus(read)
-            locus2reads[locus].append(ReadSnapshot(read))
-        print("Number of valid reads: ", n_valid_reads)
-        print("Number of filtered by gene: ", n_filtered_gene)
-        print("Number of filtered by UMI: ", n_filtered_umi)
+            locus2reads[locus].append(ReadSnapshot(read, pre_extracted))
+        logger.info("Number of valid reads: %d", n_valid_reads)
+        logger.info("Number of filtered by gene: %d", n_filtered_gene)
+        logger.info("Number of filtered by UMI: %d", n_filtered_umi)
     return locus2reads
 
 

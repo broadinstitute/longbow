@@ -12,9 +12,13 @@ parent: Commands
 
 Correct UMIs with Set Cover algorithm.
 
-Corrects all UMIs in the given bam file.  Bam file is should be aligned and annotated with genes and transcript equivalence classes prior to running.
+Corrects all UMIs in the given bam file.  
 
-### Required input tags:
+### Data Requirements:
+
+- Bam file should be aligned and annotated with genes and transcript equivalence classes prior to running.
+
+The following tags are required in the input file:
 
 - `JX` (Adjusted UMI)
 - `eq` (Equivalence class assignment)
@@ -37,6 +41,8 @@ Options:
   -x, --reject-bam PATH     Filtered bam output (failing reads only).
   -f, --force               Force overwrite of the output files if they exist.
                             [default: False]
+  --pre-extracted           Whether the input file has been processed with
+                            `longbow extract`  [default: True]
   --help                    Show this message and exit.
 ```
 
