@@ -48,7 +48,7 @@ class BarcodeResolutionFailure(enum.Enum):
     "-t",
     "--threads",
     type=int,
-    default=mp.cpu_count() - 1,
+    default=1,
     show_default=True,
     help="number of threads to use (0 for all)",
 )
