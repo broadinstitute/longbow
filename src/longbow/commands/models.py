@@ -58,10 +58,10 @@ def main(list_models, dump):
         print("Longbow includes the following models:")
 
         print("\nArray models\n============")
-        print_models(ModelBuilder.pre_configured_array_models)
+        print_models(ModelBuilder.pre_configured_models['array'])
 
         print("\ncDNA models\n===========")
-        print_models(ModelBuilder.pre_configured_cdna_models)
+        print_models(ModelBuilder.pre_configured_models['cdna'])
 
         print("\nSpecify a fully combined model via '<array model>+<cDNA model>' syntax, e.g. 'mas_15+sc_10x5p'.")
 
@@ -69,10 +69,10 @@ def main(list_models, dump):
         model_name = dump
         (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
 
-        if array_model_name not in ModelBuilder.pre_configured_array_models.keys():
+        if array_model_name not in ModelBuilder.pre_configured_models['array'].keys():
             logger.error(f"Given model name '{array_model_name}' not in preconfigured array models {list(ModelBuilder.pre_configured_array_models.keys())}")
 
-        if cdna_model_name not in ModelBuilder.pre_configured_cdna_models.keys():
+        if cdna_model_name not in ModelBuilder.pre_configured_models['cdna'].keys():
             logger.error(f"Given model name '{cdna_model_name}' not in preconfigured cDNA models {list(ModelBuilder.pre_configured_cdna_models.keys())}")
 
         lb = LibraryModel(
@@ -81,16 +81,16 @@ def main(list_models, dump):
             model_name=model_name
         )
 
-        labelsdict = {}
-        for s in lb.hmm.states:
-            if s.name.endswith('-start') or s.name.endswith('-end'):
-                labelsdict[s] = s.name
-            else:
-                labelsdict[s] = ''
+        # labelsdict = {}
+        # for s in lb.hmm.states:
+        #     if s.name.endswith('-start') or s.name.endswith('-end'):
+        #         labelsdict[s] = s.name
+        #     else:
+        #         labelsdict[s] = ''
 
-        layout = nx.spring_layout(lb.hmm.graph)
-        nx.draw(lb.hmm.graph, with_labels=True, labels=labelsdict, pos=layout)
-        plt.savefig('plotgraph.png', dpi=300, bbox_inches='tight')
+        # layout = nx.spring_layout(lb.hmm.graph)
+        # nx.draw(lb.hmm.graph, with_labels=True, labels=labelsdict, pos=layout)
+        # plt.savefig('plotgraph.png', dpi=300, bbox_inches='tight')
         # plt.show()
 
         # Get out model:

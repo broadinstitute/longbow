@@ -24,18 +24,25 @@ class LibraryModel:
     def __init__(self,
                  array_model,
                  cdna_model,
+                 multiplex_model=None,
                  model_name='hierarchical_model',
                  do_build=True):
 
         self.name = model_name
         self.description = f"{array_model['description']}, {cdna_model['description']}"
         self.array_version = array_model['version']
-        self.cdna_version = array_model['version']
+        self.cdna_version = cdna_model['version']
+        self.multiplex_version = None if multiplex_model is None else multiplex_model['version']
 
         self.array_model = array_model
         self.cdna_model = cdna_model
+        self.multiplex_model = multiplex_model
 
-        self.adapter_dict = {**array_model['adapters'], **cdna_model['adapters']}
+        multiplex_adapters = {}
+        for index_name in multiplex_model['adapters']:
+            multiplex_adapters.update(multiplex_model['adapters'][index_name])
+
+        self.adapter_dict = {**array_model['adapters'], **cdna_model['adapters'], **multiplex_adapters}
 
         self.named_random_segments = set(cdna_model['named_random_segments'])
         self.coding_region = cdna_model['coding_region']
@@ -218,12 +225,30 @@ class LibraryModel:
         array_states, array_hmm = self._create_array_model()
         self.hmm.add_model(array_hmm)
 
+        # Add multiplexing model
+        multiplex_states, multiplex_hmm = self._create_multiplex_model()
+        self.hmm.add_model(multiplex_hmm)
+
         # Make a dict of all available states for easy lookup and connection
-        all_states = {**random_states, **cdna_states, **array_states}
+        all_states = {**random_states, **cdna_states, **array_states, **multiplex_states}
 
         # Connect random start to array start and cDNA start
         self.hmm.add_transition(all_states['random-start'], all_states[f"{self.cdna_model['structure'][0]}-start"], 0.5)
         self.hmm.add_transition(all_states['random-start'], all_states[f"{self.array_model['structure'][0]}-start"], 0.5)
+
+        # Connect multiplexing adapters
+        if self.multiplex_model is not None:
+            for index_name in self.multiplex_model['structure']:
+                for adapter_name in self.multiplex_model['adapters'][index_name].keys():
+                    self.hmm.add_transition(all_states['random-start'], all_states[f"{adapter_name}-start"], 0.5)
+
+                    l = len(self.multiplex_model['adapters'][index_name][adapter_name])
+
+                    for op in ['M', 'I', 'D']:
+                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'], all_states['random:RDB'], 0.01)
+                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'], all_states['random-end'], 0.01)
+                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'], all_states[f'{self.cdna_model["structure"][0]}-start'], 0.5)
+                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'], all_states[f'{self.array_model["structure"][0]}-start'], 0.5)
 
         # Connect random:RDA to appropriate array starts
         for array_state in self.array_model['structure'][1:len(self.array_model['structure'])]:
@@ -369,6 +394,8 @@ class LibraryModel:
             adapter_def = self.cdna_model['adapters'][adapter_name_i]
 
             if type(adapter_def) is dict:
+                segment_type = list(adapter_def.keys())[0]
+
                 if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
                     l = list(adapter_def.values())[0]
                     model.add_transition(states[f'{adapter_name_i}:M{l}'], states[f'{adapter_name_j}-start'], 1.0)
@@ -377,6 +404,27 @@ class LibraryModel:
                 #model.add_transition(states[f'{adapter_name_i}:M{l}'], states[f'{adapter_name_j}-start'], 1.0)
 
         model.bake(merge="None")
+
+        return states, model
+
+    def _create_multiplex_model(self):
+        model = None
+        states = dict()
+
+        if self.multiplex_model is not None:
+            for index_name in self.multiplex_model['structure']:
+                for adapter_name in self.multiplex_model['adapters'][index_name]:
+                    adapter_hmm = ModelBuilder.make_global_alignment_model(self.multiplex_model['adapters'][index_name][adapter_name], adapter_name)
+
+                    if model is None:
+                        model = adapter_hmm
+                    else:
+                        model.add_model(adapter_hmm)
+
+            model.bake(merge="None")
+
+            for s in model.states:
+                states[s.name] = s
 
         return states, model
 
@@ -472,7 +520,11 @@ class LibraryModel:
 
     @staticmethod
     def has_prebuilt_model(model_name):
-        (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
+        # (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
+        model_component_names = re.split('\+', model_name)
+        array_model_name = model_component_names[0]
+        cdna_model_name = model_component_names[1]
+        multiplex_model_name = None if len(model_component_names) <= 2 else model_component_names[2]
 
         if array_model_name not in ModelBuilder.pre_configured_models['array'].keys():
             return False
@@ -480,15 +532,23 @@ class LibraryModel:
         if cdna_model_name not in ModelBuilder.pre_configured_models['cdna'].keys():
             return False
 
+        if multiplex_model_name is not None and multiplex_model_name not in ModelBuilder.pre_configured_models['multiplex'].keys():
+            return False
+
         return True
 
     @staticmethod
     def build_pre_configured_model(model_name):
-        (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
+        # (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
+        model_component_names = re.split('\+', model_name)
+        array_model_name = model_component_names[0]
+        cdna_model_name = model_component_names[1]
+        multiplex_model_name = None if len(model_component_names) <= 2 else model_component_names[2]
 
         lb = LibraryModel(
             array_model=ModelBuilder.pre_configured_models['array'][array_model_name], 
             cdna_model=ModelBuilder.pre_configured_models['cdna'][cdna_model_name],
+            multiplex_model=(None if multiplex_model_name is None else ModelBuilder.pre_configured_models['multiplex'][multiplex_model_name]),
             model_name=model_name
         )
 

@@ -108,8 +108,16 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     show_default=True,
     help="Create quick (simplified) inspection figures."
 )
+@click.option(
+    '-d',
+    '--direction',
+    type=click.Choice(['fw', 'rc']),
+    show_default=True,
+    required=False,
+    help="If set, force annotation direction ('fw' or 'rc')."
+)
 @click.argument("input-bam", type=click.Path(exists=True))
-def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min_rq, quick, input_bam):
+def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min_rq, quick, direction, input_bam):
     """Inspect the classification results on specified reads."""
 
     t_start = time.time()
@@ -142,7 +150,7 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
                 logger.info("No .pbi file available. Inspecting whole input bam file until we find specified reads.")
                 for read in bam_file:
                     if read.query_name in read_names:
-                        __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick)
+                        __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, direction)
             else:
                 file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
@@ -154,22 +162,22 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
                     bam_file.seek(file_offsets[z]["offset"])
                     read = bam_file.__next__()
-                    __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick)
+                    __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, direction)
         else:
             # Without read names we just inspect every read in the file:
             logger.info("No read names given. Inspecting every read in the input bam file.")
             for read in bam_file:
-                __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick)
+                __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, direction)
 
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick):
+def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, direction):
     """Create a figure for the given read."""
 
     out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
 
-    seq, path, logp = annotate_read(read, lb_model, max_length, min_rq)
+    seq, path, logp = annotate_read(read, lb_model, max_length, min_rq, direction)
 
     if seq is not None:
         logger.info("Drawing read '%s' to '%s'", read.query_name, out)
@@ -267,7 +275,7 @@ def load_read_offsets(pbi_file, read_names):
     return file_offsets_hash
 
 
-def annotate_read(read, m, max_length, min_rq):
+def annotate_read(read, m, max_length, min_rq, direction):
     fseq = read.query_sequence
     fppath = []
     flogp = -math.inf
@@ -288,13 +296,21 @@ def annotate_read(read, m, max_length, min_rq):
             logger.warning(f"Read quality is below the minimum.  "
                            f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
             return [None] * 3
-        for seq in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
-            logp, ppath = m.annotate(seq)
 
-            if logp > flogp:
-                fseq = seq
-                flogp = logp
-                fppath = ppath
+        if direction == 'fw':
+            fseq = read.query_sequence
+            flogp, fppath = m.annotate(fseq)
+        elif direction == 'rc':
+            fseq = bam_utils.reverse_complement(read.query_sequence)
+            flogp, fppath = m.annotate(fseq)
+        else:
+            for seq in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
+                logp, ppath = m.annotate(seq)
+
+                if logp > flogp:
+                    fseq = seq
+                    flogp = logp
+                    fppath = ppath
 
     return fseq, fppath, flogp
 
@@ -560,7 +576,7 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
 
     last_label = ''
     for i, (o, m, e, c) in enumerate(zip(observed_track, mismatch_track, expected_track, classification_track)):
-        color = color_map[c]
+        color = color_map[c] if c in color_map else '#F5A503'
 
         if column == 0:
             pos1 = ax.text(
