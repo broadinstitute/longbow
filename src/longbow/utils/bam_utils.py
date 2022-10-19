@@ -335,6 +335,8 @@ def collapse_annotations(path):
             if cur_state == state:
                 if op in ['M', 'I', 'RI']:
                     cur_len += oplen
+                elif op in ['D', 'RD']:
+                    cur_len -= oplen
 
     segments.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
 
