@@ -135,6 +135,9 @@ class LibraryModel:
 
                 cur_op_len += 1
 
+        cigar.append(f'{cur_op}{cur_op_len}')
+        ppath.append(f'{cur_adapter_name}:{"".join(cigar)}')
+
         return logp, ppath
 
     def validate_segment_order(self, segments, allow_missing_first_adapter=True):

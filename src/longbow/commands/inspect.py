@@ -526,20 +526,20 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
 
     segment_order_valid = True
 
-    collapsed_annotations = bam_utils.collapse_annotations(path)
-    read_mas_adapters = [s.name for s in collapsed_annotations if len(s.name) == 1]
-    segment_order_valid, key_adapters_found, first_key_adapter_indx = \
-        library_model.validate_segment_order([s.name for s in collapsed_annotations])
+    # collapsed_annotations = bam_utils.collapse_annotations(path)
+    # read_mas_adapters = [s.name for s in collapsed_annotations if len(s.name) == 1]
+    # segment_order_valid, key_adapters_found, first_key_adapter_indx = \
+    #     library_model.validate_segment_order([s.name for s in collapsed_annotations])
 
     valid_library_order_string = f"[{library_model.name} adapters: {' '.join(library_model.key_adapters)}]"
     is_valid_order_string = "[Segment order: Valid]" if segment_order_valid else "[Segment order: INVALID]"
-    read_mas_adapter_string = f"[Key adapters: {' '.join(read_mas_adapters)}]"
+    # read_mas_adapter_string = f"[Key adapters: {' '.join(read_mas_adapters)}]"
 
     f.suptitle(
         r"$\bf{" + read.query_name.replace("_", "\\_") + "}$" + f"\n{qual_string}{np_string}"
         f"[{len(read.query_sequence)} bp]    {is_rc_string}    "
-        r"[$\bf{" + library_model.name.replace("_", "\\_") + "}$" + f" model score: {logp:.2f}]\n"
-        f"{is_valid_order_string}    {read_mas_adapter_string}    {valid_library_order_string}",
+        r"[$\bf{" + library_model.name.replace("_", "\\_") + "}$" + f" model score: {logp:.2f}]\n",
+        # f"{is_valid_order_string}    {read_mas_adapter_string}    {valid_library_order_string}",
         fontsize=16
     )
 

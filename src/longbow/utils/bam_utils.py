@@ -310,7 +310,7 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
 
 def collapse_annotations(path):
     """Collapses given path into a list of SegmentInfo objects."""
-    segments = []
+    segment_ranges = []
 
     cur_state = None
     cur_pos = 0
@@ -327,21 +327,19 @@ def collapse_annotations(path):
                 cur_state = state
 
             if cur_state != state:
-                segments.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
+                segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
                 cur_state = state
-                cur_pos += cur_len + 1
+                cur_pos += cur_len
                 cur_len = 0
 
             if cur_state == state:
                 if op in ['M', 'I', 'RI']:
                     cur_len += oplen
-                elif op in ['D', 'RD']:
-                    cur_len -= oplen
 
-    segments.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
+    segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
 
     collapsed_segments = []
-    for s in segments:
+    for s in segment_ranges:
         collapsed_segments.append(f'{s.name}:{s.start}-{s.end}')
 
     return collapsed_segments

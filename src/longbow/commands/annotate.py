@@ -251,16 +251,16 @@ def get_segments(read):
                 cur_state = state
 
             if cur_state != state:
-                segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
+                segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
                 cur_state = state
-                cur_pos += cur_len + 1
+                cur_pos += cur_len
                 cur_len = 0
 
             if cur_state == state:
                 if op in ['M', 'I', 'RI']:
                     cur_len += oplen
 
-    segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
+    segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
 
     return read.to_string(), segment_ranges, segment_cigars
 
