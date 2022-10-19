@@ -38,6 +38,7 @@ UNLABELED_BARCODE = "unclassified"
 # Constants for bam file reading / writing:
 #######################################
 
+SEGMENTS_CIGAR_TAG = "SC"
 SEGMENTS_TAG = "SG"
 SEGMENTS_QUAL_TAG = "XQ"
 SEGMENTS_RC_TAG = "RC"

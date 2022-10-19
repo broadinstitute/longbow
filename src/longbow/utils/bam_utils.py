@@ -21,9 +21,9 @@ import ssw
 
 from ..meta import VERSION
 
-from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_QUAL_TAG, SEGMENTS_RC_TAG, \
-    SEGMENT_TAG_DELIMITER, READ_MODEL_NAME_TAG, READ_MODEL_SCORE_TAG, READ_APPROX_QUAL_TAG, READ_RAW_UMI_TAG, \
-    READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE
+from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_CIGAR_TAG, SEGMENTS_QUAL_TAG, \
+    SEGMENTS_RC_TAG, SEGMENT_TAG_DELIMITER, READ_MODEL_NAME_TAG, READ_MODEL_SCORE_TAG, READ_APPROX_QUAL_TAG, \
+    READ_RAW_UMI_TAG, READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE
 
 from ..utils.model import LibraryModel
 from ..utils import bam_utils
@@ -310,23 +310,39 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
 
 def collapse_annotations(path):
     """Collapses given path into a list of SegmentInfo objects."""
-    last = ""
-    start = 0
     segments = []
-    i = 0
-    for i, seg in enumerate(path):
-        if ":" in seg:
-            seg, op = re.split(":", seg)
 
-        if seg != last:
-            if i != 0:
-                segments.append(SegmentInfo(last, start, i - 1))
-            last = seg
-            start = i
-    # Don't forget the last one:
-    segments.append(SegmentInfo(last, start, i))
+    cur_state = None
+    cur_pos = 0
+    cur_len = 0
 
-    return segments
+    for p in path:
+        state, ops = re.split(":", p)
+        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
+            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
+            op = q.group(1)
+            oplen = int(q.group(2))
+
+            if cur_state is None:
+                cur_state = state
+
+            if cur_state != state:
+                segments.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
+                cur_state = state
+                cur_pos += cur_len + 1
+                cur_len = 0
+
+            if cur_state == state:
+                if op in ['M', 'I', 'RI']:
+                    cur_len += oplen
+
+    segments.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len}'))
+
+    collapsed_segments = []
+    for s in segments:
+        collapsed_segments.append(f'{s.name}:{s.start}-{s.end}')
+
+    return collapsed_segments
 
 
 def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file):
@@ -342,7 +358,10 @@ def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file):
     )
 
     # Set our tag and write out the read to the annotated file:
-    read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join(ppath))
+    segments = collapse_annotations(ppath)
+
+    read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join(segments))
+    read.set_tag(SEGMENTS_CIGAR_TAG, SEGMENT_TAG_DELIMITER.join(ppath))
 
     # Set the model info tags:
     read.set_tag(READ_MODEL_SCORE_TAG, logp)
