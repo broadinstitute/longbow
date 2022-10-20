@@ -16,6 +16,7 @@ import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
+from ..utils.bam_utils import SegmentInfo
 from .annotate import get_segments
 
 logging.basicConfig(stream=sys.stderr)
@@ -166,13 +167,14 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
 
                 # Get our read segments:
                 try:
-                    _, segments = get_segments(read)
+                    # read.to_string(), segment_ranges, segment_cigars
+                    seq, segment_ranges, segment_cigars = get_segments(read)
                 except KeyError:
                     logger.error(f"Input bam file does not contain longbow segmented reads!  "
                                  f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
                     sys.exit(1)
 
-                is_valid = check_validity(lb_model, segments)
+                is_valid = check_validity(lb_model, segment_ranges)
 
                 if is_valid:
                     logger.debug("Read is %s valid: %s",
@@ -223,11 +225,11 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 
-def check_validity(lb_model, segments):
+def check_validity(lb_model, segment_ranges):
     expected_elements = lb_model.cdna_model['structure']
 
     actual_elements = []
-    for s in segments:
+    for s in segment_ranges:
         actual_elements.append(s.name)
 
     valid = True
