@@ -30,7 +30,7 @@ class LibraryModel:
         self.name = model_name
         self.description = f"{array_model['description']}, {cdna_model['description']}"
         self.array_version = array_model['version']
-        self.cdna_version = array_model['version']
+        self.cdna_version = cdna_model['version']
 
         self.array_model = array_model
         self.cdna_model = cdna_model
@@ -372,6 +372,8 @@ class LibraryModel:
             adapter_def = self.cdna_model['adapters'][adapter_name_i]
 
             if type(adapter_def) is dict:
+                segment_type = list(adapter_def.keys())[0]
+
                 if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
                     l = list(adapter_def.values())[0]
                     model.add_transition(states[f'{adapter_name_i}:M{l}'], states[f'{adapter_name_j}-start'], 1.0)
@@ -475,15 +477,20 @@ class LibraryModel:
 
     @staticmethod
     def has_prebuilt_model(model_name):
-        (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
+        model_name_pieces = re.split('\+', model_name)
 
-        if array_model_name not in ModelBuilder.pre_configured_models['array'].keys():
-            return False
+        if len(model_name_pieces) == 2:
+            array_model_name, cdna_model_name = model_name_pieces
 
-        if cdna_model_name not in ModelBuilder.pre_configured_models['cdna'].keys():
-            return False
+            if array_model_name not in ModelBuilder.pre_configured_models['array'].keys():
+                return False
 
-        return True
+            if cdna_model_name not in ModelBuilder.pre_configured_models['cdna'].keys():
+                return False
+
+            return True
+
+        return False
 
     @staticmethod
     def build_pre_configured_model(model_name):
