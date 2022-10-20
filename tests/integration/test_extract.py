@@ -8,8 +8,8 @@ from longbow.__main__ import main_entry as longbow
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 TEST_PARAMS = [
-    TEST_DATA_FOLDER / "segment" / "mas_15_sc_10x5p_single_none.expected.bam",
-    TEST_DATA_FOLDER / "segment" / "mas_10_sc_10x5p_single_none.expected.bam",
+    TEST_DATA_FOLDER / "segment" / "mas_15+sc_10x5p.expected.bam",
+    TEST_DATA_FOLDER / "segment" / "mas_10+sc_10x5p.expected.bam",
 ]
 
 

@@ -14,12 +14,12 @@ TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 TEST_PARAMS = [
     [
         TEST_DATA_FOLDER / "mas15_test_input.bam",
-        TEST_DATA_FOLDER / "annotate" / "mas15v2_expected.bam",
+        TEST_DATA_FOLDER / "annotate" / "mas_15+sc_10x5p.expected.bam",
         "mas_15+sc_10x5p",
     ],
     [
         TEST_DATA_FOLDER / "mas10_test_input.bam",
-        TEST_DATA_FOLDER / "annotate" / "mas10v2_expected.bam",
+        TEST_DATA_FOLDER / "annotate" / "mas_10+sc_10x5p.expected.bam",
         "mas_10+sc_10x5p",
     ],
 ]

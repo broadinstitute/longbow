@@ -41,7 +41,7 @@ def test_correct(tmpdir, input_data_files):
     args = [
         "correct",
         "-t", 1,
-        "-m", "mas_15_sc_10x5p_single_none",
+        "-m", "mas_15+sc_10x5p",
         "-a", str(TEST_DATA_FOLDER / "barcode_allow_list.txt"),
         str(input_bam),
         "-o", str(actual_bc_corrected_file),
@@ -68,7 +68,7 @@ def test_correct_from_pipe(tmpdir, input_data_files):
     args = [
         "correct",
         "-t", 1,
-        "-m", "mas_15_sc_10x5p_single_none",
+        "-m", "mas_15+sc_10x5p",
         "-a", str(TEST_DATA_FOLDER / "barcode_allow_list.txt"),
         "-o", str(actual_bc_corrected_file),
         "--barcode-uncorrectable-bam", str(actual_bc_uncorrected_file)
