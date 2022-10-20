@@ -15,12 +15,12 @@ TEST_PARAMS = [
     [
         TEST_DATA_FOLDER / "mas15_test_input.bam",
         TEST_DATA_FOLDER / "annotate" / "mas15v2_expected.bam",
-        "mas_15_sc_10x5p_single_none",
+        "mas_15+sc_10x5p",
     ],
     [
         TEST_DATA_FOLDER / "mas10_test_input.bam",
         TEST_DATA_FOLDER / "annotate" / "mas10v2_expected.bam",
-        "mas_10_sc_10x5p_single_none",
+        "mas_10+sc_10x5p",
     ],
 ]
 
