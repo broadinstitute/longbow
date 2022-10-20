@@ -1,0 +1,102 @@
+{
+    "name": "mas_10+spatial_slideseq",
+    "description": "10-element MAS-ISO-seq array, Slide-seq protocol",
+    "array": {
+        "description": "10-element MAS-ISO-seq array",
+        "version": "3.0.0",
+        "structure": [
+            "Q",
+            "C",
+            "M",
+            "I",
+            "O",
+            "J",
+            "B",
+            "D",
+            "K",
+            "H",
+            "R"
+        ],
+        "adapters": {
+            "Q": "AAGCACCATAATGTGT",
+            "C": "ACTCTGTCAGGTCCGA",
+            "M": "ACCTAGATCAGAGCCT",
+            "I": "AGTGCGTTGCGAATTG",
+            "O": "AAGTCACCGGCACCTT",
+            "J": "AATTGCGTAGTTGGCC",
+            "B": "ACTTGTAAGCTGTCTA",
+            "D": "ACCTCCTCCTCCAGAA",
+            "K": "ACACTTGGTCGCAATC",
+            "H": "ATGTTGAATCCTAGCG",
+            "R": "AACCGGACACACTTAG"
+        },
+        "deprecated": false
+    },
+    "cdna": {
+        "description": "Slide-seq protocol",
+        "version": "3.0.0",
+        "structure": [
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        "adapters": {
+            "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+            "SBC2": {
+                "FixedLengthRandomBases": 8
+            },
+            "SLS2": "TCTTCAGCGTTCCCGAGA",
+            "SBC1": {
+                "FixedLengthRandomBases": 6
+            },
+            "UMI": {
+                "FixedLengthRandomBases": 9
+            },
+            "Poly_T": {
+                "HomopolymerRepeat": [
+                    "T",
+                    30
+                ]
+            },
+            "cDNA": "random",
+            "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT"
+        },
+        "named_random_segments": [
+            "UMI",
+            "SBC2",
+            "SBC1",
+            "cDNA"
+        ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+            "UMI": [
+                [
+                    "ZU",
+                    "XU"
+                ],
+                [
+                    "XM",
+                    "XU"
+                ]
+            ],
+            "SBC1": [
+                [
+                    "X1",
+                    "XP"
+                ]
+            ],
+            "SBC2": [
+                [
+                    "X2",
+                    "XR"
+                ]
+            ]
+        },
+        "deprecated": false
+    }
+}

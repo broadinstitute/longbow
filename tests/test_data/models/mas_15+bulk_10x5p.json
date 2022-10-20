@@ -1,0 +1,101 @@
+{
+    "name": "mas_15+bulk_10x5p",
+    "description": "15-element MAS-ISO-seq array, bulk 10x 5' kit",
+    "array": {
+        "description": "15-element MAS-ISO-seq array",
+        "version": "3.0.0",
+        "structure": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G",
+            "H",
+            "I",
+            "J",
+            "K",
+            "L",
+            "M",
+            "N",
+            "O",
+            "P"
+        ],
+        "adapters": {
+            "A": "AGCTTACTTGTGAAGA",
+            "B": "ACTTGTAAGCTGTCTA",
+            "C": "ACTCTGTCAGGTCCGA",
+            "D": "ACCTCCTCCTCCAGAA",
+            "E": "AACCGGACACACTTAG",
+            "F": "AGAGTCCAATTCGCAG",
+            "G": "AATCAAGGCTTAACGG",
+            "H": "ATGTTGAATCCTAGCG",
+            "I": "AGTGCGTTGCGAATTG",
+            "J": "AATTGCGTAGTTGGCC",
+            "K": "ACACTTGGTCGCAATC",
+            "L": "AGTAAGCCTTCGTGTC",
+            "M": "ACCTAGATCAGAGCCT",
+            "N": "AGGTATGCCGGTTAAG",
+            "O": "AAGTCACCGGCACCTT",
+            "P": "ATGAAGTGGCTCGAGA"
+        },
+        "deprecated": false
+    },
+    "cdna": {
+        "description": "bulk 10x 5' kit",
+        "version": "3.0.0",
+        "structure": [
+            "5p_Adapter",
+            "UMI",
+            "SLS",
+            "cDNA",
+            "Poly_A",
+            "sample_index",
+            "3p_Adapter"
+        ],
+        "adapters": {
+            "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+            "UMI": {
+                "FixedLengthRandomBases": 10
+            },
+            "SLS": "TTTCTTATATGGG",
+            "cDNA": "random",
+            "Poly_A": {
+                "HomopolymerRepeat": [
+                    "A",
+                    30
+                ]
+            },
+            "sample_index": {
+                "FixedLengthRandomBases": 10
+            },
+            "3p_Adapter": "CTCTGCGTTGATACCACTGCTT"
+        },
+        "named_random_segments": [
+            "UMI",
+            "cDNA",
+            "sample_index"
+        ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+            "UMI": [
+                [
+                    "ZU",
+                    "XU"
+                ],
+                [
+                    "XM",
+                    "XU"
+                ]
+            ],
+            "sample_index": [
+                [
+                    "id",
+                    "ip"
+                ]
+            ]
+        },
+        "deprecated": false
+    }
+}

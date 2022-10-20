@@ -11,12 +11,12 @@ from ..utils import assert_reads_files_equal
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 TEST_PARAMS = [
     [
-        TEST_DATA_FOLDER / "filter" / "mas15_sc_10x5p_single_none.expected.bam",
-        TEST_DATA_FOLDER / "segment" / "mas_15_sc_10x5p_single_none.expected.bam",
+        TEST_DATA_FOLDER / "filter" / "mas_15+sc_10x5p.expected.bam",
+        TEST_DATA_FOLDER / "segment" / "mas_15+sc_10x5p.expected.bam",
     ],
     [
-        TEST_DATA_FOLDER / "filter" / "mas10_sc_10x5p_single_none.expected.bam",
-        TEST_DATA_FOLDER / "segment" / "mas_10_sc_10x5p_single_none.expected.bam",
+        TEST_DATA_FOLDER / "filter" / "mas_10+sc_10x5p.expected.bam",
+        TEST_DATA_FOLDER / "segment" / "mas_10+sc_10x5p.expected.bam",
     ],
 ]
 

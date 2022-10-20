@@ -646,20 +646,20 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     # this array element / read segment:
     out_segment_ranges = []
     out_segment_cigars = []
-    # out_seg_model_quals = []
+    out_seg_model_quals = []
     segments_to_annotate = []
 
     # Create an array for our segment quality scores so we can index them below:
-    # read_seg_quals = read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG).strip().split(
-    #     longbow.utils.constants.SEGMENT_TAG_DELIMITER)
+    read_seg_quals = read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG).strip().split(
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER)
 
     for i, (r,c) in enumerate(zip(segment_ranges, segment_cigars)):
         if start_coord <= r.start <= end_coord:
             seg_info = SegmentInfo(r.name, r.start - start_coord, r.end - start_coord)
-            out_segment_ranges.append(seg_info)
+            out_segment_ranges.append(f'{seg_info.name}:{seg_info.start}-{seg_info.end}')
             out_segment_cigars.append(c)
 
-            # out_seg_model_quals.append(read_seg_quals[i])
+            out_seg_model_quals.append(read_seg_quals[i])
 
             # If we have to annotate this segment, store it here for annotation later:
             if (model.annotation_segments is not None) and (r.name in model.annotation_segments.keys()):
@@ -668,15 +668,19 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         longbow.utils.constants.SEGMENTS_TAG,
-        # longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segment_ranges]),
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_segment_ranges),
+    )
+
+    a.set_tag(
+        longbow.utils.constants.SEGMENTS_CIGAR_TAG,
         longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_segment_cigars),
     )
 
     # Set our segment quality score tag to only include the segments in this read:
-    # a.set_tag(
-    #     longbow.utils.constants.SEGMENTS_QUAL_TAG,
-    #     longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_seg_model_quals),
-    # )
+    a.set_tag(
+        longbow.utils.constants.SEGMENTS_QUAL_TAG,
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_seg_model_quals),
+    )
 
     # Store tags where we'll record a refined tag instead of extracting query subsequence
     ba_tags = {}

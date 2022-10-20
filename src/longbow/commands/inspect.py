@@ -272,9 +272,9 @@ def annotate_read(read, m, max_length, min_rq):
     fppath = []
     flogp = -math.inf
 
-    if read.has_tag(longbow.utils.constants.SEGMENTS_TAG):
+    if read.has_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG):
         # Set our ppath from the bam file:
-        fppath = re.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER, read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
+        fppath = re.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER, read.get_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG))
 
         # Set our logp from the bam file:
         flogp = read.get_tag(longbow.utils.constants.READ_MODEL_SCORE_TAG)

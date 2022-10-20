@@ -233,14 +233,14 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
 
 def get_segments(read):
     """Get the segments corresponding to a particular read by reading the segments tag information."""
-    segment_cigars = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(longbow.utils.constants.SEGMENT_TAG_DELIMITER) 
+    segment_cigars = read.get_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG).split(longbow.utils.constants.SEGMENT_TAG_DELIMITER) 
     segment_ranges = []
 
     cur_state = None
     cur_pos = 0
     cur_len = 0
 
-    for p in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(longbow.utils.constants.SEGMENT_TAG_DELIMITER):
+    for p in segment_cigars:
         state, ops = re.split(":", p)
         for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
             q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)

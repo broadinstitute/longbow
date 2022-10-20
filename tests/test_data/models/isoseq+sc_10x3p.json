@@ -1,0 +1,75 @@
+{
+    "name": "isoseq+sc_10x3p",
+    "description": "PacBio IsoSeq model, single-cell 10x 3' kit",
+    "array": {
+        "description": "PacBio IsoSeq model",
+        "version": "3.0.0",
+        "structure": [
+            "V",
+            "M"
+        ],
+        "adapters": {
+            "V": "TCTACACGACGCTCTTCCGATCT",
+            "M": "GTACTCTGCGTTGATACCACTGCTT"
+        },
+        "deprecated": false
+    },
+    "cdna": {
+        "description": "single-cell 10x 3' kit",
+        "version": "3.0.0",
+        "structure": [
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        "adapters": {
+            "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+            "CBC": {
+                "FixedLengthRandomBases": 16
+            },
+            "UMI": {
+                "FixedLengthRandomBases": 12
+            },
+            "Poly_T": {
+                "HomopolymerRepeat": [
+                    "T",
+                    30
+                ]
+            },
+            "cDNA": "random",
+            "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT"
+        },
+        "named_random_segments": [
+            "CBC",
+            "UMI",
+            "cDNA"
+        ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+            "UMI": [
+                [
+                    "ZU",
+                    "XU"
+                ],
+                [
+                    "XM",
+                    "XU"
+                ]
+            ],
+            "CBC": [
+                [
+                    "CR",
+                    "XB"
+                ],
+                [
+                    "XC",
+                    "XB"
+                ]
+            ]
+        },
+        "deprecated": false
+    }
+}

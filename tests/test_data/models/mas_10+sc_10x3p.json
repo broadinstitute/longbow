@@ -1,0 +1,93 @@
+{
+    "name": "mas_10+sc_10x3p",
+    "description": "10-element MAS-ISO-seq array, single-cell 10x 3' kit",
+    "array": {
+        "description": "10-element MAS-ISO-seq array",
+        "version": "3.0.0",
+        "structure": [
+            "Q",
+            "C",
+            "M",
+            "I",
+            "O",
+            "J",
+            "B",
+            "D",
+            "K",
+            "H",
+            "R"
+        ],
+        "adapters": {
+            "Q": "AAGCACCATAATGTGT",
+            "C": "ACTCTGTCAGGTCCGA",
+            "M": "ACCTAGATCAGAGCCT",
+            "I": "AGTGCGTTGCGAATTG",
+            "O": "AAGTCACCGGCACCTT",
+            "J": "AATTGCGTAGTTGGCC",
+            "B": "ACTTGTAAGCTGTCTA",
+            "D": "ACCTCCTCCTCCAGAA",
+            "K": "ACACTTGGTCGCAATC",
+            "H": "ATGTTGAATCCTAGCG",
+            "R": "AACCGGACACACTTAG"
+        },
+        "deprecated": false
+    },
+    "cdna": {
+        "description": "single-cell 10x 3' kit",
+        "version": "3.0.0",
+        "structure": [
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        "adapters": {
+            "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+            "CBC": {
+                "FixedLengthRandomBases": 16
+            },
+            "UMI": {
+                "FixedLengthRandomBases": 12
+            },
+            "Poly_T": {
+                "HomopolymerRepeat": [
+                    "T",
+                    30
+                ]
+            },
+            "cDNA": "random",
+            "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT"
+        },
+        "named_random_segments": [
+            "CBC",
+            "UMI",
+            "cDNA"
+        ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+            "UMI": [
+                [
+                    "ZU",
+                    "XU"
+                ],
+                [
+                    "XM",
+                    "XU"
+                ]
+            ],
+            "CBC": [
+                [
+                    "CR",
+                    "XB"
+                ],
+                [
+                    "XC",
+                    "XB"
+                ]
+            ]
+        },
+        "deprecated": false
+    }
+}

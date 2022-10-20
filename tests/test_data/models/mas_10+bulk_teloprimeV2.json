@@ -1,0 +1,74 @@
+{
+    "name": "mas_10+bulk_teloprimeV2",
+    "description": "10-element MAS-ISO-seq array, Lexogen TeloPrime V2 kit",
+    "array": {
+        "description": "10-element MAS-ISO-seq array",
+        "version": "3.0.0",
+        "structure": [
+            "Q",
+            "C",
+            "M",
+            "I",
+            "O",
+            "J",
+            "B",
+            "D",
+            "K",
+            "H",
+            "R"
+        ],
+        "adapters": {
+            "Q": "AAGCACCATAATGTGT",
+            "C": "ACTCTGTCAGGTCCGA",
+            "M": "ACCTAGATCAGAGCCT",
+            "I": "AGTGCGTTGCGAATTG",
+            "O": "AAGTCACCGGCACCTT",
+            "J": "AATTGCGTAGTTGGCC",
+            "B": "ACTTGTAAGCTGTCTA",
+            "D": "ACCTCCTCCTCCAGAA",
+            "K": "ACACTTGGTCGCAATC",
+            "H": "ATGTTGAATCCTAGCG",
+            "R": "AACCGGACACACTTAG"
+        },
+        "deprecated": false
+    },
+    "cdna": {
+        "description": "Lexogen TeloPrime V2 kit",
+        "version": "3.0.0",
+        "structure": [
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        "adapters": {
+            "TPV2_adapter": "CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG",
+            "cDNA": "random",
+            "Poly_A": {
+                "HomopolymerRepeat": [
+                    "A",
+                    30
+                ]
+            },
+            "idx": {
+                "FixedLengthRandomBases": 10
+            },
+            "rev_bind": "CTCTGCGTTGATACCACTGCTT"
+        },
+        "named_random_segments": [
+            "idx",
+            "cDNA"
+        ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+            "idx": [
+                [
+                    "BC",
+                    "XB"
+                ]
+            ]
+        },
+        "deprecated": false
+    }
+}
