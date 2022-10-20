@@ -9,7 +9,7 @@ TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 
 
 @pytest.mark.parametrize("input_bam, model_exp", [
-    [TEST_DATA_FOLDER / "mas15_test_input.bam", "mas_15_sc_10x5p_single_none"],
+    [TEST_DATA_FOLDER / "mas15_test_input.bam", "mas_15+sc_10x5p"],
 ])
 def test_peek_from_file(tmpdir, input_bam, model_exp):
 
@@ -26,7 +26,7 @@ def test_peek_from_file(tmpdir, input_bam, model_exp):
 
 
 @pytest.mark.parametrize("input_bam, model_exp", [
-    [TEST_DATA_FOLDER / "mas15_test_input.bam", "mas_15_sc_10x5p_single_none"],
+    [TEST_DATA_FOLDER / "mas15_test_input.bam", "mas_15+sc_10x5p"],
 ])
 def test_peek_from_pipe(tmpdir, input_bam, model_exp):
     actual_file = tmpdir.join(f"peek_actual_out.{model_exp}.pipe.txt")

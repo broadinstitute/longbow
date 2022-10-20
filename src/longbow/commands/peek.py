@@ -23,6 +23,7 @@ from ..utils import bam_utils
 from ..utils.bam_utils import SegmentInfo
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
+from ..utils.model_utils import ModelBuilder
 
 
 logging.basicConfig(stream=sys.stderr)
@@ -129,10 +130,13 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
 
     # Make all prebuilt models
     models = {}
-    for model_name in LibraryModel.pre_configured_models:
-        if not LibraryModel.pre_configured_models[model_name]['deprecated'] or include_deprecated_models:
-            m = LibraryModel.build_pre_configured_model(model_name)
-            models[model_name] = m
+    for array_model_name in ModelBuilder.pre_configured_models['array']:
+        for cdna_model_name in ModelBuilder.pre_configured_models['cdna']:
+            if not ModelBuilder.pre_configured_models['array'][array_model_name]['deprecated'] and \
+               not ModelBuilder.pre_configured_models['cdna'][cdna_model_name]['deprecated']:
+                model_name = f'{array_model_name}+{cdna_model_name}'
+                m = LibraryModel.build_pre_configured_model(model_name)
+                models[model_name] = m
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None

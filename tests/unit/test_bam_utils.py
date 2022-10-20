@@ -84,7 +84,6 @@ def bam_header_with_program_group(request):
     return header
 
 
-# @pytest.fixture(scope="module", params=list(filter(lambda x: x != "sc_10x5p", model.ModelBuilder.pre_configured_models['cdna'].keys())))
 @pytest.fixture(scope="module", params=list(filter(lambda x: x != "mas_15+sc_10x5p", map(lambda x: f'{x[0]}+{x[1]}', list(itertools.product(list(model.ModelBuilder.pre_configured_models['array'].keys()), list(model.ModelBuilder.pre_configured_models['cdna'].keys())))))))
 def bam_header_with_multiple_program_groups(request):
     rgid = '01234567'
