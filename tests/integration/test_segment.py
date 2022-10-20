@@ -43,5 +43,4 @@ def test_segment_from_pipe(tmpdir, input_bam, expected_bam):
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0
-
     assert_reads_files_equal(actual_bam, expected_bam, order_matters=True)
