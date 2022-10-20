@@ -69,6 +69,11 @@ class ReadSnapshot:
         self.gc = float(sequence.count('C') + sequence.count('G'))/len(sequence)
         self.name = read.qname
 
+    def __eq__(self, other):
+        return self.umi == other.umi and self.type == other.type and self.start == other.start and \
+               self.end == other.end and self.len == other.len and \
+               self.gc == other.gc and self.name == other .name
+
 
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
@@ -133,7 +138,7 @@ def main(umi_length, output_bam, reject_bam, force, pre_extracted, input_bam):
 
     # split reads into groups by locus
     logger.info("Creating locus -> read map...")
-    locus2reads = extract_read_groups(input_bam, umi_length, pre_extracted)
+    locus2reads = create_read_loci(input_bam, umi_length, pre_extracted)
     logger.info("Number of loci: %d", len(locus2reads))
 
     # Reset our position to the start of the input file for our second traversal:
@@ -229,7 +234,7 @@ def read_passes_filters(read, umi_length):
            abs(len(read.get_tag(FINAL_UMI_TAG)) - umi_length) <= MAX_UMI_DELTA_FILTER[ReadType(get_read_type(read)).name]
 
 
-def extract_read_groups(input_bam_fname, umi_length, pre_extracted):
+def create_read_loci(input_bam_fname, umi_length, pre_extracted):
     locus2reads = defaultdict(list)
     n_filtered_umi = 0
     n_filtered_gene = 0
@@ -272,7 +277,7 @@ def can_convert(source, target):
 
 
 def get_unique_targets(reads):
-    return list(set([r for r in reads]))
+    return list(set(reads))
 
 
 def build_graph(reads):
