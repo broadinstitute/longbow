@@ -462,7 +462,7 @@ class ModelBuilder:
             "bulk_10x5p": {
                 "description": "bulk 10x 5' kit",
                 "version": "3.0.0",
-                "array_element_structure": [ "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter" ],
+                "structure": [ "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter" ],
                 "adapters": {
                     "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                     "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
@@ -485,7 +485,7 @@ class ModelBuilder:
             "bulk_teloprimeV2": {
                 "description": "Lexogen TeloPrime V2 kit",
                 "version": "3.0.0",
-                "array_element_structure": [ "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind" ],
+                "structure": [ "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind" ],
                 "adapters": {
                     "TPV2_adapter": "CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG",
                     "cDNA": RANDOM_SEGMENT_NAME,
@@ -511,7 +511,7 @@ class ModelBuilder:
             "spatial_slideseq": {
                 "description": "Slide-seq protocol",
                 "version": "3.0.0",
-                "array_element_structure": [ "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter" ],
+                "structure": [ "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter" ],
                 "adapters": {
                     "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                     "SBC2": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 8},
