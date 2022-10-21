@@ -93,9 +93,8 @@ def assert_reads_files_equal(actual_file, expected_file, order_matters=False, co
 
             nreads_2 = 0
             for r in actual_bam:
-                print(f'{r.query_name} {r.query_name in expected_reads}')
-                # assert r.query_name in expected_reads, f"Read not in expected file: {r.query_name}"
-                # assert_reads_are_equal(r, expected_reads[r.query_name])
+                assert r.query_name in expected_reads, f"Read not in expected file: {r.query_name}"
+                assert_reads_are_equal(r, expected_reads[r.query_name])
                 nreads_2 += 1
 
             assert nreads_2 == len(expected_reads)
