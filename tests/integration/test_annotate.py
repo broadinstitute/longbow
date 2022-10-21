@@ -34,7 +34,7 @@ def test_annotate(tmpdir, input_bam, expected_bam, model_name):
     result = runner.invoke(longbow, args)
 
     assert result.exit_code == 0
-    assert_reads_files_equal(actual_bam, expected_bam, order_matters=True)
+    assert_reads_files_equal(actual_bam, expected_bam, order_matters=False)
 
 
 @pytest.mark.parametrize("input_bam, expected_bam, model_name", TEST_PARAMS)
@@ -47,4 +47,4 @@ def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0
-    assert_reads_files_equal(actual_bam, expected_bam)
+    assert_reads_files_equal(actual_bam, expected_bam, order_matters=False)

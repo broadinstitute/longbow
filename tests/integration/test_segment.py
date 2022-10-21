@@ -24,23 +24,23 @@ TEST_PARAMS = [
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
 def test_segment_from_file(tmpdir, input_bam, expected_bam):
     actual_bam = tmpdir.join(f"segment_actual_out.bam")
-    args = ["segment", "-t", 1, "-f", "-o", actual_bam, str(input_bam)]
+    args = ["segment", "-t", "1", "-f", "-o", actual_bam, str(input_bam)]
 
     runner = CliRunner()
     result = runner.invoke(longbow, args)
 
     assert result.exit_code == 0
-    assert_reads_files_equal(actual_bam, expected_bam, order_matters=True)
+    assert_reads_files_equal(actual_bam, expected_bam, order_matters=False)
 
 
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
 def test_segment_from_pipe(tmpdir, input_bam, expected_bam):
     actual_bam = tmpdir.join(f"segment_actual_out.pipe.bam")
-    args = ["segment", "-t", 1, "-f", "-o", str(actual_bam)]
+    args = ["segment", "-t", "1", "-f", "-o", str(actual_bam)]
 
     runner = CliRunner()
     with open(input_bam, "rb") as fh:
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0
-    assert_reads_files_equal(actual_bam, expected_bam, order_matters=True)
+    assert_reads_files_equal(actual_bam, expected_bam, order_matters=False)
