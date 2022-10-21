@@ -14,7 +14,7 @@ import gzip
 import numpy as np
 import pysam
 
-import editdistance
+from polyleven import levenshtein
 
 from collections import OrderedDict
 from collections import Counter
@@ -763,7 +763,7 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
                         segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
 
                         # Annotate the score
-                        seg_score_string = f" ({len(known_segment_seq) - editdistance.eval(segment_bases, known_segment_seq)}" \
+                        seg_score_string = f" ({len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
                                            f"/{len(known_segment_seq)})"
 
                         # Also annotate the actual length:
@@ -775,7 +775,7 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
                     known_segment_seq = library_model.adapter_dict[lbl]
                     segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
 
-                    seg_score_string = f" ({len(known_segment_seq) - editdistance.eval(segment_bases, known_segment_seq)}" \
+                    seg_score_string = f" ({len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
                                        f"/{len(known_segment_seq)})"
 
             ax.text(

@@ -23,6 +23,7 @@ Commands:
   annotate     Annotate reads in a BAM file with segments from the model.
   convert      Convert reads from fastq{,.gz} files for use with `annotate`.
   correct      Correct tag to values provided in barcode allowlist.
+  correct_umi  Correct UMIs with Set Cover algorithm.
   demultiplex  Separate reads into files based on which model they fit best.
   extract      Extract coding segments from the reads in the given bam.
   filter       Filter reads by conformation to expected segment order.
@@ -32,10 +33,12 @@ Commands:
   peek         Guess the best pre-built array model to use for annotation.
   scsplit      Create files for use in `alevin` for single-cell analysis.
   segment      Segment pre-annotated reads from an input BAM file.
+  sift         Filter segmented reads by conformation to expected cDNA...
   stats        Calculate and produce stats on the given input bam file.
   tagfix       Update longbow read tags after alignment.
   train        Train transition and emission probabilities on real data.
   version      Print the version of longbow.
+
 ```
 
 ## Help for individual commands
