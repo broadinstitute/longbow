@@ -51,17 +51,17 @@ The commands below illustrate the Longbow workflow on a small library of SIRVs (
     wget https://github.com/broadinstitute/longbow/raw/main/tests/test_data/resources/SIRV_Library.fasta
 
     # Basic processing workflow
-    longbow annotate -m mas15v2 mas15_test_input.bam | \  # Annotate reads according to the mas15v2 model
-      tee ann.bam | \                                     # Save annotated BAM for later
-      longbow filter | \                                  # Filter out improperly-constructed arrays
-      longbow segment | \                                 # Segment reads according to the model
-      longbow extract -o filter_passed.bam                # Extract adapter-free cDNA sequences
+    longbow annotate -m mas_15+sc_10x5p mas15_test_input.bam | \  # Annotate reads according to the mas_15+sc_10x5p model
+      tee ann.bam | \                                             # Save annotated BAM for later
+      longbow filter | \                                          # Filter out improperly-constructed arrays
+      longbow segment | \                                         # Segment reads according to the model
+      longbow extract -o filter_passed.bam                        # Extract adapter-free cDNA sequences
 
     # Align reads with long read aligner (e.g. minimap2, pbmm2)
     samtools fastq filter_passed.bam | \
-        minimap2 -ayYL --MD -x splice:hq SIRV_Library.fasta - | \
-        samtools sort > align.bam &&
-        samtools index align.bam
+      minimap2 -ayYL --MD -x splice:hq SIRV_Library.fasta - | \
+      samtools sort > align.bam &&
+      samtools index align.bam
 
 
 Getting help
