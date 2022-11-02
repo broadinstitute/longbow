@@ -48,7 +48,7 @@ class ReadType(enum.Enum):
     CLR = enum.auto()
 
 
-UMI_TAG = "JX"  # "ZU"
+UMI_TAG = "ZU" # "JX"
 FINAL_UMI_TAG = "BX"
 UMI_CORR_TAG = "UX"
 EQ_CLASS_TAG = "eq"
