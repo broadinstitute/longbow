@@ -146,7 +146,7 @@ class LibraryModel:
         Returns: (True|False, # key adapters found, first key adapter index)"""
 
         # Iterate through our given segment names and check if they occur in order:
-        ordered_segment_names = list(map(lambda x: re.split(":", x)[0], segments))
+        ordered_segment_names = tuple([s.name for s in segments])
 
         num_key_adapters_found = 0
         key_adapter_indx = 0

@@ -23,7 +23,7 @@ from ..meta import VERSION
 
 from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_CIGAR_TAG, SEGMENTS_QUAL_TAG, \
     SEGMENTS_RC_TAG, SEGMENT_TAG_DELIMITER, READ_MODEL_NAME_TAG, READ_MODEL_SCORE_TAG, READ_APPROX_QUAL_TAG, \
-    READ_RAW_UMI_TAG, READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE
+    READ_RAW_UMI_TAG, READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE, SEGMENT_POS_DELIMITER
 
 from ..utils.model import LibraryModel
 from ..utils import bam_utils
@@ -49,7 +49,7 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
         return f"SegmentInfo({self.to_tag()})"
 
     def to_tag(self):
-        return f"{self.name}:{self.start}-{self.end}"
+        return f"{self.name}{SEGMENT_POS_DELIMITER}{self.start}-{self.end}"
 
     @classmethod
     def from_tag(cls, tag_string):
@@ -327,7 +327,7 @@ def collapse_annotations(path):
                 cur_state = state
 
             if cur_state != state:
-                segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
+                segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
                 cur_state = state
                 cur_pos += cur_len
                 cur_len = 0
@@ -336,13 +336,9 @@ def collapse_annotations(path):
                 if op in ['M', 'I', 'RI']:
                     cur_len += oplen
 
-    segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
+    segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
 
-    collapsed_segments = []
-    for s in segment_ranges:
-        collapsed_segments.append(f'{s.name}:{s.start}-{s.end}')
-
-    return collapsed_segments
+    return segment_ranges
 
 
 def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file):
@@ -360,7 +356,7 @@ def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file):
     # Set our tag and write out the read to the annotated file:
     segments = collapse_annotations(ppath)
 
-    read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join(segments))
+    read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
     read.set_tag(SEGMENTS_CIGAR_TAG, SEGMENT_TAG_DELIMITER.join(ppath))
 
     # Set the model info tags:
@@ -383,9 +379,7 @@ def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file):
     total_max_score = 0
     score_strings = []
     for s in segments:
-        segment_range = SegmentInfo.from_tag(s)
-
-        score, max_score = get_segment_score(read.query_sequence, segment_range, model, ssw_aligner)
+        score, max_score = get_segment_score(read.query_sequence, s, model, ssw_aligner)
         score_strings.append(f"{score}/{max_score}")
         total_score += score
         total_max_score += max_score

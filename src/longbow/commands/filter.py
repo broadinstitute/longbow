@@ -15,6 +15,7 @@ import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
+from ..utils.bam_utils import SegmentInfo
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("filter")
@@ -122,8 +123,14 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                                   disable=not sys.stdin.isatty(), total=read_count):
                 # Get our read segments:
                 try:
-                    segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
-                        longbow.utils.constants.SEGMENT_TAG_DELIMITER
+                    # Create SegmentInfo objects so we can deal with them better:
+                    segments = tuple(
+                        [
+                            SegmentInfo.from_tag(s) for s in
+                            read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
+                                longbow.utils.constants.SEGMENT_TAG_DELIMITER
+                            )
+                         ]
                     )
                 except KeyError:
                     logger.error(f"Input bam file does not contain longbow segmented reads!  "
@@ -160,7 +167,8 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                                      first_valid_adapter_index,
                                      lb_model.key_adapters[first_valid_adapter_index],
                                      num_valid_adapters,
-                                     lb_model.extract_key_segment_names(segment_names))
+                                     ",".join([s.name for s in segments])
+                        )
 
                     read.set_tag(longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, False)
                     failing_bam_file.write(read)

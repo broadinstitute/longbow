@@ -745,6 +745,7 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
 
     plt.close()
 
+
 def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, **kwargs):
 
     line_length = 150
@@ -768,7 +769,7 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
     collapsed_annotations = bam_utils.collapse_annotations(path)
     read_mas_adapters = [s.name for s in collapsed_annotations if len(s.name) == 1]
     segment_order_valid, key_adapters_found, first_key_adapter_indx = \
-        library_model.validate_segment_order([s.name for s in collapsed_annotations])
+        library_model.validate_segment_order(collapsed_annotations)
 
     valid_library_order_string = f"[{library_model.name} adapters: {' '.join(library_model.key_adapters)}]"
     is_valid_order_string = "[Segment order: Valid]" if segment_order_valid else "[Segment order: INVALID]"

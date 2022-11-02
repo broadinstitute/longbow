@@ -8,6 +8,8 @@ import itertools
 
 from longbow.utils import bam_utils
 from longbow.utils import model
+from longbow.utils import model_utils
+
 
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / "models"
@@ -43,7 +45,7 @@ def bam_header_without_program_group():
     return header
 
 
-@pytest.fixture(scope="module", params=list(map(lambda x: f'{x[0]}+{x[1]}', list(itertools.product(list(model.ModelBuilder.pre_configured_models['array'].keys()), list(model.ModelBuilder.pre_configured_models['cdna'].keys()))))))
+@pytest.fixture(scope="module", params=list(map(lambda x: f'{x[0]}+{x[1]}', list(itertools.product(list(model_utils.ModelBuilder.pre_configured_models['array'].keys()), list(model_utils.ModelBuilder.pre_configured_models['cdna'].keys()))))))
 def bam_header_with_program_group(request):
     rgid = '01234567'
     movie_name = 'm00001e_210000_000000'
@@ -84,7 +86,7 @@ def bam_header_with_program_group(request):
     return header
 
 
-@pytest.fixture(scope="module", params=list(filter(lambda x: x != "mas_15+sc_10x5p", map(lambda x: f'{x[0]}+{x[1]}', list(itertools.product(list(model.ModelBuilder.pre_configured_models['array'].keys()), list(model.ModelBuilder.pre_configured_models['cdna'].keys())))))))
+@pytest.fixture(scope="module", params=list(filter(lambda x: x != "mas_15+sc_10x5p", map(lambda x: f'{x[0]}+{x[1]}', list(itertools.product(list(model_utils.ModelBuilder.pre_configured_models['array'].keys()), list(model_utils.ModelBuilder.pre_configured_models['cdna'].keys())))))))
 def bam_header_with_multiple_program_groups(request):
     rgid = '01234567'
     movie_name = 'm00001e_210000_000000'
@@ -205,14 +207,11 @@ def test_load_models_from_bam_header(bam_header_with_multiple_program_groups):
 
 
 def test_load_model_from_name():
-    for array_model_name in list(model.ModelBuilder.pre_configured_models['array'].keys()):
-        for cdna_model_name in list(model.ModelBuilder.pre_configured_models['cdna'].keys()):
+    for array_model_name in list(model_utils.ModelBuilder.pre_configured_models['array'].keys()):
+        for cdna_model_name in list(model_utils.ModelBuilder.pre_configured_models['cdna'].keys()):
             model_name = f'{array_model_name}+{cdna_model_name}'
 
             lb_models = bam_utils.load_models([model_name])
-
-            # with open(f'{TEST_DATA_FOLDER}/{model_name}.json', 'w') as wf:
-            #     wf.write(lb_models[0].to_json())
 
             stored_model = model.LibraryModel.from_json_file(TEST_DATA_FOLDER / f"{model_name}.json")
 
@@ -220,7 +219,15 @@ def test_load_model_from_name():
 
 
 def test_load_model_from_json():
-    json_string = b'{"name":"mas_3+bulk_teloprimeV2","description":"3-element MAS-ISO-seq array, Lexogen TeloPrime V2 kit","array":{"description":"3-element MAS-ISO-seq array","version":"3.0.0","structure":["A","B","C","D"],"adapters":{"A":"AGCTTACTTGTGAAGA","B":"ACTTGTAAGCTGTCTA","C":"ACTCTGTCAGGTCCGA","D":"ACCTCCTCCTCCAGAA"},"deprecated":false},"cdna":{"description":"Lexogen TeloPrime V2 kit","version":"3.0.0","structure":["TPV2_adapter","cDNA","Poly_A","idx","rev_bind"],"adapters":{"TPV2_adapter":"CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG","cDNA":"random","Poly_A":{"HomopolymerRepeat":["A",30]},"idx":{"FixedLengthRandomBases":10},"rev_bind":"CTCTGCGTTGATACCACTGCTT"},"named_random_segments":["idx","cDNA"],"coding_region":"cDNA","annotation_segments":{"idx":[["BC","XB"]]},"deprecated":false}}'
+    json_string = b'{"name":"mas_3+bulk_teloprimeV2","description":"3-element MAS-ISO-seq array, Lexogen TeloPrime V2' \
+                  b' kit","array":{"description":"3-element MAS-ISO-seq array","version":"3.0.0","structure":["A","B"' \
+                  b',"C","D"],"adapters":{"A":"AGCTTACTTGTGAAGA","B":"ACTTGTAAGCTGTCTA","C":"ACTCTGTCAGGTCCGA","D":' \
+                  b'"ACCTCCTCCTCCAGAA"},"deprecated":false},"cdna":{"description":"Lexogen TeloPrime V2 kit",' \
+                  b'"version":"3.0.0","structure":["TPV2_adapter","cDNA","Poly_A","idx","rev_bind"],"adapters":' \
+                  b'{"TPV2_adapter":"CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG","cDNA":"random","Poly_A"' \
+                  b':{"HomopolymerRepeat":["A",30]},"idx":{"FixedLengthRandomBases":10},"rev_bind":' \
+                  b'"CTCTGCGTTGATACCACTGCTT"},"named_random_segments":["idx","cDNA"],"coding_region":"cDNA",' \
+                  b'"annotation_segments":{"idx":[["BC","XB"]]},"deprecated":false}}'
 
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(json_string)

@@ -58,7 +58,6 @@ class ModelBuilder:
     SUDDEN_END_PROB = 0.01
     MATCH_END_PROB = 0.1
 
-
     @staticmethod
     def make_global_alignment_model(target, name=None):
         logger.debug("Making Model: GLOBAL_ALIGNMENT (%s)", name)
@@ -220,7 +219,8 @@ class ModelBuilder:
             model.add_transition(s[f"{name}:M{c}"], s[f"{name}:M{c + 1}"], ModelBuilder.MATCH_MATCH_PROB)
 
         # Add transitions for the last states:
-        model.add_transition(s[f"{name}:I{expected_length}"], s[f"{name}:I{expected_length}"], ModelBuilder.INDEL_SWITCH_PROB / 2)
+        model.add_transition(s[f"{name}:I{expected_length}"], s[f"{name}:I{expected_length}"],
+                             ModelBuilder.INDEL_SWITCH_PROB / 2)
         model.add_transition(
             s[f"{name}:I{expected_length}"],
             model.end,
@@ -357,7 +357,7 @@ class ModelBuilder:
             "mas_15": {
                 "description": "15-element MAS-ISO-seq array",
                 "version": "3.0.0",
-                "structure": [ "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P" ],
+                "structure": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"],
                 "adapters": {
                     "A": "AGCTTACTTGTGAAGA",
                     "B": "ACTTGTAAGCTGTCTA",
@@ -382,7 +382,7 @@ class ModelBuilder:
             "mas_10": {
                 "description": "10-element MAS-ISO-seq array",
                 "version": "3.0.0",
-                "structure": [ "Q", "C", "M", "I", "O", "J", "B", "D", "K", "H", "R" ],
+                "structure": ["Q", "C", "M", "I", "O", "J", "B", "D", "K", "H", "R"],
                 "adapters": {
                     "Q": "AAGCACCATAATGTGT",
                     "C": "ACTCTGTCAGGTCCGA",
@@ -415,7 +415,7 @@ class ModelBuilder:
             "sc_10x3p": {
                 "description": "single-cell 10x 3' kit",
                 "version": "3.0.0",
-                "structure": [ "5p_Adapter", "CBC", "UMI", "Poly_T", "cDNA", "3p_Adapter" ],
+                "structure": ["5p_Adapter", "CBC", "UMI", "Poly_T", "cDNA", "3p_Adapter"],
                 "adapters": {
                     "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                     "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
@@ -429,8 +429,10 @@ class ModelBuilder:
                 "annotation_segments": {
                     "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
                             (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
-                    "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG),
-                            (longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+                    "CBC": [(longbow.utils.constants.READ_BARCODE_TAG,
+                             longbow.utils.constants.READ_BARCODE_POS_TAG),
+                            (longbow.utils.constants.READ_RAW_BARCODE_TAG,
+                             longbow.utils.constants.READ_BARCODE_POS_TAG)],
                 },
                 "deprecated": False,
             },
@@ -438,7 +440,7 @@ class ModelBuilder:
             "sc_10x5p": {
                 "description": "single-cell 10x 5' kit",
                 "version": "3.0.0",
-                "structure": [ "5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter" ],
+                "structure": ["5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter"],
                 "adapters": {
                     "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                     "CBC": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 16},
@@ -454,7 +456,8 @@ class ModelBuilder:
                     "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
                             (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
                     "CBC": [(longbow.utils.constants.READ_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG),
-                            (longbow.utils.constants.READ_RAW_BARCODE_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
+                            (longbow.utils.constants.READ_RAW_BARCODE_TAG,
+                             longbow.utils.constants.READ_BARCODE_POS_TAG)],
                 },
                 "deprecated": False,
             },
@@ -462,7 +465,7 @@ class ModelBuilder:
             "bulk_10x5p": {
                 "description": "bulk 10x 5' kit",
                 "version": "3.0.0",
-                "structure": [ "5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter" ],
+                "structure": ["5p_Adapter", "UMI", "SLS", "cDNA", "Poly_A", "sample_index", "3p_Adapter"],
                 "adapters": {
                     "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                     "UMI": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 10},
@@ -477,7 +480,8 @@ class ModelBuilder:
                 "annotation_segments": {
                     "UMI": [(longbow.utils.constants.READ_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG),
                             (longbow.utils.constants.READ_RAW_UMI_TAG, longbow.utils.constants.READ_UMI_POS_TAG)],
-                    "sample_index": [(longbow.utils.constants.READ_DEMUX_TAG, longbow.utils.constants.READ_DEMUX_POS_TAG)],
+                    "sample_index": [(longbow.utils.constants.READ_DEMUX_TAG,
+                                      longbow.utils.constants.READ_DEMUX_POS_TAG)],
                 },
                 "deprecated": False,
             },
@@ -485,7 +489,7 @@ class ModelBuilder:
             "bulk_teloprimeV2": {
                 "description": "Lexogen TeloPrime V2 kit",
                 "version": "3.0.0",
-                "structure": [ "TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind" ],
+                "structure": ["TPV2_adapter", "cDNA", "Poly_A", "idx", "rev_bind"],
                 "adapters": {
                     "TPV2_adapter": "CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG",
                     "cDNA": RANDOM_SEGMENT_NAME,
@@ -511,7 +515,7 @@ class ModelBuilder:
             "spatial_slideseq": {
                 "description": "Slide-seq protocol",
                 "version": "3.0.0",
-                "structure": [ "5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter" ],
+                "structure": ["5p_Adapter", "SBC2", "SLS2", "SBC1", "UMI", "Poly_T", "cDNA", "3p_Adapter"],
                 "adapters": {
                     "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
                     "SBC2": {FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME: 8},
