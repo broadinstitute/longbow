@@ -418,7 +418,17 @@ def _adjust_aligned_state_sequence(seq, path, library_model, read_anns):
         if cur_state == 'CBC' or cur_state == 'UMI':
             tag = 'CB' if cur_state == 'CBC' else 'ZU'
             ssw_aligner = ssw.Aligner()
-            s = ssw_aligner.align(cur_seq, read_anns[0][tag])
+            s = None
+            si = 0
+            for i in range(len(read_anns)):
+                s1 = ssw_aligner.align(cur_seq, read_anns[i][tag])
+                if s is None:
+                    s = s1
+                    si = i
+                else:
+                    if s1.score > s.score:
+                        s = s1
+                        si = i
 
             new_cigar = []
             for opgroup in list(filter(None, re.split(r'(\d+[MIDS])', s.cigar))):
@@ -427,7 +437,7 @@ def _adjust_aligned_state_sequence(seq, path, library_model, read_anns):
                 oplen = int(q.group(1))
                 new_cigar.append(f'{op}{oplen}')
 
-            last_path = f"{cur_state}:{''.join(new_cigar)}:{read_anns[0][tag]}"
+            last_path = f"{cur_state}:{''.join(new_cigar)}:{read_anns[si][tag]}"
 
         if last_path != '':
             new_path.append(last_path)
@@ -599,8 +609,10 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
 
     line_length = 150
 
-    new_path = _adjust_aligned_state_sequence(seq, path, library_model, list(map(lambda x: anns[x], name_map[read.query_name])))
-    observed_track, mismatch_track, expected_track, classification_track = _make_aligned_state_sequence(seq, new_path, library_model)
+    if name_map is not None:
+        path = _adjust_aligned_state_sequence(seq, path, library_model, list(map(lambda x: anns[x], name_map[read.query_name])))
+
+    observed_track, mismatch_track, expected_track, classification_track = _make_aligned_state_sequence(seq, path, library_model)
 
     f = plt.figure(figsize=(24, 24))
 
