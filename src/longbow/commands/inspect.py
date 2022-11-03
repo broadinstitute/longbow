@@ -83,7 +83,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     is_flag=True,
     default=False,
     show_default=True,
-    help="Display alignment score for annotated segments."
+    help="Display alignment score for annotated segments.  (--quick mode only)"
 )
 @click.option(
     "--max-length",
@@ -665,7 +665,6 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
                 transform=t,
                 va="bottom",
                 ha="right",
-                #fontsize=8,
             )
             pos1.draw(canvas.get_renderer())
 
