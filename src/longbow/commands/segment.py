@@ -519,9 +519,8 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
     return tuple(delimiter_found), tuple(delimiter_segments)
 
 
-def _write_segmented_read(
-    model, read, segment_ranges, segment_cigars, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi, model_annotates_cbc, model_annotates_umi
-):
+def _write_segmented_read(model, read, segment_ranges, segment_cigars, delimiters, bam_out, barcode_conf_file,
+                          ignore_cbc_and_umi, model_annotates_cbc, model_annotates_umi):
     """Split and write out the segments of each read to the given bam output file.
 
     NOTE: Assumes that all given data are in the forward direction.
@@ -586,8 +585,8 @@ def _write_split_array_element(
     split_read_index
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
-    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segment_ranges, segment_cigars, start_coord,
-                                          split_read_index)
+    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segment_ranges,
+                                          segment_cigars, start_coord, split_read_index)
 
     # Write our barcode confidence to the file if we have to:
     if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
@@ -646,7 +645,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     for i, (r, c) in enumerate(zip(segment_ranges, segment_cigars)):
         if start_coord <= r.start <= end_coord:
             seg_info = SegmentInfo(r.name, r.start - start_coord, r.end - start_coord)
-            out_segment_ranges.append(f'{seg_info.name}:{seg_info.start}-{seg_info.end}')
+            out_segment_ranges.append(seg_info)
             out_segment_cigars.append(c)
 
             out_seg_model_quals.append(read_seg_quals[i])
@@ -658,7 +657,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         longbow.utils.constants.SEGMENTS_TAG,
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_segment_ranges),
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(([s.to_tag() for s in out_segment_ranges])),
     )
 
     a.set_tag(

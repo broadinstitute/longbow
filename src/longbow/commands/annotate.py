@@ -10,6 +10,8 @@ import click
 import click_log
 import tqdm
 
+import ssw
+
 import pysam
 import multiprocessing as mp
 
@@ -229,6 +231,8 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
     """Thread / process fn to write out all our data."""
 
     out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
+
+    ssw_aligner = ssw.Aligner()
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header

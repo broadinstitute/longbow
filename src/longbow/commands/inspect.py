@@ -452,9 +452,8 @@ def _adjust_aligned_state_sequence(seq, path, library_model, read_anns):
                 cur_adapter = None
                 cur_seq = ''
 
-                if cur_state in library_model.adapter_dict and \
-                    cur_state not in library_model.annotation_segments and \
-                    type(library_model.adapter_dict[cur_state]) == str:
+                if cur_state in library_model.adapter_dict and cur_state not in library_model.annotation_segments and \
+                        type(library_model.adapter_dict[cur_state]) == str:
                     cur_adapter = library_model.adapter_dict[cur_state]
 
             for _ in range(oplen):
@@ -491,7 +490,6 @@ def _make_aligned_state_sequence(seq, path, library_model):
 
     seq_pos = 0
     for p in path:
-        #state, ops = re.split(":", p)
         f = re.split(":", p)
         state, ops = f[0], f[1]
 
@@ -505,9 +503,8 @@ def _make_aligned_state_sequence(seq, path, library_model):
                 cur_pos = 0
                 cur_adapter = None
 
-                if cur_state in library_model.adapter_dict and \
-                    cur_state not in library_model.annotation_segments and \
-                    type(library_model.adapter_dict[cur_state]) == str:
+                if cur_state in library_model.adapter_dict and cur_state not in library_model.annotation_segments \
+                        and type(library_model.adapter_dict[cur_state]) == str:
                     cur_adapter = library_model.adapter_dict[cur_state]
                 elif len(f) > 2:
                     cur_adapter = f[2]
@@ -558,6 +555,7 @@ def _make_aligned_state_sequence(seq, path, library_model):
                     seq_pos += 1
 
     return observed_track, mismatch_track, expected_track, classification_track
+
 
 def format_state_sequence(seq, path, library_model, line_length=150):
     color_map = create_colormap_for_model(library_model)
@@ -680,7 +678,6 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
                 transform=t,
                 va="bottom",
                 ha="left",
-                #fontsize=8,
             )
             pos2.draw(canvas.get_renderer())
 
@@ -849,7 +846,8 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
                         logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
 
             # If we want to show the segment scores, we calculate them here:
-            elif show_seg_score and (not library_model.has_named_random_segments or lbl not in library_model.named_random_segments):
+            elif show_seg_score and (not library_model.has_named_random_segments or
+                                     lbl not in library_model.named_random_segments):
 
                 if type(library_model.adapter_dict[lbl]) is dict:
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
@@ -860,7 +858,8 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
                         segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
 
                         # Annotate the score
-                        seg_score_string = f" ({len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
+                        seg_score_string = f" (" \
+                                           f"{len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
                                            f"/{len(known_segment_seq)})"
 
                         # Also annotate the actual length:
@@ -914,8 +913,6 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
 
         # Store our label so we don't write it twice:
         last_label = lbl
-
-    y2tic = ax.text(0, rows - row, f"  {total_bases_seen}", transform=t, ha="left")
 
     plt.savefig(out, bbox_inches="tight")
 

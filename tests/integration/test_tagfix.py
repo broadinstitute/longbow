@@ -37,7 +37,7 @@ def test_tagfix(tmpdir, input_sam, expected_sam):
     assert result.exit_code == 0
 
     # Equal files result as True:
-    assert_reads_files_equal(actual_bam_out, expected_bam, order_matters=False)
+    assert_reads_files_equal(actual_bam_out, expected_bam, order_matters=True)
 
 
 @pytest.mark.parametrize("input_sam, expected_sam", TEST_PARAMS)
@@ -61,4 +61,4 @@ def test_tagfix_from_pipe(tmpdir, input_sam, expected_sam):
     assert result.exit_code == 0
 
     # Equal files result as True:
-    assert_reads_files_equal(actual_bam_out, expected_bam, order_matters=False)
+    assert_reads_files_equal(actual_bam_out, expected_bam, order_matters=True)

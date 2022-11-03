@@ -429,7 +429,9 @@ def _create_extracted_aligned_segment(read, seg_to_extract, cig_to_extract, qual
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
     a.set_tag(longbow.utils.constants.READ_ALTERED_NAME_TAG, f"{read.query_name}/{start_coord}_{end_coord}")
-    a.set_tag(longbow.utils.constants.SEGMENTS_TAG, seg_to_extract.to_tag())
+    a.set_tag(longbow.utils.constants.SEGMENTS_TAG, f"{seg_to_extract.name}"
+                                                    f"{longbow.utils.constants.SEGMENT_POS_DELIMITER}0"
+                                                    f"-{end_coord-start_coord}")
     a.set_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG, cig_to_extract)
     a.set_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG, qual_to_extract)
 

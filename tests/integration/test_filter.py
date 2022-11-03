@@ -30,7 +30,7 @@ def test_filter_from_file(tmpdir, input_bam, expected_bam):
     result = runner.invoke(longbow, args)
 
     assert result.exit_code == 0
-    assert_reads_files_equal(actual_bam, expected_bam, order_matters=False)
+    assert_reads_files_equal(actual_bam, expected_bam, order_matters=True)
 
 
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
@@ -44,4 +44,4 @@ def test_filter_from_pipe(tmpdir, input_bam, expected_bam):
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0
-    assert_reads_files_equal(actual_bam, expected_bam, order_matters=False)
+    assert_reads_files_equal(actual_bam, expected_bam, order_matters=True)
