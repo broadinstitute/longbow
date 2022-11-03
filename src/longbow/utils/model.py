@@ -18,6 +18,9 @@ logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
 
+# NOTE: The backslash here is because the delimiter itself is a plus sign.
+MODEL_NAME_REGEX = re.compile(f"\{MODEL_DESC_DELIMITER}")
+
 
 class LibraryModel:
     """Model describing a given library preparation.
@@ -634,7 +637,7 @@ class LibraryModel:
     def _assert_required_model_fields_are_present(m, required_fields, model_type):
         missing_fields = []
         for f in required_fields:
-            if f not in m and f != "name":
+            if f not in m:
                 missing_fields.append(f)
         if len(missing_fields) > 0:
             message = f"ERROR: {model_type} model does not have the following required fields: " \
@@ -707,11 +710,10 @@ class LibraryModel:
 
         return json.dumps(model_data, indent=indent)
 
-
-
     @staticmethod
     def has_prebuilt_model(model_name):
-        model_name_pieces = re.split('\+', model_name)
+        print(model_name)
+        model_name_pieces = MODEL_NAME_REGEX.split(model_name)
 
         if len(model_name_pieces) == 2:
             array_model_name, cdna_model_name = model_name_pieces
@@ -728,7 +730,7 @@ class LibraryModel:
 
     @staticmethod
     def build_pre_configured_model(model_name):
-        (array_model_name, cdna_model_name) = re.split(r'\+', model_name, 2)
+        (array_model_name, cdna_model_name) = MODEL_NAME_REGEX.split(model_name, 2)
 
         lb = LibraryModel(
             array_model=ModelBuilder.pre_configured_models['array'][array_model_name], 

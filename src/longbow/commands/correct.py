@@ -231,7 +231,7 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
             worker_process_pool.append(p)
 
         # Get header for output file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, model=lb_model)
 
         # Start output worker:
         res = manager.dict({"num_ccs_reads": 0, "num_ccs_reads_corrected": 0, "num_ccs_reads_raw_was_correct": 0,

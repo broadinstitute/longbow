@@ -150,7 +150,7 @@ def main(threads, output_bam, model, force, barcode_tag, new_barcode_tag, expand
                   file=sys.stderr)
             sys.exit(1)
 
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, model=lb_model)
 
         # Start output worker:
         res = manager.dict({"num_reads_refined": 0, "num_reads": 0})

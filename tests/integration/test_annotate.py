@@ -30,6 +30,8 @@ def test_annotate(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"{TOOL_NAME}_actual_out.{model_name}.bam")
     args = ["annotate", "-t", 1, "-v", "INFO", "-m", model_name, str(input_bam), "-o", str(actual_bam)]
 
+    print(" ".join([str(a) for a in args]))
+
     runner = CliRunner()
     result = runner.invoke(longbow, args)
 

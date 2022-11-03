@@ -402,7 +402,7 @@ class ModelBuilder:
             "isoseq": {
                 "description": "PacBio IsoSeq model",
                 "version": "3.0.0",
-                "structure": [ "V", "M" ],
+                "structure": ["V", "M"],
                 "adapters": {
                     "V": "TCTACACGACGCTCTTCCGATCT",
                     "M": "GTACTCTGCGTTGATACCACTGCTT",
@@ -547,5 +547,3 @@ class ModelBuilder:
             },
         }
     }
-
-

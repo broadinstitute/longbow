@@ -15,9 +15,10 @@ from networkx.drawing.nx_pydot import write_dot
 
 import matplotlib.pyplot as plt
 
-# from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
+from ..utils.model import MODEL_NAME_REGEX
 from ..utils.model_utils import ModelBuilder
+
 
 from ..utils import cli_utils
 
@@ -65,7 +66,7 @@ def main(list_models, dump):
 
     if dump is not None:
         model_name = dump
-        (array_model_name, cdna_model_name) = re.split(r'\+', model_name, 2)
+        (array_model_name, cdna_model_name) = MODEL_NAME_REGEX.split(model_name, 2)
 
         if array_model_name not in ModelBuilder.pre_configured_models['array'].keys():
             logger.error(f"Given model name '{array_model_name}' not in preconfigured array models "

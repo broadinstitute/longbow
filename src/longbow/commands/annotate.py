@@ -53,8 +53,6 @@ click_log.basic_config(logger)
     "-m",
     "--model",
     type=str,
-    multiple=True,
-    show_default=True,
     help="The model(s) to use for annotation.  If the given value is a pre-configured model name, then that "
          "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
          "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
@@ -165,7 +163,7 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
     for i in range(threads):
         p = mp.Process(
             target=_worker_segmentation_fn,
-            args=(input_data_queue, results, i, lb_models, min_length, max_length, min_rq)
+            args=(input_data_queue, results, i, lb_model, min_length, max_length, min_rq)
         )
         p.start()
         worker_pool.append(p)
@@ -180,13 +178,13 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
             bam_file.seek(start_offset)
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=lb_models)
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, model=lb_model)
 
         # Start output worker:
         res = manager.dict({"num_reads_annotated": 0, "num_sections": 0})
         output_worker = mp.Process(
             target=_write_thread_fn,
-            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, lb_models)
+            args=(results, out_header, output_bam, not sys.stdin.isatty(), res, read_count, lb_model)
         )
         output_worker.start()
 
@@ -227,10 +225,9 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
                 f"Overall processing rate: {res['num_reads_annotated']/(et - t_start):2.2f} reads/s.")
 
 
-def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, lb_models):
+def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar, res, read_count, lb_model):
     """Thread / process fn to write out all our data."""
 
-    lb_models_dict = {k.name: k for k in lb_models}
     out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     with pysam.AlignmentFile(
@@ -256,7 +253,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
                 continue
 
             # Unpack data:
-            read, ppath, logp, is_rc, model_name = raw_data
+            read, ppath, logp, is_rc = raw_data
 
             if read is not None:
                 read = pysam.AlignedSegment.fromstring(read, out_bam_header)
@@ -273,7 +270,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
                     )
 
                 # Write our our read:
-                bam_utils.write_annotated_read(read, ppath, is_rc, logp, lb_models_dict[model_name], out_bam_file)
+                bam_utils.write_annotated_read(read, ppath, is_rc, logp, lb_model, out_bam_file)
 
                 # Increment our counters:
                 res["num_reads_annotated"] += 1
@@ -282,7 +279,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
             pbar.update(1)
 
 
-def _worker_segmentation_fn(in_queue, out_queue, worker_num, lb_models, min_length, max_length, min_rq):
+def _worker_segmentation_fn(in_queue, out_queue, worker_num, lb_model, min_length, max_length, min_rq):
     """Function to run in each subthread / subprocess.
     Segments each read and place the segments in the output queue."""
 
@@ -321,47 +318,39 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, lb_models, min_leng
                          f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
         else:
             # Process and place our data on the output queue:
-            segment_info = _annotate_and_assign_read_to_model(read, lb_models)
+            segment_info = _annotate_and_assign_read_to_model(read, lb_model)
             num_reads_segmented += 1
 
         out_queue.put(segment_info)
         num_reads_processed += 1
 
-    logger.debug(f"Worker %d: Num reads segmented/processed: %d/%d", worker_num, num_reads_segmented, num_reads_processed)
+    logger.debug(f"Worker %d: Num reads segmented/processed: %d/%d", worker_num, num_reads_segmented,
+                 num_reads_processed)
 
 
-def _annotate_and_assign_read_to_model(read, model_list):
-    """Annotate the given read with all given models and assign the read to the model with the best score."""
+def _annotate_and_assign_read_to_model(read, model):
+    """Annotate the given read with the given model."""
 
-    best_model = ""
     best_logp = -math.inf
     best_path = None
     best_fit_is_rc = False
-    model_scores = dict()
-    for model in model_list:
 
-        _, ppath, logp, is_rc = _annotate_read(read, model)
+    _, ppath, logp, is_rc = _annotate_read(read, model)
 
-        model_scores[model.name] = logp
-
-        if logp > best_logp:
-            best_model = model.name
-            best_logp = logp
-            best_path = ppath
-            best_fit_is_rc = is_rc
+    if logp > best_logp:
+        best_logp = logp
+        best_path = ppath
+        best_fit_is_rc = is_rc
 
     # Provide some info as to which model was chosen:
     if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("%s model scores: %s", read.query_name, str(model_scores))
         logger.debug(
-            "Sequence %s scored best with model%s: %s (%2.4f)",
+            "Sequence %s scored best %s." ,
             read.query_name,
-            " in RC " if best_fit_is_rc else "",
-            best_model,
-            best_logp
+            "in RC" if best_fit_is_rc else "in forward direction",
         )
 
-    return read.to_string(), best_path, best_logp, best_fit_is_rc, best_model
+    return read.to_string(), best_path, best_logp, best_fit_is_rc
 
 
 def _annotate_read(read, model):

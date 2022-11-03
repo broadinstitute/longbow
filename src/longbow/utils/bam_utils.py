@@ -170,7 +170,7 @@ def compute_shard_offsets(pbi_file, num_shards):
     return shard_offsets, zmw_count_hash, idx_contents.n_reads, read_counts, read_nums
 
 
-def create_bam_header_with_program_group(command_name, base_bam_header, description=None, models=None):
+def create_bam_header_with_program_group(command_name, base_bam_header, description=None, model=None):
     """Create a dictionary with program group (PG) information populated by the given arguments, suitable for
     converting into a pysam.AlignmentHeader object.
 
@@ -184,8 +184,8 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
         description = getdoc(prev_frame.f_globals['main']).split("\n")[0]
 
     # If we have a model here, we should add the description of the model to our program group:
-    if models:
-        description = description + "  MODEL(s): " + ", ".join([m.to_json(indent=None) for m in models])
+    if model:
+        description = description + "  MODEL: " + model.to_json(indent=None)
 
     # Add our program group to it:
     pg_dict = {
@@ -462,8 +462,10 @@ def get_models_from_bam_header(header):
     model_jsons = []
     for pg in header.as_dict()['PG']:
         try:
-            if pg['PN'] == 'longbow' and (pg['ID'].startswith('longbow-annotate') or pg['ID'].startswith('longbow-pad')):
-                desc, models_str = pg['DS'].split('MODEL(s): ')
+            if pg['PN'] == 'longbow' and (pg['ID'].startswith('longbow-annotate') or
+                                          pg['ID'].startswith('longbow-pad')):
+
+                desc, models_str = pg['DS'].split('MODEL: ')
                 model_json = json.loads(models_str)
                 model_jsons.append(model_json)
         except KeyError:

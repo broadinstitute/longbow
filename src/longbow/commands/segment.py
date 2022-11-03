@@ -154,7 +154,7 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
                 logger.warning("Model does not have Cell Barcode or UMI tags.  All segments will be emitted.")
                 ignore_cbc_and_umi = True
 
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, model=lb_model)
 
         # Start output worker:
         res = manager.dict({"num_reads_segmented": 0, "num_segments": 0})
