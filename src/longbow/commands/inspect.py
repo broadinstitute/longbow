@@ -738,11 +738,39 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
     plt.close()
 
 
+def _expand_cigar_sequence(cigar_path):
+    """Expand a cigar sequence to a `ppath` list ala the model."""
+    ppath = []
+    op_re = re.compile("([A-Za-z]+)(\d+)")
+    for p in cigar_path:
+        # Get our segment:
+        seg = re.split(":", p)[0]
+
+        # Get our cigar operators for this segment:
+        ops_string = re.split(":", p)[1]
+        while len(ops_string) >= 1:
+            m = op_re.match(ops_string)
+            op, count = m.groups()
+
+            # Update our ops string:
+            ops_string = ops_string[m.span()[1]:]
+
+            # We need to ignore deletions:
+            if op != "D":
+                # Add the correct number of operations for this cigar to the ppath:
+                for i in range(int(count)):
+                    ppath.append(f"{seg}:{i}")
+
+    return ppath
+
+
 def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, **kwargs):
 
     line_length = 150
 
-    base_strings, colors, labels = format_state_sequence(seq, path, library_model, line_length=line_length)
+    # TODO: This is a bandaid.  This method should not exist.  Instead we should fix `format_state_sequence`.
+    ppath = _expand_cigar_sequence(path)
+    base_strings, colors, labels = format_state_sequence(seq, ppath, library_model, line_length=line_length)
 
     # Collapse the path here so we can later annotate our reads with the correct scores:
     segments = bam_utils.collapse_annotations(path) if show_seg_score else None
@@ -809,9 +837,9 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
         text.draw(canvas.get_renderer())
         ex = text.get_window_extent()
 
-        # I truly have no idea why I need the 0.36 scaling factor, but if I don't have this, PDF images
+        # I truly have no idea why I need the scaling factor, but if I don't have this, PDF images
         # are super broken.
-        scaling_factor = 1.00 if out.endswith(".png") else 0.36
+        scaling_factor = 1.00 if out.endswith(".png") else 0.72
         t = transforms.offset_copy(
             text.get_transform(), x=scaling_factor * ex.width, units="dots"
         )
@@ -916,7 +944,6 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
     plt.savefig(out, bbox_inches="tight")
 
     plt.close()
-
 
 def _get_segment_bases(seq, position, segments):
     """Get the bases for the whole segment based on the given position in the given sequence."""
