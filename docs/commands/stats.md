@@ -2,7 +2,7 @@
 layout: default
 title: stats 
 description: "Calculate stats on input file."
-nav_order: 14
+nav_order: 13
 parent: Commands
 ---
 

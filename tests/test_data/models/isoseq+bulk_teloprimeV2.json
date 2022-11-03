@@ -12,7 +12,8 @@
             "V": "TCTACACGACGCTCTTCCGATCT",
             "M": "GTACTCTGCGTTGATACCACTGCTT"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "isoseq"
     },
     "cdna": {
         "description": "Lexogen TeloPrime V2 kit",
@@ -51,7 +52,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "bulk_teloprimeV2"
     }
 }
 

@@ -12,7 +12,8 @@
             "V": "TCTACACGACGCTCTTCCGATCT",
             "M": "GTACTCTGCGTTGATACCACTGCTT"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "isoseq"
     },
     "cdna": {
         "description": "Slide-seq protocol",
@@ -79,7 +80,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "spatial_slideseq"
     }
 }
 

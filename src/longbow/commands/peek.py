@@ -271,14 +271,6 @@ def plot_model_counts(res, models, max_width=50.0):
             logger.info(f"  {model_name:>{max_label_width}} {small_block_char} 0 (0.0%)")
 
 
-def get_segments(read):
-    """Get the segments corresponding to a particular read by reading the segments tag information."""
-    return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
-            longbow.utils.constants.SEGMENT_TAG_DELIMITER)
-    ]
-
-
 def _collect_thread_fn(out_queue, out_bam_file_name, disable_pbar, res, read_count):
     """Thread / process fn to write out all our data."""
 

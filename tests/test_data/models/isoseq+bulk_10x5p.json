@@ -12,7 +12,8 @@
             "V": "TCTACACGACGCTCTTCCGATCT",
             "M": "GTACTCTGCGTTGATACCACTGCTT"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "isoseq"
     },
     "cdna": {
         "description": "bulk 10x 5' kit",
@@ -68,7 +69,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "bulk_10x5p"
     }
 }
 

@@ -26,8 +26,6 @@ from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG,
     READ_RAW_UMI_TAG, READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE, SEGMENT_POS_DELIMITER
 
 from ..utils.model import LibraryModel
-from ..utils import bam_utils
-
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("bam_utils")
@@ -228,34 +226,18 @@ def check_for_preexisting_files(file_list, exist_ok=False):
         sys.exit(1)
 
 
-def load_models(models, input_bam=None):
-    """Load LibraryModel objects from a BAM file header, built-in models, or an external JSON file."""
-
-    lb_models = []
-    sources = []
-    if models is None and input_bam is not None:
+def load_model(model, input_bam=None):
+    # Get our model:
+    if model is None and input_bam is not None:
         pysam.set_verbosity(0)
         with pysam.AlignmentFile(input_bam.name, "rb", check_sq=False, require_index=False) as bam_file:
-            if bam_utils.bam_header_has_model(bam_file.header):
-                for model_json in get_models_from_bam_header(bam_file.header):
-                    lb_models.append(LibraryModel.from_json_obj(model_json))
-                    sources.append("BAM header")
-            else:
-                logger.fatal("Model not specified and no model present in BAM header.")
-                sys.exit(1)
+            lb_model = LibraryModel.from_json_obj(get_model_from_bam_header(bam_file.header))
+    elif model is not None and LibraryModel.has_prebuilt_model(model):
+        lb_model = LibraryModel.build_pre_configured_model(model)
     else:
-        for model in models:
-            if LibraryModel.has_prebuilt_model(model):
-                lb_models.append(LibraryModel.build_pre_configured_model(model))
-                sources.append("pre-built models")
-            else:
-                lb_models.append(LibraryModel.from_json_file(model))
-                sources.append("user-supplied JSON")
+        lb_model = LibraryModel.from_json_file(model)
 
-    for lb_model, source in zip(lb_models, sources):
-        logger.info(f"Using {lb_model.name} ({lb_model.description}) from {source}")
-
-    return lb_models
+    return lb_model
 
 
 def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
@@ -516,3 +498,37 @@ def bam_header_has_longbow_command_program_group(header, command):
 
 def generate_read_name(movie_name, zmw, split_read_index):
     return f'{movie_name}/1{zmw:09d}{split_read_index:03d}/ccs'
+
+
+def get_segments(read):
+    """Get the segments corresponding to a particular read by reading the segments tag information."""
+    segment_cigars = read.get_tag(SEGMENTS_CIGAR_TAG).split(SEGMENT_TAG_DELIMITER)
+    segment_ranges = []
+
+    cur_state = None
+    cur_pos = 0
+    cur_len = 0
+
+    for p in segment_cigars:
+        state, ops = re.split(":", p)
+        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
+            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
+            op = q.group(1)
+            oplen = int(q.group(2))
+
+            if cur_state is None:
+                cur_state = state
+
+            if cur_state != state:
+                segment_ranges.append(SegmentInfo(cur_state, cur_pos, cur_pos + cur_len - 1))
+                cur_state = state
+                cur_pos += cur_len
+                cur_len = 0
+
+            if cur_state == state:
+                if op in ['M', 'I', 'RI']:
+                    cur_len += oplen
+
+    segment_ranges.append(SegmentInfo(cur_state, cur_pos, cur_pos + cur_len - 1))
+
+    return read.to_string(), segment_ranges, segment_cigars

@@ -40,7 +40,8 @@
             "O": "AAGTCACCGGCACCTT",
             "P": "ATGAAGTGGCTCGAGA"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "mas_15"
     },
     "cdna": {
         "description": "single-cell 10x 3' kit",
@@ -98,7 +99,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "sc_10x3p"
     }
 }
 

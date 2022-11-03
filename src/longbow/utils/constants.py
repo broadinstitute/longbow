@@ -13,6 +13,8 @@ BARCODE_CONF_FILE_NAME = "barcode_confidence_scores.txt"
 # Constants for model construction:
 #######################################
 
+MODEL_DESC_DELIMITER = "+"
+
 RANDOM_SEGMENT_NAME = "random"
 FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME = "FixedLengthRandomBases"
 HPR_SEGMENT_TYPE_NAME = "HomopolymerRepeat"

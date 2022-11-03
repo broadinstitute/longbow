@@ -28,10 +28,9 @@ Commands:
   extract      Extract coding segments from the reads in the given bam.
   filter       Filter reads by conformation to expected segment order.
   inspect      Inspect the classification results on specified reads.
-  model        Get information about built-in Longbow models.
+  models       Get information about built-in Longbow models.
   pad          Pad tag by specified number of adjacent bases from the read.
   peek         Guess the best pre-built array model to use for annotation.
-  scsplit      Create files for use in `alevin` for single-cell analysis.
   segment      Segment pre-annotated reads from an input BAM file.
   sift         Filter segmented reads by conformation to expected cDNA...
   stats        Calculate and produce stats on the given input bam file.

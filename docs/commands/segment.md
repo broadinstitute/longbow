@@ -2,7 +2,7 @@
 layout: default
 title: segment
 description: "Segment reads."
-nav_order: 13
+nav_order: 12
 parent: Commands
 ---
 

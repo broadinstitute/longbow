@@ -189,53 +189,36 @@ def _compare_models(prebuilt_model, stored_model):
                     assert p[k] == s[k]
 
 
-@pytest.mark.skip(reason="support for annotating reads using multiple models is currently broken")
-@pytest.mark.parametrize("bam_header_with_multiple_program_groups", ['mas_15+bulk_teloprimeV2'], indirect=True)
-def test_load_models_from_bam_header(bam_header_with_multiple_program_groups):
-    with tempfile.NamedTemporaryFile(delete=True) as f:
-        with pysam.AlignmentFile(f.name, "wb", header=bam_header_with_multiple_program_groups) as bf:
-            bf.close()
-
-        lb_models = bam_utils.load_models(None, input_bam=f)
-
-        assert len(lb_models) == 2
-
-        for lb_model in lb_models:
-            stored_model = model.LibraryModel.from_json_file(TEST_DATA_FOLDER / f"{lb_model.name}.json")
-
-            _compare_models(lb_model, stored_model)
-
-
 def test_load_model_from_name():
     for array_model_name in list(model_utils.ModelBuilder.pre_configured_models['array'].keys()):
         for cdna_model_name in list(model_utils.ModelBuilder.pre_configured_models['cdna'].keys()):
             model_name = f'{array_model_name}+{cdna_model_name}'
 
-            lb_models = bam_utils.load_models([model_name])
+            lb_model = bam_utils.load_model(model_name)
 
             stored_model = model.LibraryModel.from_json_file(TEST_DATA_FOLDER / f"{model_name}.json")
 
-            _compare_models(lb_models[0], stored_model)
+            _compare_models(lb_model, stored_model)
 
 
 def test_load_model_from_json():
     json_string = b'{"name":"mas_3+bulk_teloprimeV2","description":"3-element MAS-ISO-seq array, Lexogen TeloPrime V2' \
                   b' kit","array":{"description":"3-element MAS-ISO-seq array","version":"3.0.0","structure":["A","B"' \
                   b',"C","D"],"adapters":{"A":"AGCTTACTTGTGAAGA","B":"ACTTGTAAGCTGTCTA","C":"ACTCTGTCAGGTCCGA","D":' \
-                  b'"ACCTCCTCCTCCAGAA"},"deprecated":false},"cdna":{"description":"Lexogen TeloPrime V2 kit",' \
+                  b'"ACCTCCTCCTCCAGAA"},"deprecated":false,"name":"mas_3"},"cdna":{"description":"Lexogen TeloPrime V2 kit",' \
                   b'"version":"3.0.0","structure":["TPV2_adapter","cDNA","Poly_A","idx","rev_bind"],"adapters":' \
                   b'{"TPV2_adapter":"CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG","cDNA":"random","Poly_A"' \
                   b':{"HomopolymerRepeat":["A",30]},"idx":{"FixedLengthRandomBases":10},"rev_bind":' \
                   b'"CTCTGCGTTGATACCACTGCTT"},"named_random_segments":["idx","cDNA"],"coding_region":"cDNA",' \
-                  b'"annotation_segments":{"idx":[["BC","XB"]]},"deprecated":false}}'
+                  b'"annotation_segments":{"idx":[["BC","XB"]]},"deprecated":false,"name":"bulk_teloprimeV2"}}'
 
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(json_string)
 
-    lb_models = bam_utils.load_models([f.name])
+    lb_model = bam_utils.load_model(f.name)
     stored_model = model.LibraryModel.from_json_obj(json.loads(json_string))
 
-    _compare_models(lb_models[0], stored_model)
+    _compare_models(lb_model, stored_model)
 
 
 def test_reverse_complement():

@@ -4,13 +4,11 @@ import logging
 
 import click_log
 
-from pomegranate import State
 from pomegranate import *
 
 import longbow.utils.constants
 from .constants import RANDOM_SEGMENT_NAME, FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME, HPR_SEGMENT_TYPE_NAME, \
-    RANDOM_SILENT_STATE_A, RANDOM_SILENT_STATE_B, RANDOM_BASE_STATE, START_STATE_INDICATOR, END_STATE_INDICATOR, \
-    BAKE_MERGE_STRATEGY
+    RANDOM_SILENT_STATE_A, RANDOM_SILENT_STATE_B, RANDOM_BASE_STATE, BAKE_MERGE_STRATEGY
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger(__name__)
@@ -377,6 +375,7 @@ class ModelBuilder:
                     "P": "ATGAAGTGGCTCGAGA",
                 },
                 "deprecated": False,
+                "name": "mas_15",
             },
 
             "mas_10": {
@@ -397,6 +396,7 @@ class ModelBuilder:
                     "R": "AACCGGACACACTTAG",
                 },
                 "deprecated": False,
+                "name": "mas_10",
             },
 
             "isoseq": {
@@ -408,6 +408,7 @@ class ModelBuilder:
                     "M": "GTACTCTGCGTTGATACCACTGCTT",
                 },
                 "deprecated": False,
+                "name": "isoseq",
             },
         },
 
@@ -435,6 +436,7 @@ class ModelBuilder:
                              longbow.utils.constants.READ_BARCODE_POS_TAG)],
                 },
                 "deprecated": False,
+                "name": "sc_10x3p",
             },
 
             "sc_10x5p": {
@@ -460,6 +462,7 @@ class ModelBuilder:
                              longbow.utils.constants.READ_BARCODE_POS_TAG)],
                 },
                 "deprecated": False,
+                "name": "sc_10x5p",
             },
 
             "bulk_10x5p": {
@@ -484,6 +487,7 @@ class ModelBuilder:
                                       longbow.utils.constants.READ_DEMUX_POS_TAG)],
                 },
                 "deprecated": False,
+                "name": "bulk_10x5p",
             },
 
             "bulk_teloprimeV2": {
@@ -503,6 +507,7 @@ class ModelBuilder:
                     "idx": [(longbow.utils.constants.READ_INDEX_TAG, longbow.utils.constants.READ_BARCODE_POS_TAG)],
                 },
                 "deprecated": False,
+                "name": "bulk_teloprimeV2",
             },
 
             # The slide-seq model is:
@@ -538,6 +543,9 @@ class ModelBuilder:
                             longbow.utils.constants.READ_SPATIAL_BARCODE2_POS_TAG)],
                 },
                 "deprecated": False,
+                "name": "spatial_slideseq",
             },
         }
     }
+
+

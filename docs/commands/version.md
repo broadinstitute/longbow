@@ -2,7 +2,7 @@
 layout: default
 title: version
 description: "Print version number."
-nav_order: 17
+nav_order: 16
 parent: Commands
 ---
 

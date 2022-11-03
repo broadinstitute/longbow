@@ -17,7 +17,7 @@ from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 from ..utils.bam_utils import SegmentInfo
-from .annotate import get_segments
+from ..utils.bam_utils import get_segments
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("sift")
@@ -97,7 +97,6 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
-    read_count = None
     if os.path.exists(pbi):
         read_count = bam_utils.load_read_count(pbi)
         logger.info("About to Sift %d reads", read_count)
@@ -105,6 +104,10 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
         read_count = bam_utils.get_read_count_from_bam_index(input_bam)
         if read_count:
             logger.info("About to Sift %d reads", read_count)
+
+    # Get our model:
+    lb_model = bam_utils.load_model(model, input_bam)
+    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
     reads_to_ignore = set()
     if ignore_list and os.path.exists(ignore_list):
@@ -126,16 +129,6 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
 
-        # Get our model:
-        if model is None:
-            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        elif model is not None and LibraryModel.has_prebuilt_model(model):
-            lb_model = LibraryModel.build_pre_configured_model(model)
-        else:
-            lb_model = LibraryModel.from_json_file(model)
-
-        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
-
         # Get our header from the input bam file:
         out_header = pysam.AlignmentHeader.from_dict(
             bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
@@ -156,9 +149,12 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
             num_failed = 0
             num_ignored = 0
 
-            stats_file.write('\t'.join(['read_name', 'rq', '5p_Adapter', 'CBC', 'UMI', 'SLS', 'cDNA', 'Poly_A', '3p_Adapter', 'SG']) + '\n')
+            all_model_states = sorted(lb_model.cdna_model['structure'] + lb_model.key_adapters + ["random"])
 
-            for i, read in enumerate(tqdm.tqdm(bam_file, desc="Progress", unit=" read", colour="green", file=sys.stderr, disable=not sys.stdin.isatty(), total=read_count)):
+            stats_file.write('\t'.join(all_model_states) + '\n')
+
+            for i, read in enumerate(tqdm.tqdm(bam_file, desc="Progress", unit=" read", colour="green", file=sys.stderr,
+                                               disable=not sys.stdin.isatty(), total=read_count)):
 
                 if read.query_name in reads_to_ignore:
                     logger.debug(f"Ignoring read: {read.query_name}")
@@ -167,14 +163,13 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
 
                 # Get our read segments:
                 try:
-                    # read.to_string(), segment_ranges, segment_cigars
                     seq, segment_ranges, segment_cigars = get_segments(read)
                 except KeyError:
                     logger.error(f"Input bam file does not contain longbow segmented reads!  "
                                  f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
                     sys.exit(1)
 
-                is_valid = check_validity(lb_model, segment_ranges)
+                is_valid, actual_element_counts = check_validity(lb_model, segment_ranges)
 
                 if is_valid:
                     logger.debug("Read is %s valid: %s",
@@ -190,6 +185,12 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
                                      read.query_name)
 
                     failing_bam_file.write(read)
+
+                    # Write out read info to stats file:
+                    stats_file.write('\t'.join(
+                        [str(actual_element_counts[s]) for s in all_model_states]
+                    ) + '\n')
+
                     num_failed += 1
 
                 if (i % hard_print_interval) == 0:
@@ -245,4 +246,4 @@ def check_validity(lb_model, segment_ranges):
     for e in expected_elements:
         valid &= c[e] == 1
 
-    return valid
+    return valid, c

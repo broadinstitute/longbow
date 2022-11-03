@@ -19,9 +19,7 @@ from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
-from .annotate import SegmentInfo
-from .annotate import get_segments
-
+from ..utils.bam_utils import SegmentInfo, get_segments
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("segment")
@@ -105,6 +103,10 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
     if total_reads:
         logger.info(f"About to segment %d reads.", total_reads)
 
+    # Get our model:
+    lb_model = bam_utils.load_model(model, input_bam)
+    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -132,16 +134,6 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
-
-        # Get our model:
-        if model is None:
-            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        elif model is not None and LibraryModel.has_prebuilt_model(model):
-            lb_model = LibraryModel.build_pre_configured_model(model)
-        else:
-            lb_model = LibraryModel.from_json_file(model)
-
-        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         if ignore_cbc_and_umi:
             logger.info("Ignoring CBC / UMI - all split elements will be written.")
@@ -331,7 +323,7 @@ def create_simple_delimiters(model, num_seqs_from_each_array_element=1):
     return delimiters
 
 
-def segment_read_with_simple_splitting(read, delimiters, segment_ranges=None, segments=None):
+def segment_read_with_simple_splitting(read, delimiters, segment_ranges=None):
     """Segments the given read using the simple splitting algorithm.
 
     NOTE: Assumes that all given data are in the forward direction.
@@ -339,8 +331,6 @@ def segment_read_with_simple_splitting(read, delimiters, segment_ranges=None, se
     :param read: A pysam.AlignedSegment object containing a read that has been segmented.
     :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
     :param segment_ranges: None or A list of SegmentInfo objects representing the segments of the given reads.
-                           If None, will be populated by getting segments from the given read.
-    :param segments: None or A list of cigar-like segment alignments representing the segments of the given reads.
                            If None, will be populated by getting segments from the given read.
     :return: a list of tuples containing the split segments in the given read
     """
@@ -547,7 +537,7 @@ def _write_segmented_read(
     :return: the number of segments written.
     """
 
-    segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segment_ranges, segment_cigars)
+    segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segment_ranges)
 
     sri = 1
     for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
@@ -624,8 +614,8 @@ def _write_split_array_element(
             return True
 
 
-def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segment_ranges, segment_cigars, start_coord,
-                                      split_read_index):
+def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segment_ranges,
+                                      segment_cigars, start_coord, split_read_index):
     """Package an array element into an AlignedSegment from the results of simple splitting rules."""
 
     # Add one to end_coord because coordinates are inclusive:
@@ -653,7 +643,7 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     read_seg_quals = read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG).strip().split(
         longbow.utils.constants.SEGMENT_TAG_DELIMITER)
 
-    for i, (r,c) in enumerate(zip(segment_ranges, segment_cigars)):
+    for i, (r, c) in enumerate(zip(segment_ranges, segment_cigars)):
         if start_coord <= r.start <= end_coord:
             seg_info = SegmentInfo(r.name, r.start - start_coord, r.end - start_coord)
             out_segment_ranges.append(f'{seg_info.name}:{seg_info.start}-{seg_info.end}')

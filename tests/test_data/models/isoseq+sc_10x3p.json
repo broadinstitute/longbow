@@ -12,7 +12,8 @@
             "V": "TCTACACGACGCTCTTCCGATCT",
             "M": "GTACTCTGCGTTGATACCACTGCTT"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "isoseq"
     },
     "cdna": {
         "description": "single-cell 10x 3' kit",
@@ -70,7 +71,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "sc_10x3p"
     }
 }
 

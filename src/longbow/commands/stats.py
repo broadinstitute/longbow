@@ -23,8 +23,7 @@ from ..utils.model import LibraryModel
 
 from . import segment
 
-from .annotate import get_segments
-
+from ..utils.bam_utils import get_segments
 
 plot_title_path_regex = re.compile(r".*/([^/].*?)/*$")
 
@@ -84,7 +83,11 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     if not read_count:
         read_count = bam_utils.get_read_count_from_bam_index(input_bam)
     if read_count:
-        logger.info("Annotating %d reads", read_count)
+        logger.info("Collecting stats on %d reads", read_count)
+
+    # Get our model:
+    lb_model = bam_utils.load_model(model, input_bam)
+    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
     if do_simple_splitting:
         logger.warning("Simple splitting is now the default.  \"-s\" / \"--do-simple-splitting\" is now DEPRECATED.")
@@ -111,16 +114,6 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
-
-        # Get our model:
-        if model is None:
-            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        elif model is not None and LibraryModel.has_prebuilt_model(model):
-            lb_model = LibraryModel.build_pre_configured_model(model)
-        else:
-            lb_model = LibraryModel.from_json_file(model)
-
-        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         # Prepare our delimiters for segmentation below:
         delimiters = segment.create_simple_delimiters(lb_model)

@@ -40,7 +40,8 @@
             "O": "AAGTCACCGGCACCTT",
             "P": "ATGAAGTGGCTCGAGA"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "mas_15"
     },
     "cdna": {
         "description": "Slide-seq protocol",
@@ -107,7 +108,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "spatial_slideseq"
     }
 }
 

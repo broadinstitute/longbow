@@ -30,7 +30,8 @@
             "H": "ATGTTGAATCCTAGCG",
             "R": "AACCGGACACACTTAG"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "mas_10"
     },
     "cdna": {
         "description": "bulk 10x 5' kit",
@@ -86,7 +87,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "bulk_10x5p"
     }
 }
 

@@ -30,7 +30,8 @@
             "H": "ATGTTGAATCCTAGCG",
             "R": "AACCGGACACACTTAG"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "mas_10"
     },
     "cdna": {
         "description": "Slide-seq protocol",
@@ -97,7 +98,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "spatial_slideseq"
     }
 }
 

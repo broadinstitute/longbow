@@ -30,7 +30,8 @@
             "H": "ATGTTGAATCCTAGCG",
             "R": "AACCGGACACACTTAG"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "mas_10"
     },
     "cdna": {
         "description": "single-cell 10x 3' kit",
@@ -88,7 +89,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "sc_10x3p"
     }
 }
 

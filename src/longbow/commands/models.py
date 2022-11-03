@@ -52,35 +52,58 @@ click_log.basic_config(logger)
 def main(list_models, dump):
     """Get information about built-in Longbow models."""
 
-    # logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
     if list_models or (not list_models and dump is None):
         print("Longbow includes the following models:")
 
         print("\nArray models\n============")
-        print_models(ModelBuilder.pre_configured_array_models)
+        print_models(ModelBuilder.pre_configured_models['array'])
 
         print("\ncDNA models\n===========")
-        print_models(ModelBuilder.pre_configured_cdna_models)
+        print_models(ModelBuilder.pre_configured_models['cdna'])
 
         print("\nSpecify a fully combined model via '<array model>+<cDNA model>' syntax, e.g. 'mas_15+sc_10x5p'.")
 
     if dump is not None:
         model_name = dump
-        (array_model_name, cdna_model_name) = re.split('\+', model_name, 2)
+        (array_model_name, cdna_model_name) = re.split(r'\+', model_name, 2)
 
-        if array_model_name not in ModelBuilder.pre_configured_array_models.keys():
-            logger.error(f"Given model name '{array_model_name}' not in preconfigured array models {list(ModelBuilder.pre_configured_array_models.keys())}")
+        if array_model_name not in ModelBuilder.pre_configured_models['array'].keys():
+            logger.error(f"Given model name '{array_model_name}' not in preconfigured array models "
+                         f"{list(ModelBuilder.pre_configured_models['array'].keys())}")
 
-        if cdna_model_name not in ModelBuilder.pre_configured_cdna_models.keys():
-            logger.error(f"Given model name '{cdna_model_name}' not in preconfigured cDNA models {list(ModelBuilder.pre_configured_cdna_models.keys())}")
+        if cdna_model_name not in ModelBuilder.pre_configured_models['cdna'].keys():
+            logger.error(f"Given model name '{cdna_model_name}' not in preconfigured cDNA models "
+                         f"{list(ModelBuilder.pre_configured_models['cdna'].keys())}")
 
+        logger.info(f"Generating model: {model_name}")
         lb = LibraryModel(
-            array_model=ModelBuilder.pre_configured_array_models[array_model_name], 
-            cdna_model=ModelBuilder.pre_configured_cdna_models[cdna_model_name],
+            array_model=ModelBuilder.pre_configured_models['array'][array_model_name],
+            cdna_model=ModelBuilder.pre_configured_models["cdna"][cdna_model_name],
             model_name=model_name
         )
 
+        logger.info(f"Dumping %s: %s", lb.name, lb.description)
+
+        model_dump_base_name = f"longbow_model-{lb.name}-Av{lb.array_version}_Cv{lb.cdna_version}"
+
+        logger.info(f"Dumping dotfile: {model_dump_base_name + '.dot'}")
+        lb.dump_as_dotfile(out_file_name=model_dump_base_name + ".dot", do_subgraphs=False)
+
+        logger.info(f"Dumping simple dotfile: {model_dump_base_name + '.simple.dot'}")
+        lb.dump_as_dotfile_simple(out_file_name=model_dump_base_name + ".simple.dot")
+
+        logger.info(f"Dumping json model specification: {model_dump_base_name + '.spec.json'}")
+        lb.to_json(f"{model_dump_base_name}.spec.json")
+
+        logger.info(f"Dumping dense transition matrix: {model_dump_base_name + '.dense_transition_matrix.pickle'}")
+        with open(f"{model_dump_base_name}.dense_transition_matrix.pickle", 'wb') as f:
+            pickle.dump(lb.hmm.dense_transition_matrix(), f)
+
+        logger.info(f"Dumping emission distributions: {model_dump_base_name + '.emission_distributions.txt'}")
+        with open(f"{model_dump_base_name}.emission_distributions.txt", 'w') as f:
+            print(lb.hmm, file=f, flush=True)
+
+        logger.info(f"Creating model graph from {len(lb.hmm.states)} states...")
         labelsdict = {}
         for s in lb.hmm.states:
             if s.name.endswith('-start') or s.name.endswith('-end'):
@@ -89,39 +112,12 @@ def main(list_models, dump):
                 labelsdict[s] = ''
 
         layout = nx.spring_layout(lb.hmm.graph)
+
+        logger.info("Rendering graph ...")
         nx.draw(lb.hmm.graph, with_labels=True, labels=labelsdict, pos=layout)
-        plt.savefig('plotgraph.png', dpi=300, bbox_inches='tight')
-        # plt.show()
 
-        # Get out model:
-        # if LibraryModel.has_prebuilt_model(model_name):
-        #     m = LibraryModel.build_pre_configured_model(model_name)
-        # else:
-        #     logger.info(f"Loading model from json file: %s", model_name)
-        #     m = LibraryModel.from_json_file(model_name)
-
-        # m = LibraryModel.build_pre_configured_hierarchical_model(model_name)
-
-        # logger.info(f"Dumping %s: %s", model_name, m.description)
-
-        # model_dump_base_name = f"longbow_model_{m.name}.v{m.version}"
-
-        # logger.info(f"Dumping dotfile: {model_dump_base_name + '.dot'}")
-        # m.dump_as_dotfile(out_file_name=model_dump_base_name + ".dot", do_subgraphs=False)
-
-        # logger.info(f"Dumping simple dotfile: {model_dump_base_name + '.simple.dot'}")
-        # m.dump_as_dotfile_simple(out_file_name=model_dump_base_name + ".simple.dot")
-
-        # logger.info(f"Dumping json model specification: {model_dump_base_name + '.spec.json'}")
-        # m.to_json(f"{model_dump_base_name}.spec.json")
-
-        # logger.info(f"Dumping dense transition matrix: {model_dump_base_name + '.dense_transition_matrix.pickle'}")
-        # with open(f"{model_dump_base_name}.dense_transition_matrix.pickle", 'wb') as f:
-        #     pickle.dump(m.hmm.dense_transition_matrix(), f)
-
-        # logger.info(f"Dumping emission distributions: {model_dump_base_name + '.emission_distributions.txt'}")
-        # with open(f"{model_dump_base_name}.emission_distributions.txt", 'w') as f:
-        #     print(m.hmm, file=f, flush=True)
+        logger.info(f"Writing model graph now to {model_dump_base_name}.graph.png ...")
+        plt.savefig(f'{model_dump_base_name}.graph.png', dpi=300, bbox_inches='tight')
 
 
 def print_models(models):

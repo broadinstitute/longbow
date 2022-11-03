@@ -30,7 +30,8 @@
             "H": "ATGTTGAATCCTAGCG",
             "R": "AACCGGACACACTTAG"
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "mas_10"
     },
     "cdna": {
         "description": "Lexogen TeloPrime V2 kit",
@@ -69,7 +70,8 @@
                 ]
             ]
         },
-        "deprecated": false
+        "deprecated": false,
+        "name": "bulk_teloprimeV2"
     }
 }
 
