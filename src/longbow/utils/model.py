@@ -34,7 +34,7 @@ class LibraryModel:
                  do_build=True):
 
         if not model_name:
-            self.name =array_model['name'] + MODEL_DESC_DELIMITER + cdna_model['name']
+            self.name = array_model['name'] + MODEL_DESC_DELIMITER + cdna_model['name']
         else:
             self.name = model_name
 

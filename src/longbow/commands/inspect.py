@@ -142,6 +142,9 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
         logger.info(f"Figure drawing mode: %s", 'simplified' if quick else 'extended')
 
+        if seg_score and not quick:
+            logger.warning(f"Seg score selected, but not using quick mode.  Ignoring --seg-score.")
+
         # If we have read names, we should use them to inspect the file:
         if len(read_names) > 0:
 
@@ -614,28 +617,8 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
     t = ax.transData
     canvas = ax.figure.canvas
 
-    qual_string = f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    " if read.has_tag("rq") else ""
-    np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
-    is_rc_string = "[Direction: RC]" if read.has_tag("RC") and read.get_tag("RC") == 1 else "[Direction: Forward]"
-
-    segment_order_valid = True
-
-    # collapsed_annotations = bam_utils.collapse_annotations(path)
-    # read_mas_adapters = [s.name for s in collapsed_annotations if len(s.name) == 1]
-    # segment_order_valid, key_adapters_found, first_key_adapter_indx = \
-    #     library_model.validate_segment_order([s.name for s in collapsed_annotations])
-
-    valid_library_order_string = f"[{library_model.name} adapters: {' '.join(library_model.key_adapters)}]"
-    is_valid_order_string = "[Segment order: Valid]" if segment_order_valid else "[Segment order: INVALID]"
-    # read_mas_adapter_string = f"[Key adapters: {' '.join(read_mas_adapters)}]"
-
-    f.suptitle(
-        r"$\bf{" + read.query_name.replace("_", "\\_") + "}$" + f"\n{qual_string}{np_string}"
-        f"[{len(read.query_sequence)} bp]    {is_rc_string}    "
-        r"[$\bf{" + library_model.name.replace("_", "\\_") + "}$" + f" model score: {logp:.2f}]\n",
-        # f"{is_valid_order_string}    {read_mas_adapter_string}    {valid_library_order_string}",
-        fontsize=16
-    )
+    collapsed_annotations = bam_utils.collapse_annotations(path)
+    _set_figure_title(f, library_model, logp, collapsed_annotations, read)
 
     f.patch.set_visible(False)
     ax.axis("off")
@@ -781,27 +764,8 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
     t = ax.transData
     canvas = ax.figure.canvas
 
-    qual_string = f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    " if read.has_tag("rq") else ""
-    np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
-    is_rc_string = "[Direction: RC]" if read.has_tag("RC") and read.get_tag("RC") == 1 else "[Direction: Forward]"
-
-    # Calculate whether the read has the correct array structure:
     collapsed_annotations = bam_utils.collapse_annotations(path)
-    read_mas_adapters = [s.name for s in collapsed_annotations if len(s.name) == 1]
-    segment_order_valid, key_adapters_found, first_key_adapter_indx = \
-        library_model.validate_segment_order(collapsed_annotations)
-
-    valid_library_order_string = f"[{library_model.name} adapters: {' '.join(library_model.key_adapters)}]"
-    is_valid_order_string = "[Segment order: Valid]" if segment_order_valid else "[Segment order: INVALID]"
-    read_mas_adapter_string = f"[Key adapters: {' '.join(read_mas_adapters)}]"
-
-    f.suptitle(
-        r"$\bf{" + read.query_name.replace("_", "\\_") + "}$" + f"\n{qual_string}{np_string}"
-        f"[{len(read.query_sequence)} bp]    {is_rc_string}    "
-        r"[$\bf{" + library_model.name.replace("_", "\\_") + "}$" + f" model score: {logp:.2f}]\n"
-        f"{is_valid_order_string}    {read_mas_adapter_string}    {valid_library_order_string}",
-        fontsize=16
-    )
+    _set_figure_title(f, library_model, logp, collapsed_annotations, read)
 
     f.patch.set_visible(False)
     ax.axis("off")
@@ -944,6 +908,32 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
     plt.savefig(out, bbox_inches="tight")
 
     plt.close()
+
+
+def _set_figure_title(f, library_model, logp, collapsed_annotations, read):
+    qual_string = f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    " if read.has_tag("rq") else ""
+    np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
+    is_rc_string = "[Direction: RC]" if read.has_tag("RC") and read.get_tag("RC") == 1 else "[Direction: Forward]"
+
+    # Calculate whether the read has the correct array structure:
+    read_mas_adapters = [s.name for s in collapsed_annotations if s.name in library_model.array_model["structure"]]
+    segment_order_valid, key_adapters_found, first_key_adapter_indx = \
+        library_model.validate_segment_order(collapsed_annotations)
+
+    printed_array_model_name = library_model.array_model['name'].replace('_', '\\_')
+    valid_library_order_string = "[$\\bf{" + printed_array_model_name + "}$ adapters: " + \
+                                 f"{' '.join(library_model.key_adapters)}]"
+    is_valid_order_string = "[Segment order: $\\bf{Valid}$]" if segment_order_valid \
+        else "[Segment order: $\\bf{INVALID}$]"
+    read_mas_adapter_string = f"[Key adapters: {' '.join(read_mas_adapters)}]"
+    f.suptitle(
+        r"$\bf{" + read.query_name.replace("_", "\\_") + "}$" + f"\n{qual_string}{np_string}"
+        f"[{len(read.query_sequence)} bp]    {is_rc_string}    "
+        r"[$\bf{" + library_model.name.replace("_", "\\_") + "}$" + f" model score: {logp:.2f}]\n"
+        f"{is_valid_order_string}    {read_mas_adapter_string}    {valid_library_order_string}",
+        fontsize=16
+    )
+
 
 def _get_segment_bases(seq, position, segments):
     """Get the bases for the whole segment based on the given position in the given sequence."""
