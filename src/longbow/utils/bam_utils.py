@@ -280,7 +280,7 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
         )
 
     # Get our alignment and our score:
-    if segment.end - segment.start > 1:
+    if segment.end - segment.start > 1 and segment.end < len(read_sequence):
         alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], model_seg_sequence)
         optimal_score = alignment.score
     else:
@@ -310,8 +310,13 @@ def collapse_annotations(path):
             if cur_state is None:
                 cur_state = state
 
+<<<<<<< HEAD
             if cur_state != state:
                 segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
+=======
+            if cur_state != state and cur_state != 'random':
+                segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
+>>>>>>> b6f8dbf (WIP)
                 cur_state = state
                 cur_pos += cur_len
                 cur_len = 0
@@ -320,7 +325,16 @@ def collapse_annotations(path):
                 if op in ['M', 'I', 'RI']:
                     cur_len += oplen
 
+<<<<<<< HEAD
     segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
+=======
+    if cur_state != 'random':
+        segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
+
+    collapsed_segments = []
+    for s in segment_ranges:
+        collapsed_segments.append(f'{s.name}:{s.start}-{s.end}')
+>>>>>>> b6f8dbf (WIP)
 
     return segment_ranges
 
