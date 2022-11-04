@@ -22,6 +22,7 @@ from collections import Counter
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils.bam_utils import SegmentInfo
 
 PROG_NAME = "correct_umi"
 
@@ -48,12 +49,13 @@ class ReadType(enum.Enum):
     CLR = enum.auto()
 
 
-UMI_TAG = "ZU" # "JX"
+UMI_TAG = "JX"
 FINAL_UMI_TAG = "BX"
 UMI_CORR_TAG = "UX"
 EQ_CLASS_TAG = "eq"
+
 GENE_TAG = "XG"
-CODING_REGION = "cDNA"
+CODING_REGION = "cDNA"  # TODO: Make this take in / read in a model so that we don't have to specify this.
 READ_QUALITY_TAG = "rq"
 BACK_ALIGNMENT_SCORE_TAG = "JB"
 
@@ -68,12 +70,21 @@ class ReadSnapshot:
         self.len = len(sequence)
         self.gc = float(sequence.count('C') + sequence.count('G'))/len(sequence)
         self.name = read.qname
+    #
+    # def __eq__(self, other):
+    #     return self.umi == other.umi and self.type == other.type and self.start == other.start and \
+    #            self.end == other.end and self.len == other.len and \
+    #            self.gc == other.gc and self.name == other .name
 
-    def __eq__(self, other):
-        return self.umi == other.umi and self.type == other.type and self.start == other.start and \
-               self.end == other.end and self.len == other.len and \
-               self.gc == other.gc and self.name == other .name
-
+############################################################
+import inspect
+import re
+def PDEBUG(x):
+    frame = inspect.currentframe().f_back
+    s = inspect.getframeinfo(frame).code_context[0]
+    r = re.search(r"\((.*)\)", s).group(1)
+    print("{} = {}".format(r,x))
+############################################################
 
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
@@ -114,6 +125,7 @@ class ReadSnapshot:
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(umi_length, output_bam, reject_bam, force, pre_extracted, input_bam):
     """Correct UMIs with Set Cover algorithm."""
+    # This algorithm was originally developed by Victoria Popic and imported into Longbow by Jonn Smith.
 
     t_start = time.time()
 
@@ -203,9 +215,8 @@ def get_read_seq(read, pre_extracted):
     if pre_extracted:
         return read.query_sequence.upper()
     else:
-        start, end = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(f"{CODING_REGION}:", 1)[1].split(",")[
-            0].split("-")
-        return read.query_sequence.upper()[int(start):int(end) + 1]
+        seg = SegmentInfo.from_tag(read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
+        return read.query_sequence.upper()[seg.start:seg.end + 1]
 
 
 def get_back_aln_score(read):
@@ -331,9 +342,11 @@ def process_reads_at_locus(reads, read2umi, umi_length):
         return
 
     graph, target2umi_counts, target2umi_seq = build_graph(reads)
+
     read_ids = list(range(len(reads)))
     umi_groups = min_vertex_cover(read_ids, graph, target2umi_counts, target2umi_seq)
     for group in umi_groups:
+        PDEBUG(group)
         umis = [reads[read_id].umi for read_id in group]
         # pick a umi with maximal support and closest len to UMI_LEN
         umi_max = max(umis, key=lambda t: (umis.count(t), -abs(umi_length - len(t))))

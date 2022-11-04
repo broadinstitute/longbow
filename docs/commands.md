@@ -32,7 +32,7 @@ Commands:
   pad          Pad tag by specified number of adjacent bases from the read.
   peek         Guess the best pre-built array model to use for annotation.
   segment      Segment pre-annotated reads from an input BAM file.
-  sift         Filter segmented reads by conformation to expected cDNA...
+  sift         Filter segmented reads by conformation to expected cDNA.
   stats        Calculate and produce stats on the given input bam file.
   tagfix       Update longbow read tags after alignment.
   train        Train transition and emission probabilities on real data.

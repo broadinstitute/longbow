@@ -14,6 +14,8 @@ Correct UMIs with Set Cover algorithm.
 
 Corrects all UMIs in the given bam file.  
 
+Algorithm originally developed by Victoric Popic.
+
 ### Data Requirements:
 
 - Bam file should be aligned and annotated with genes and transcript equivalence classes prior to running.
@@ -23,6 +25,7 @@ Corrects all UMIs in the given bam file.
 
 The following tags are required in the input file:
 
+- `CB` Cell Barcode
 - `JX` (Adjusted UMI)
 - `eq` (Equivalence class assignment)
 - `XG` (Gene assignment)
