@@ -10,3 +10,12 @@ T2_same_umi_not_corrected_ccs_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9
 T2_same_umi_not_corrected_ccs_3	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAAAAAAA	CB:Z:2	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAAAAAAA	UX:i:0
 T2_same_umi_not_corrected_ccs_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAAAAAAA	CB:Z:2	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAAAAAAA	UX:i:0
 T3_singleton_read	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAAAAAAA	CB:Z:3	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAAAAAAA	UX:i:0
+T4_bad_gene_name	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAAAAAAA	CB:Z:4	eq:Z:A1	XG:Z:A	JB:Z:26/26	BX:Z:AAAAAAAAAA	UX:i:0
+T5_corrected_together_ccs_lev_2_1	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAACAAAA	CB:Z:5	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAACAAAA	UX:i:1
+T5_corrected_together_ccs_lev_2_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:TAAAAACAAA	CB:Z:5	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAACAAAA	UX:i:1
+T5_corrected_together_ccs_lev_2_3	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAATAAAA	CB:Z:5	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAACAAAA	UX:i:1
+T5_corrected_together_ccs_lev_2_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:CAAAAAAAA	CB:Z:5	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAACAAAA	UX:i:1
+T6_not_corrected_ccs_lev_3_1	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAACAACA	CB:Z:6	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAACAACA	UX:i:0
+T6_not_corrected_ccs_lev_3_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:TAAAAACATA	CB:Z:6	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:TAAAAACATA	UX:i:0
+T6_not_corrected_ccs_lev_3_3	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAGTAAAA	CB:Z:6	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAGTAAAA	UX:i:0
+T6_not_corrected_ccs_lev_3_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:CAAAAAAA	CB:Z:6	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAAAAA	UX:i:0

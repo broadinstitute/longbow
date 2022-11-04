@@ -61,7 +61,8 @@ BACK_ALIGNMENT_SCORE_TAG = "JB"
 
 
 class ReadSnapshot:
-    def __init__(self, read, pre_extracted):
+
+    def __init__(self, read, pre_extracted) -> None:
         self.umi = read.get_tag(UMI_TAG)
         self.type = get_read_type(read)
         self.start = read.reference_start
@@ -70,11 +71,15 @@ class ReadSnapshot:
         self.len = len(sequence)
         self.gc = float(sequence.count('C') + sequence.count('G'))/len(sequence)
         self.name = read.qname
-    #
-    # def __eq__(self, other):
-    #     return self.umi == other.umi and self.type == other.type and self.start == other.start and \
-    #            self.end == other.end and self.len == other.len and \
-    #            self.gc == other.gc and self.name == other .name
+
+    def __eq__(self, other) -> bool:
+        return self.umi == other.umi and self.type == other.type and self.start == other.start and \
+               self.end == other.end and self.len == other.len and \
+               self.gc == other.gc and self.name == other .name
+
+    def __hash__(self) -> int:
+        return super().__hash__()
+
 
 ############################################################
 import inspect
@@ -85,6 +90,7 @@ def PDEBUG(x):
     r = re.search(r"\((.*)\)", s).group(1)
     print("{} = {}".format(r,x))
 ############################################################
+
 
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
@@ -242,7 +248,8 @@ def valid_tags(read):
 def read_passes_filters(read, umi_length):
     # filters the read based on the final UMI length and back alignment score
     return get_back_aln_score(read) >= MIN_BACK_ALIGNMENT_SCORE and \
-           abs(len(read.get_tag(FINAL_UMI_TAG)) - umi_length) <= MAX_UMI_DELTA_FILTER[ReadType(get_read_type(read)).name]
+           abs(len(read.get_tag(FINAL_UMI_TAG)) - umi_length) <= \
+           MAX_UMI_DELTA_FILTER[ReadType(get_read_type(read)).name]
 
 
 def create_read_loci(input_bam_fname, umi_length, pre_extracted):
@@ -346,7 +353,6 @@ def process_reads_at_locus(reads, read2umi, umi_length):
     read_ids = list(range(len(reads)))
     umi_groups = min_vertex_cover(read_ids, graph, target2umi_counts, target2umi_seq)
     for group in umi_groups:
-        PDEBUG(group)
         umis = [reads[read_id].umi for read_id in group]
         # pick a umi with maximal support and closest len to UMI_LEN
         umi_max = max(umis, key=lambda t: (umis.count(t), -abs(umi_length - len(t))))
