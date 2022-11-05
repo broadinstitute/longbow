@@ -309,14 +309,11 @@ def collapse_annotations(path):
 
             if cur_state is None:
                 cur_state = state
+                cur_len += oplen
 
-<<<<<<< HEAD
             if cur_state != state:
+                # if cur_len - 1 > 0:
                 segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
-=======
-            if cur_state != state and cur_state != 'random':
-                segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
->>>>>>> b6f8dbf (WIP)
                 cur_state = state
                 cur_pos += cur_len
                 cur_len = 0
@@ -325,16 +322,11 @@ def collapse_annotations(path):
                 if op in ['M', 'I', 'RI']:
                     cur_len += oplen
 
-<<<<<<< HEAD
-    segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
-=======
-    if cur_state != 'random':
-        segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
+    segment_ranges.append(SegmentInfo.from_tag(f'{cur_state}:{cur_pos}-{cur_pos+cur_len-1}'))
 
     collapsed_segments = []
     for s in segment_ranges:
         collapsed_segments.append(f'{s.name}:{s.start}-{s.end}')
->>>>>>> b6f8dbf (WIP)
 
     return segment_ranges
 
