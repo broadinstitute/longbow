@@ -48,7 +48,7 @@ class BarcodeResolutionFailure(enum.Enum):
     "-t",
     "--threads",
     type=int,
-    default=mp.cpu_count() - 1,
+    default=1,
     show_default=True,
     help="number of threads to use (0 for all)",
 )
@@ -164,6 +164,10 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
     logger.info(f"Writing reads with barcodes that could not be corrected to: {barcode_uncorrectable_bam}")
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
+    if threads > 1:
+        logger.warning("You have selected %d threads.  Each thread can use a very large amount of memory.  "
+                       "In the case of the 3' barcode list, each thread will use about 30Gb of ram.  "
+                       "You probably do not want to do this.", threads)
     logger.info(f"Running with {threads} worker subprocess(es)")
 
     logger.info(f"Using CCS Levenshtein distance threshold: {max_hifi_dist}")
@@ -188,17 +192,12 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
     # process_input_data_queue = manager.Queue()
     results = manager.Queue()
 
+    # Get our model:
+    lb_model = bam_utils.load_model(model, input_bam)
+    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
-
-        # Load our model:
-        if model is None:
-            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        elif model is not None and LibraryModel.has_prebuilt_model(model):
-            lb_model = LibraryModel.build_pre_configured_model(model)
-        else:
-            lb_model = LibraryModel.from_json_file(model)
-        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         # Get our barcode length:
         barcode_length = _get_barcode_tag_length_from_model(lb_model, barcode_tag)
@@ -232,7 +231,7 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
             worker_process_pool.append(p)
 
         # Get header for output file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, model=lb_model)
 
         # Start output worker:
         res = manager.dict({"num_ccs_reads": 0, "num_ccs_reads_corrected": 0, "num_ccs_reads_raw_was_correct": 0,

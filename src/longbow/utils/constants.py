@@ -13,6 +13,8 @@ BARCODE_CONF_FILE_NAME = "barcode_confidence_scores.txt"
 # Constants for model construction:
 #######################################
 
+MODEL_DESC_DELIMITER = "+"
+
 RANDOM_SEGMENT_NAME = "random"
 FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME = "FixedLengthRandomBases"
 HPR_SEGMENT_TYPE_NAME = "HomopolymerRepeat"
@@ -38,10 +40,12 @@ UNLABELED_BARCODE = "unclassified"
 # Constants for bam file reading / writing:
 #######################################
 
+SEGMENTS_CIGAR_TAG = "SC"
 SEGMENTS_TAG = "SG"
 SEGMENTS_QUAL_TAG = "XQ"
 SEGMENTS_RC_TAG = "RC"
 SEGMENT_TAG_DELIMITER = ","
+SEGMENT_POS_DELIMITER = ":"
 
 READ_IS_SEGMENTED_TAG = "ZS"
 READ_MODEL_NAME_TAG = "YN"

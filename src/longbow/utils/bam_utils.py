@@ -21,13 +21,11 @@ import ssw
 
 from ..meta import VERSION
 
-from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_QUAL_TAG, SEGMENTS_RC_TAG, \
-    SEGMENT_TAG_DELIMITER, READ_MODEL_NAME_TAG, READ_MODEL_SCORE_TAG, READ_APPROX_QUAL_TAG, READ_RAW_UMI_TAG, \
-    READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE
+from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_CIGAR_TAG, SEGMENTS_QUAL_TAG, \
+    SEGMENTS_RC_TAG, SEGMENT_TAG_DELIMITER, READ_MODEL_NAME_TAG, READ_MODEL_SCORE_TAG, READ_APPROX_QUAL_TAG, \
+    READ_RAW_UMI_TAG, READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE, SEGMENT_POS_DELIMITER
 
 from ..utils.model import LibraryModel
-from ..utils import bam_utils
-
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("bam_utils")
@@ -49,7 +47,7 @@ class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"]
         return f"SegmentInfo({self.to_tag()})"
 
     def to_tag(self):
-        return f"{self.name}:{self.start}-{self.end}"
+        return f"{self.name}{SEGMENT_POS_DELIMITER}{self.start}-{self.end}"
 
     @classmethod
     def from_tag(cls, tag_string):
@@ -172,7 +170,7 @@ def compute_shard_offsets(pbi_file, num_shards):
     return shard_offsets, zmw_count_hash, idx_contents.n_reads, read_counts, read_nums
 
 
-def create_bam_header_with_program_group(command_name, base_bam_header, description=None, models=None):
+def create_bam_header_with_program_group(command_name, base_bam_header, description=None, model=None):
     """Create a dictionary with program group (PG) information populated by the given arguments, suitable for
     converting into a pysam.AlignmentHeader object.
 
@@ -186,8 +184,8 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
         description = getdoc(prev_frame.f_globals['main']).split("\n")[0]
 
     # If we have a model here, we should add the description of the model to our program group:
-    if models:
-        description = description + "  MODEL(s): " + ", ".join([m.to_json(indent=None) for m in models])
+    if model:
+        description = description + "  MODEL: " + model.to_json(indent=None)
 
     # Add our program group to it:
     pg_dict = {
@@ -228,34 +226,20 @@ def check_for_preexisting_files(file_list, exist_ok=False):
         sys.exit(1)
 
 
-def load_models(models, input_bam=None):
-    """Load LibraryModel objects from a BAM file header, built-in models, or an external JSON file."""
+def load_model(model, input_bam=None):
 
-    lb_models = []
-    sources = []
-    if models is None and input_bam is not None:
+    # Get our model:
+    if model is None and input_bam is not None:
         pysam.set_verbosity(0)
-        with pysam.AlignmentFile(input_bam.name, "rb", check_sq=False, require_index=False) as bam_file:
-            if bam_utils.bam_header_has_model(bam_file.header):
-                for model_json in get_models_from_bam_header(bam_file.header):
-                    lb_models.append(LibraryModel.from_json_obj(model_json))
-                    sources.append("BAM header")
-            else:
-                logger.fatal("Model not specified and no model present in BAM header.")
-                sys.exit(1)
+        input_bam_path = input_bam if type(input_bam) is str else input_bam.name
+        with pysam.AlignmentFile(input_bam_path, "rb", check_sq=False, require_index=False) as bam_file:
+            lb_model = LibraryModel.from_json_obj(get_model_from_bam_header(bam_file.header))
+    elif model is not None and LibraryModel.has_prebuilt_model(model):
+        lb_model = LibraryModel.build_pre_configured_model(model)
     else:
-        for model in models:
-            if LibraryModel.has_prebuilt_model(model):
-                lb_models.append(LibraryModel.build_pre_configured_model(model))
-                sources.append("pre-built models")
-            else:
-                lb_models.append(LibraryModel.from_json_file(model))
-                sources.append("user-supplied JSON")
+        lb_model = LibraryModel.from_json_file(model)
 
-    for lb_model, source in zip(lb_models, sources):
-        logger.info(f"Using {lb_model.name} ({lb_model.description}) from {source}")
-
-    return lb_models
+    return lb_model
 
 
 def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
@@ -267,7 +251,7 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     #                         known_segment_seq = base * count
     #                         segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
     #
-    #                         seg_score_string = f" ({len(known_segment_seq) - editdistance.eval(segment_bases, known_segment_seq)}" \
+    #                         seg_score_string = f" ({len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
     #                                            f"/{len(known_segment_seq)})"
 
 
@@ -310,36 +294,56 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
 
 def collapse_annotations(path):
     """Collapses given path into a list of SegmentInfo objects."""
-    last = ""
-    start = 0
-    segments = []
-    i = 0
-    for i, seg in enumerate(path):
-        if seg != last:
-            if i != 0:
-                segments.append(SegmentInfo(last, start, i - 1))
-            last = seg
-            start = i
-    # Don't forget the last one:
-    segments.append(SegmentInfo(last, start, i))
+    segment_ranges = []
 
-    return segments
+    cur_state = None
+    cur_pos = 0
+    cur_len = 0
+
+    for p in path:
+        state, ops = re.split(":", p)
+        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
+            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
+            op = q.group(1)
+            oplen = int(q.group(2))
+
+            if cur_state is None:
+                cur_state = state
+
+            if cur_state != state:
+                segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
+                cur_state = state
+                cur_pos += cur_len
+                cur_len = 0
+
+            if cur_state == state:
+                if op in ['M', 'I', 'RI']:
+                    cur_len += oplen
+
+    segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
+
+    return segment_ranges
 
 
-def write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_bam_file):
+def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file, ssw_aligner=None):
     """Write the given pysam.AlignedSegment read object to the given file with the given metadata."""
 
     # Obligatory log message:
-    logger.debug(
-        "Path for read %s (%2.2f)%s: %s",
-        read.query_name,
-        logp,
-        " (RC)" if is_rc else "",
-        segments,
-    )
+    if logger.isEnabledFor(logging.DEBUG):
+        # in an `if` because the join is work:
+        logger.debug(
+            "Path for read %s (%2.2f)%s: %s",
+            read.query_name,
+            logp,
+            " (RC)" if is_rc else "",
+            ','.join(ppath),
+        )
 
     # Set our tag and write out the read to the annotated file:
+    segments = collapse_annotations(ppath)
+
     read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
+    read.set_tag(SEGMENTS_CIGAR_TAG, SEGMENT_TAG_DELIMITER.join(ppath))
 
     # Set the model info tags:
     read.set_tag(READ_MODEL_SCORE_TAG, logp)
@@ -355,6 +359,9 @@ def write_annotated_read(read, segments, is_rc, logp, model, ssw_aligner, out_ba
         read.query_qualities = quals
 
     # Get our segment scores and set them:
+    if not ssw_aligner:
+        ssw_aligner = ssw.Aligner()
+
     total_score = 0
     total_max_score = 0
     score_strings = []
@@ -460,8 +467,10 @@ def get_models_from_bam_header(header):
     model_jsons = []
     for pg in header.as_dict()['PG']:
         try:
-            if pg['PN'] == 'longbow' and (pg['ID'].startswith('longbow-annotate') or pg['ID'].startswith('longbow-pad')):
-                desc, models_str = pg['DS'].split('MODEL(s): ')
+            if pg['PN'] == 'longbow' and (pg['ID'].startswith('longbow-annotate') or
+                                          pg['ID'].startswith('longbow-pad')):
+
+                desc, models_str = pg['DS'].split('MODEL: ')
                 model_json = json.loads(models_str)
                 model_jsons.append(model_json)
         except KeyError:
@@ -496,3 +505,37 @@ def bam_header_has_longbow_command_program_group(header, command):
 
 def generate_read_name(movie_name, zmw, split_read_index):
     return f'{movie_name}/1{zmw:09d}{split_read_index:03d}/ccs'
+
+
+def get_segments(read):
+    """Get the segments corresponding to a particular read by reading the segments tag information."""
+    segment_cigars = read.get_tag(SEGMENTS_CIGAR_TAG).split(SEGMENT_TAG_DELIMITER)
+    segment_ranges = []
+
+    cur_state = None
+    cur_pos = 0
+    cur_len = 0
+
+    for p in segment_cigars:
+        state, ops = re.split(":", p)
+        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
+            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
+            op = q.group(1)
+            oplen = int(q.group(2))
+
+            if cur_state is None:
+                cur_state = state
+
+            if cur_state != state:
+                segment_ranges.append(SegmentInfo(cur_state, cur_pos, cur_pos + cur_len - 1))
+                cur_state = state
+                cur_pos += cur_len
+                cur_len = 0
+
+            if cur_state == state:
+                if op in ['M', 'I', 'RI']:
+                    cur_len += oplen
+
+    segment_ranges.append(SegmentInfo(cur_state, cur_pos, cur_pos + cur_len - 1))
+
+    return read.to_string(), segment_ranges, segment_cigars

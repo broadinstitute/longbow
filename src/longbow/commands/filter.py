@@ -15,7 +15,7 @@ import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
-from .annotate import get_segments
+from ..utils.bam_utils import SegmentInfo
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("filter")
@@ -84,22 +84,16 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files([output_bam, reject_bam], exist_ok=force)
 
+    # Get our model:
+    lb_model = bam_utils.load_model(model, input_bam)
+    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
     logger.info(f"Writing reads that conform to the model to: {output_bam}")
     logger.info(f"Writing reads that do not conform to the model to: {reject_bam}")
 
     # Open our input bam file:
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
-
-        # Get our model:
-        if model is None:
-            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        elif model is not None and LibraryModel.has_prebuilt_model(model):
-            lb_model = LibraryModel.build_pre_configured_model(model)
-        else:
-            lb_model = LibraryModel.from_json_file(model)
-
-        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
 
         logger.info(f"Filtering according to {lb_model.name} model ordered key adapters: "
                     f"{', '.join(lb_model.key_adapters)}")
@@ -123,7 +117,15 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                                   disable=not sys.stdin.isatty(), total=read_count):
                 # Get our read segments:
                 try:
-                    _, segments = get_segments(read)
+                    # Create SegmentInfo objects so we can deal with them better:
+                    segments = tuple(
+                        [
+                            SegmentInfo.from_tag(s) for s in
+                            read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
+                                longbow.utils.constants.SEGMENT_TAG_DELIMITER
+                            )
+                         ]
+                    )
                 except KeyError:
                     logger.error(f"Input bam file does not contain longbow segmented reads!  "
                                  f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
@@ -133,9 +135,8 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                 read.set_tag(longbow.utils.constants.READ_MODEL_NAME_TAG, lb_model.name)
 
                 # Check to see if the read is valid by this model and write it out:
-                segment_names = [s.name for s in segments]
                 is_valid, num_valid_adapters, first_valid_adapter_index = \
-                    lb_model.validate_segment_order(segment_names)
+                    lb_model.validate_segment_order(segments)
 
                 if is_valid:
                     logger.debug("Read is %s valid: %s: first key adapter: [%d, %s], # key adapters: %d",
@@ -160,7 +161,8 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                                      first_valid_adapter_index,
                                      lb_model.key_adapters[first_valid_adapter_index],
                                      num_valid_adapters,
-                                     lb_model.extract_key_segment_names(segment_names))
+                                     ",".join([s.name for s in segments])
+                        )
 
                     read.set_tag(longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, False)
                     failing_bam_file.write(read)

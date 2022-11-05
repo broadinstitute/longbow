@@ -23,6 +23,7 @@ from ..utils import bam_utils
 from ..utils.bam_utils import SegmentInfo
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
+from ..utils.model_utils import ModelBuilder
 
 
 logging.basicConfig(stream=sys.stderr)
@@ -129,10 +130,13 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
 
     # Make all prebuilt models
     models = {}
-    for model_name in LibraryModel.pre_configured_models:
-        if not LibraryModel.pre_configured_models[model_name]['deprecated'] or include_deprecated_models:
-            m = LibraryModel.build_pre_configured_model(model_name)
-            models[model_name] = m
+    for array_model_name in ModelBuilder.pre_configured_models['array']:
+        for cdna_model_name in ModelBuilder.pre_configured_models['cdna']:
+            if not ModelBuilder.pre_configured_models['array'][array_model_name]['deprecated'] and \
+               not ModelBuilder.pre_configured_models['cdna'][cdna_model_name]['deprecated']:
+                model_name = f'{array_model_name}+{cdna_model_name}'
+                m = LibraryModel.build_pre_configured_model(model_name)
+                models[model_name] = m
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
@@ -265,14 +269,6 @@ def plot_model_counts(res, models, max_width=50.0):
     for model_name in models:
         if model_name not in res:
             logger.info(f"  {model_name:>{max_label_width}} {small_block_char} 0 (0.0%)")
-
-
-def get_segments(read):
-    """Get the segments corresponding to a particular read by reading the segments tag information."""
-    return read.to_string(), [
-        SegmentInfo.from_tag(s) for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
-            longbow.utils.constants.SEGMENT_TAG_DELIMITER)
-    ]
 
 
 def _collect_thread_fn(out_queue, out_bam_file_name, disable_pbar, res, read_count):

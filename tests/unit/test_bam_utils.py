@@ -4,9 +4,12 @@ import pysam
 import tempfile
 import pathlib
 import json
+import itertools
 
 from longbow.utils import bam_utils
 from longbow.utils import model
+from longbow.utils import model_utils
+
 
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / "models"
@@ -42,7 +45,7 @@ def bam_header_without_program_group():
     return header
 
 
-@pytest.fixture(scope="module", params=list(model.LibraryModel.pre_configured_models.keys()))
+@pytest.fixture(scope="module", params=list(map(lambda x: f'{x[0]}+{x[1]}', list(itertools.product(list(model_utils.ModelBuilder.pre_configured_models['array'].keys()), list(model_utils.ModelBuilder.pre_configured_models['cdna'].keys()))))))
 def bam_header_with_program_group(request):
     rgid = '01234567'
     movie_name = 'm00001e_210000_000000'
@@ -83,7 +86,7 @@ def bam_header_with_program_group(request):
     return header
 
 
-@pytest.fixture(scope="module", params=list(filter(lambda x: x != "mas_15_sc_10x5p_single_none", model.LibraryModel.pre_configured_models.keys())))
+@pytest.fixture(scope="module", params=list(filter(lambda x: x != "mas_15+sc_10x5p", map(lambda x: f'{x[0]}+{x[1]}', list(itertools.product(list(model_utils.ModelBuilder.pre_configured_models['array'].keys()), list(model_utils.ModelBuilder.pre_configured_models['cdna'].keys())))))))
 def bam_header_with_multiple_program_groups(request):
     rgid = '01234567'
     movie_name = 'm00001e_210000_000000'
@@ -111,7 +114,7 @@ def bam_header_with_multiple_program_groups(request):
         'SQ': []
     }
 
-    for model_name in ['mas_15_sc_10x5p_single_none', request.param]:
+    for model_name in ['mas_15+sc_10x5p', request.param]:
         model_json = model.LibraryModel.build_pre_configured_model(model_name).to_json(indent=None)
 
         header_dict['PG'].append({
@@ -165,13 +168,11 @@ def test_bam_header_is_missing_model(bam_header_without_program_group):
 def _compare_models(prebuilt_model, stored_model):
     assert prebuilt_model.name == stored_model.name
     assert prebuilt_model.description == stored_model.description
-    assert prebuilt_model.version == stored_model.version
+    assert prebuilt_model.array_version == stored_model.array_version
+    assert prebuilt_model.cdna_version == stored_model.cdna_version
     assert prebuilt_model.array_element_structure == stored_model.array_element_structure
-    assert prebuilt_model.direct_connections_dict == stored_model.direct_connections_dict
-    assert prebuilt_model.end_element_names == stored_model.end_element_names
     assert prebuilt_model.key_adapter_set == stored_model.key_adapter_set
     assert prebuilt_model.key_adapters == stored_model.key_adapters
-    assert prebuilt_model.start_element_names == stored_model.start_element_names
 
     assert prebuilt_model.adapter_dict.keys() == stored_model.adapter_dict.keys()
     for p, s in zip(prebuilt_model.adapter_dict.values(), stored_model.adapter_dict.values()):
@@ -188,40 +189,36 @@ def _compare_models(prebuilt_model, stored_model):
                     assert p[k] == s[k]
 
 
-@pytest.mark.parametrize("bam_header_with_multiple_program_groups", ['mas_15_bulk_teloprimeV2_single_none'], indirect=True)
-def test_load_models_from_bam_header(bam_header_with_multiple_program_groups):
-    with tempfile.NamedTemporaryFile(delete=True) as f:
-        with pysam.AlignmentFile(f.name, "wb", header=bam_header_with_multiple_program_groups) as bf:
-            bf.close()
+def test_load_model_from_name():
+    for array_model_name in list(model_utils.ModelBuilder.pre_configured_models['array'].keys()):
+        for cdna_model_name in list(model_utils.ModelBuilder.pre_configured_models['cdna'].keys()):
+            model_name = f'{array_model_name}+{cdna_model_name}'
 
-        lb_models = bam_utils.load_models(None, input_bam=f)
+            lb_model = bam_utils.load_model(model_name)
 
-        assert len(lb_models) == 2
-
-        for lb_model in lb_models:
-            stored_model = model.LibraryModel.from_json_file(TEST_DATA_FOLDER / f"{lb_model.name}.json")
+            stored_model = model.LibraryModel.from_json_file(TEST_DATA_FOLDER / f"{model_name}.json")
 
             _compare_models(lb_model, stored_model)
 
 
-def test_load_model_from_name():
-    for model_name in list(model.LibraryModel.pre_configured_models.keys()):
-        lb_models = bam_utils.load_models([model_name])
-
-        stored_model = model.LibraryModel.from_json_file(TEST_DATA_FOLDER / f"{model_name}.json")
-
-        _compare_models(lb_models[0], stored_model)
-
-
 def test_load_model_from_json():
-    json_string = b'{"name":"mas3teloprimev2","description":"An example model for a 3-element array.","version":"1.0.0","array_element_structure":[["A","TPV2_adapter","cDNA","Poly_A","idx","rev_bind"],["B","TPV2_adapter","cDNA","Poly_A","idx","rev_bind"], ["C","TPV2_adapter","cDNA","Poly_A","idx","rev_bind","D"]],"adapters":{"TPV2_adapter":"CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG","rev_bind":"CTCTGCGTTGATACCACTGCTT","A":"AGCTTACTTGTGAAGAT","B":"ACTTGTAAGCTGTCTAT","C":"ACTCTGTCAGGTCCGAT","D":"ACCTCCTCCTCCAGAAT","Poly_A":{"HomopolymerRepeat":["A",30]},"idx":{"FixedLengthRandomBases":10},"cDNA":"random"},"direct_connections":{"A":["TPV2_adapter"],"B":["TPV2_adapter"],"C":["TPV2_adapter"],"D":["TPV2_adapter"],"TPV2_adapter":["cDNA"],"cDNA":["Poly_A"],"Poly_A":["idx"],"idx":["rev_bind"],"rev_bind":["B","C","D"]},"start_element_names":["A","TPV2_adapter"],"end_element_names":["rev_bind","D"],"named_random_segments":["idx","cDNA"],"coding_region":"cDNA","annotation_segments":{"idx":[["BC","XB"]]}}\n'
+    json_string = b'{"name":"mas_3+bulk_teloprimeV2","description":"3-element MAS-ISO-seq array, Lexogen TeloPrime V2' \
+                  b' kit","array":{"description":"3-element MAS-ISO-seq array","version":"3.0.0","structure":["A","B"' \
+                  b',"C","D"],"adapters":{"A":"AGCTTACTTGTGAAGA","B":"ACTTGTAAGCTGTCTA","C":"ACTCTGTCAGGTCCGA","D":' \
+                  b'"ACCTCCTCCTCCAGAA"},"deprecated":false,"name":"mas_3"},"cdna":{"description":"Lexogen TeloPrime V2 kit",' \
+                  b'"version":"3.0.0","structure":["TPV2_adapter","cDNA","Poly_A","idx","rev_bind"],"adapters":' \
+                  b'{"TPV2_adapter":"CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG","cDNA":"random","Poly_A"' \
+                  b':{"HomopolymerRepeat":["A",30]},"idx":{"FixedLengthRandomBases":10},"rev_bind":' \
+                  b'"CTCTGCGTTGATACCACTGCTT"},"named_random_segments":["idx","cDNA"],"coding_region":"cDNA",' \
+                  b'"annotation_segments":{"idx":[["BC","XB"]]},"deprecated":false,"name":"bulk_teloprimeV2"}}'
+
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(json_string)
 
-    lb_models = bam_utils.load_models([f.name])
+    lb_model = bam_utils.load_model(f.name)
     stored_model = model.LibraryModel.from_json_obj(json.loads(json_string))
 
-    _compare_models(lb_models[0], stored_model)
+    _compare_models(lb_model, stored_model)
 
 
 def test_reverse_complement():

@@ -14,13 +14,13 @@ TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 TEST_PARAMS = [
     [
         TEST_DATA_FOLDER / "mas15_test_input.bam",
-        TEST_DATA_FOLDER / "annotate" / "mas15v2_expected.bam",
-        "mas_15_sc_10x5p_single_none",
+        TEST_DATA_FOLDER / "annotate" / "mas_15+sc_10x5p.expected.bam",
+        "mas_15+sc_10x5p",
     ],
     [
         TEST_DATA_FOLDER / "mas10_test_input.bam",
-        TEST_DATA_FOLDER / "annotate" / "mas10v2_expected.bam",
-        "mas_10_sc_10x5p_single_none",
+        TEST_DATA_FOLDER / "annotate" / "mas_10+sc_10x5p.expected.bam",
+        "mas_10+sc_10x5p",
     ],
 ]
 
@@ -29,6 +29,8 @@ TEST_PARAMS = [
 def test_annotate(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"{TOOL_NAME}_actual_out.{model_name}.bam")
     args = ["annotate", "-t", 1, "-v", "INFO", "-m", model_name, str(input_bam), "-o", str(actual_bam)]
+
+    print(" ".join([str(a) for a in args]))
 
     runner = CliRunner()
     result = runner.invoke(longbow, args)
@@ -47,4 +49,4 @@ def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0
-    assert_reads_files_equal(actual_bam, expected_bam)
+    assert_reads_files_equal(actual_bam, expected_bam, order_matters=True)

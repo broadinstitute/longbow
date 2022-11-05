@@ -2,7 +2,7 @@
 layout: default
 title: demultiplex
 description: "Demultiplex reads from different array structures."
-nav_order: 4
+nav_order: 5
 parent: Commands
 ---
 

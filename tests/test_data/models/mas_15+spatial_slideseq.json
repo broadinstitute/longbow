@@ -1,0 +1,115 @@
+{
+    "name": "mas_15+spatial_slideseq",
+    "description": "15-element MAS-ISO-seq array, Slide-seq protocol",
+    "array": {
+        "description": "15-element MAS-ISO-seq array",
+        "version": "3.0.0",
+        "structure": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G",
+            "H",
+            "I",
+            "J",
+            "K",
+            "L",
+            "M",
+            "N",
+            "O",
+            "P"
+        ],
+        "adapters": {
+            "A": "AGCTTACTTGTGAAGA",
+            "B": "ACTTGTAAGCTGTCTA",
+            "C": "ACTCTGTCAGGTCCGA",
+            "D": "ACCTCCTCCTCCAGAA",
+            "E": "AACCGGACACACTTAG",
+            "F": "AGAGTCCAATTCGCAG",
+            "G": "AATCAAGGCTTAACGG",
+            "H": "ATGTTGAATCCTAGCG",
+            "I": "AGTGCGTTGCGAATTG",
+            "J": "AATTGCGTAGTTGGCC",
+            "K": "ACACTTGGTCGCAATC",
+            "L": "AGTAAGCCTTCGTGTC",
+            "M": "ACCTAGATCAGAGCCT",
+            "N": "AGGTATGCCGGTTAAG",
+            "O": "AAGTCACCGGCACCTT",
+            "P": "ATGAAGTGGCTCGAGA"
+        },
+        "deprecated": false,
+        "name": "mas_15"
+    },
+    "cdna": {
+        "description": "Slide-seq protocol",
+        "version": "3.0.0",
+        "structure": [
+            "5p_Adapter",
+            "SBC2",
+            "SLS2",
+            "SBC1",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        "adapters": {
+            "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+            "SBC2": {
+                "FixedLengthRandomBases": 8
+            },
+            "SLS2": "TCTTCAGCGTTCCCGAGA",
+            "SBC1": {
+                "FixedLengthRandomBases": 6
+            },
+            "UMI": {
+                "FixedLengthRandomBases": 9
+            },
+            "Poly_T": {
+                "HomopolymerRepeat": [
+                    "T",
+                    30
+                ]
+            },
+            "cDNA": "random",
+            "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT"
+        },
+        "named_random_segments": [
+            "UMI",
+            "SBC2",
+            "SBC1",
+            "cDNA"
+        ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+            "UMI": [
+                [
+                    "ZU",
+                    "XU"
+                ],
+                [
+                    "XM",
+                    "XU"
+                ]
+            ],
+            "SBC1": [
+                [
+                    "X1",
+                    "XP"
+                ]
+            ],
+            "SBC2": [
+                [
+                    "X2",
+                    "XR"
+                ]
+            ]
+        },
+        "deprecated": false,
+        "name": "spatial_slideseq"
+    }
+}
+

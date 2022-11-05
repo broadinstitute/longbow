@@ -1,0 +1,25 @@
+@HD	VN:1.5	SO:unknown	pb:3.0.1
+@SQ	SN:chr1	LN:248956422
+@RG	ID:cd9b433d	PL:PACBIO	DS:READTYPE=CCS;BINDINGKIT=101-894-200;SEQUENCINGKIT=101-826-100;BASECALLERVERSION=5.0.0;FRAMERATEHZ=100.000000	LB:Mouse_Mas-seq_SD	PU:m64013e_211029_235558	SM:Mouse_Mas-seq_SD	PM:SEQUELII	CM:S/P5-C2/5.0-8M
+T7_back_alignment_score_bad_1	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:CAAAAAAA	CB:Z:7	eq:Z:A1	XG:Z:ENSG_A	JB:Z:9/26	BX:Z:CAAAAAAA	UX:i:0
+T17_corrected_ccs_umi_length_test_1	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAAAAAAAAAAA	CB:Z:17	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAAAAAAAAAAA	UX:i:0
+T17_corrected_ccs_umi_length_test_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:TAAAAAAAAAAAAA	CB:Z:17	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:TAAAAAAAAAAAAA	UX:i:0
+T17_corrected_ccs_umi_length_test_3	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAAAA	CB:Z:17	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:0
+T17_corrected_ccs_umi_length_test_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:CAAAAAAAAAAAAA	CB:Z:17	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAAAAAAAAAAA	UX:i:0
+T18_corrected_clr_umi_length_test_1	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:AAAAAAAAAAAAAAA	CB:Z:18	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAAAAAAAAAAAA	UX:i:0
+T18_corrected_clr_umi_length_test_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:TAAAAAAAAAAAAAA	CB:Z:18	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:TAAAAAAAAAAAAAA	UX:i:0
+T18_corrected_clr_umi_length_test_3	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAAA	CB:Z:18	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAAA	UX:i:0
+T18_corrected_clr_umi_length_test_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:CAAAAAAAAAAAAAA	CB:Z:18	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAAAAAAAAAAAA	UX:i:0
+T20_many_reads_at_locus_ccs_and_clr_10	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAA	CB:Z:20	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAA	UX:i:0
+T21_complex_arrangement_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:CAAAA	CB:Z:21	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAA	UX:i:0
+T21_complex_arrangement_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:CAAAA	CB:Z:21	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAA	UX:i:0
+T21_complex_arrangement_9	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:CAAAA	CB:Z:21	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAA	UX:i:0
+T22_reads_pulled_to_bad_umi_1	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_3	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_5	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_6	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_7	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_8	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_9	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1

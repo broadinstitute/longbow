@@ -80,12 +80,8 @@ def main(
     logger.info(f"Running with {threads} worker subprocess(es)")
 
     # Get our model:
-    if LibraryModel.has_prebuilt_model(model):
-        m = LibraryModel.build_pre_configured_model(model)
-    else:
-        logger.info(f"Loading model from json file: %s", model)
-        m = LibraryModel.from_json_file(model)
-    logger.info(f"Using %s: %s", model, m.description)
+    m = bam_utils.load_model(model, training_bam)
+    logger.info(f"Using %s: %s", m.name, m.description)
 
     training_seqs = load_training_seqs(m, num_training_samples, threads, training_bam)
 

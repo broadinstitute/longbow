@@ -8,6 +8,7 @@ import click
 import click_log
 
 from ..utils import bam_utils
+from ..meta import VERSION
 
 import pysam
 
@@ -90,7 +91,7 @@ def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_len
         bam_utils.create_bam_header_with_program_group(
             logger.name,
             pysam.AlignmentHeader().from_dict({
-                "HD": {"VN": "1.0"},
+                "HD": {"VN": f"{VERSION}"},
                 "RG": [{"ID": read_group_id, "SM": sample_name}],
             })
         )

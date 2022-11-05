@@ -19,9 +19,7 @@ from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
-from .annotate import SegmentInfo
-from .annotate import get_segments
-
+from ..utils.bam_utils import SegmentInfo, get_segments
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("segment")
@@ -105,6 +103,10 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
     if total_reads:
         logger.info(f"About to segment %d reads.", total_reads)
 
+    # Get our model:
+    lb_model = bam_utils.load_model(model, input_bam)
+    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -133,16 +135,6 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
         disable=not sys.stdin.isatty(),
     ) as pbar:
 
-        # Get our model:
-        if model is None:
-            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        elif model is not None and LibraryModel.has_prebuilt_model(model):
-            lb_model = LibraryModel.build_pre_configured_model(model)
-        else:
-            lb_model = LibraryModel.from_json_file(model)
-
-        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
-
         if ignore_cbc_and_umi:
             logger.info("Ignoring CBC / UMI - all split elements will be written.")
         else:
@@ -162,7 +154,7 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
                 logger.warning("Model does not have Cell Barcode or UMI tags.  All segments will be emitted.")
                 ignore_cbc_and_umi = True
 
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, model=lb_model)
 
         # Start output worker:
         res = manager.dict({"num_reads_segmented": 0, "num_segments": 0})
@@ -272,21 +264,22 @@ def _sub_process_write_fn(
                 break
 
             # Unpack data:
-            read, segments = raw_data
+            read, segment_ranges, segment_cigars = raw_data
             read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
             # Obligatory log message:
             logger.debug(
                 "Segments for read %s: %s",
                 read.query_name,
-                segments,
+                segment_ranges,
             )
 
             # Write out our segmented reads:
             res["num_segments"] += _write_segmented_read(
                 model,
                 read,
-                segments,
+                segment_ranges,
+                segment_cigars,
                 delimiters,
                 out_bam_file,
                 barcode_conf_file,
@@ -330,20 +323,20 @@ def create_simple_delimiters(model, num_seqs_from_each_array_element=1):
     return delimiters
 
 
-def segment_read_with_simple_splitting(read, delimiters, segments=None):
+def segment_read_with_simple_splitting(read, delimiters, segment_ranges=None):
     """Segments the given read using the simple splitting algorithm.
 
     NOTE: Assumes that all given data are in the forward direction.
 
     :param read: A pysam.AlignedSegment object containing a read that has been segmented.
     :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
-    :param segments: None or A list of SegmentInfo objects representing the segments of the given reads.
-                     If None, will be populated by getting segments from the given read.
+    :param segment_ranges: None or A list of SegmentInfo objects representing the segments of the given reads.
+                           If None, will be populated by getting segments from the given read.
     :return: a list of tuples containing the split segments in the given read
     """
 
-    if not segments:
-        segments = get_segments(read)
+    if not segment_ranges:
+        segment_ranges = get_segments(read)
 
     # Now we have our delimiter list.
     # We need to go through our segments and split them up.
@@ -357,7 +350,7 @@ def segment_read_with_simple_splitting(read, delimiters, segments=None):
 
     # We do it this way so we iterate over the segments once and the delimiters many times
     # under the assumption the segment list is much longer than the delimiters.
-    for seg in segments:
+    for seg in segment_ranges:
         # at each position go through our delimiters and track whether we're a match:
         for i, dmi in enumerate(delimiter_match_matrix):
             try:
@@ -526,16 +519,16 @@ def segment_read_with_bounded_region_algorithm(read, model, segments=None):
     return tuple(delimiter_found), tuple(delimiter_segments)
 
 
-def _write_segmented_read(
-    model, read, segments, delimiters, bam_out, barcode_conf_file, ignore_cbc_and_umi, model_annotates_cbc, model_annotates_umi
-):
+def _write_segmented_read(model, read, segment_ranges, segment_cigars, delimiters, bam_out, barcode_conf_file,
+                          ignore_cbc_and_umi, model_annotates_cbc, model_annotates_umi):
     """Split and write out the segments of each read to the given bam output file.
 
     NOTE: Assumes that all given data are in the forward direction.
 
     :param model: The model to use for the array segment information.
     :param read: A pysam.AlignedSegment object containing a read that has been segmented.
-    :param segments: A list of SegmentInfo objects representing the segments of the given reads.
+    :param segment_ranges: A list of SegmentInfo objects representing the segments of the given reads.
+    :param segment_cigars: A list of cigar-like strings representing the segment alignments of the given reads.
     :param delimiters: A list of tuples containing the names of delimiter sequences to use to split the given read.
     :param bam_out: An open pysam.AlignmentFile ready to write out data.
     :param barcode_conf_file: An open file ready to write out the barcodes and confidence scores.
@@ -543,7 +536,7 @@ def _write_segmented_read(
     :return: the number of segments written.
     """
 
-    segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segments)
+    segment_bounds_tuples = segment_read_with_simple_splitting(read, delimiters, segment_ranges)
 
     sri = 1
     for prev_delim_name, delim_name, start_coord, end_coord in segment_bounds_tuples:
@@ -555,7 +548,8 @@ def _write_segmented_read(
             start_coord,
             end_coord,
             read,
-            segments,
+            segment_ranges,
+            segment_cigars,
             delim_name,
             prev_delim_name,
             ignore_cbc_and_umi,
@@ -581,7 +575,8 @@ def _write_split_array_element(
     start_coord,
     end_coord,
     read,
-    segments,
+    segment_ranges,
+    segment_cigars,
     delim_name,
     prev_delim_name,
     ignore_cbc_and_umi,
@@ -590,8 +585,8 @@ def _write_split_array_element(
     split_read_index
 ):
     """Write out an individual array element that has been split out according to the given coordinates."""
-    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord,
-                                          split_read_index)
+    a = create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segment_ranges,
+                                          segment_cigars, start_coord, split_read_index)
 
     # Write our barcode confidence to the file if we have to:
     if barcode_conf_file is not None and a.has_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG):
@@ -618,8 +613,8 @@ def _write_split_array_element(
             return True
 
 
-def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segments, start_coord,
-                                      split_read_index):
+def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_name, read, segment_ranges,
+                                      segment_cigars, start_coord, split_read_index):
     """Package an array element into an AlignedSegment from the results of simple splitting rules."""
 
     # Add one to end_coord because coordinates are inclusive:
@@ -638,7 +633,8 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
 
     # Get our annotations for this read and modify their output coordinates so that they're relative to the length of
     # this array element / read segment:
-    out_segments = []
+    out_segment_ranges = []
+    out_segment_cigars = []
     out_seg_model_quals = []
     segments_to_annotate = []
 
@@ -646,21 +642,27 @@ def create_simple_split_array_element(delim_name, end_coord, model, prev_delim_n
     read_seg_quals = read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG).strip().split(
         longbow.utils.constants.SEGMENT_TAG_DELIMITER)
 
-    for i, s in enumerate(segments):
-        if start_coord <= s.start <= end_coord:
-            seg_info = SegmentInfo(s.name, s.start - start_coord, s.end - start_coord)
-            out_segments.append(seg_info)
+    for i, (r, c) in enumerate(zip(segment_ranges, segment_cigars)):
+        if start_coord <= r.start <= end_coord:
+            seg_info = SegmentInfo(r.name, r.start - start_coord, r.end - start_coord)
+            out_segment_ranges.append(seg_info)
+            out_segment_cigars.append(c)
 
             out_seg_model_quals.append(read_seg_quals[i])
 
             # If we have to annotate this segment, store it here for annotation later:
-            if (model.annotation_segments is not None) and (s.name in model.annotation_segments.keys()):
+            if (model.annotation_segments is not None) and (r.name in model.annotation_segments.keys()):
                 segments_to_annotate.append(seg_info)
 
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
         longbow.utils.constants.SEGMENTS_TAG,
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in out_segments]),
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(([s.to_tag() for s in out_segment_ranges])),
+    )
+
+    a.set_tag(
+        longbow.utils.constants.SEGMENTS_CIGAR_TAG,
+        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_segment_cigars),
     )
 
     # Set our segment quality score tag to only include the segments in this read:

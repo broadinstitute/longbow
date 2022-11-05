@@ -112,6 +112,10 @@ def main(threads, output_bam, model, force, barcode_tag, new_barcode_tag, expand
     if num_reads:
         logger.info(f"About to pad %d reads.", num_reads)
 
+    # Get our model:
+    lb_model = bam_utils.load_model(model, input_bam)
+    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -140,23 +144,13 @@ def main(threads, output_bam, model, force, barcode_tag, new_barcode_tag, expand
         disable=not sys.stdin.isatty(),
     ) as pbar:
 
-        # Get our model:
-        if model is None:
-            lb_model = LibraryModel.from_json_obj(bam_utils.get_model_from_bam_header(bam_file.header))
-        elif model is not None and LibraryModel.has_prebuilt_model(model):
-            lb_model = LibraryModel.build_pre_configured_model(model)
-        else:
-            lb_model = LibraryModel.from_json_file(model)
-
-        logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
-
         # Verify that the given model actually has the barcode to change:
         if not lb_model.has_annotation_tag(barcode_tag):
             print(f"ERROR: Could not determine {lb_model.name} model segment from tag name: {barcode_tag}",
                   file=sys.stderr)
             sys.exit(1)
 
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, models=[lb_model])
+        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, model=lb_model)
 
         # Start output worker:
         res = manager.dict({"num_reads_refined": 0, "num_reads": 0})
