@@ -309,6 +309,7 @@ def collapse_annotations(path):
 
             if cur_state is None:
                 cur_state = state
+                cur_len += oplen
 
             if cur_state != state:
                 segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
