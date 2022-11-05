@@ -10,3 +10,16 @@ T18_corrected_clr_umi_length_test_1	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z
 T18_corrected_clr_umi_length_test_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:TAAAAAAAAAAAAAA	CB:Z:18	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:TAAAAAAAAAAAAAA	UX:i:0
 T18_corrected_clr_umi_length_test_3	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAAA	CB:Z:18	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAAA	UX:i:0
 T18_corrected_clr_umi_length_test_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:CAAAAAAAAAAAAAA	CB:Z:18	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAAAAAAAAAAAA	UX:i:0
+T20_many_reads_at_locus_ccs_and_clr_10	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:AAAAA	CB:Z:20	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:AAAAA	UX:i:0
+T21_complex_arrangement_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:CAAAA	CB:Z:21	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAA	UX:i:0
+T21_complex_arrangement_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:CAAAA	CB:Z:21	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAA	UX:i:0
+T21_complex_arrangement_9	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:CAAAA	CB:Z:21	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:CAAAA	UX:i:0
+T22_reads_pulled_to_bad_umi_1	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_2	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_3	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_4	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_5	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_6	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_7	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_8	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:-1	JX:Z:GAAAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
+T22_reads_pulled_to_bad_umi_9	4	*	0	255	*	*	0	0	GCAAAAAAAA	++++++++++	RG:Z:cd9b433d	rq:f:1	JX:Z:GAAAAAAAAAAA	CB:Z:22	eq:Z:A1	XG:Z:ENSG_A	JB:Z:26/26	BX:Z:GAAAAAAAAAAAAA	UX:i:1
