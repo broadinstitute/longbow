@@ -30,16 +30,6 @@ logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger(PROG_NAME)
 click_log.basic_config(logger)
 
-# Settings for the correction.
-# These have been tuned by examining data.
-MAX_EDIT_DISTANCE = {"CCS": 2, "CLR": 3}
-MAX_LENGTH_DIFF = {"CCS": 50, "CLR": 150}
-MAX_GC_CONTENT_DIFF = {"CCS": 0.05, "CLR": 0.15}
-CONFIG_FILTER_OP = "AND"
-MAX_UMI_DELTA = {"CCS": 3, "CLR": 4}
-MAX_UMI_DELTA_FILTER = {"CCS": 3, "CLR": 3}
-MIN_BACK_ALIGNMENT_SCORE = 10
-
 MAS_GENE_PREFIX = "MAS"
 GENCODE_GENE_PREFIX = "ENSG"
 
@@ -49,12 +39,6 @@ class ReadType(enum.Enum):
     CLR = enum.auto()
 
 
-UMI_TAG = "JX"
-FINAL_UMI_TAG = "BX"
-UMI_CORR_TAG = "UX"
-EQ_CLASS_TAG = "eq"
-
-GENE_TAG = "XG"
 CODING_REGION = "cDNA"  # TODO: Make this take in / read in a model so that we don't have to specify this.
 READ_QUALITY_TAG = "rq"
 BACK_ALIGNMENT_SCORE_TAG = "JB"
@@ -62,8 +46,8 @@ BACK_ALIGNMENT_SCORE_TAG = "JB"
 
 class ReadSnapshot:
 
-    def __init__(self, read, pre_extracted) -> None:
-        self.umi = read.get_tag(UMI_TAG)
+    def __init__(self, read, pre_extracted, umi_tag) -> None:
+        self.umi = read.get_tag(umi_tag)
         self.type = get_read_type(read)
         self.start = read.reference_start
         self.end = read.reference_end
@@ -82,18 +66,126 @@ class ReadSnapshot:
 
 
 ############################################################
-import inspect
-import re
-def PDEBUG(x):
-    frame = inspect.currentframe().f_back
-    s = inspect.getframeinfo(frame).code_context[0]
-    r = re.search(r"\((.*)\)", s).group(1)
-    print("{} = {}".format(r,x))
-############################################################
 
 
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
+@click.option(
+    "--max-ccs-edit-dist",
+    type=int,
+    default=2,
+    show_default=True,
+    help="Maximum edit distance between a CCS read and a target to consider them both part of a group of UMIs",
+)
+@click.option(
+    "--max-clr-edit-dist",
+    type=int,
+    default=3,
+    show_default=True,
+    help="Maximum edit distance between a CLR read and a target to consider them both part of a group of UMIs",
+)
+@click.option(
+    "--max-ccs-length-diff",
+    type=int,
+    default=50,
+    show_default=True,
+    help="Maximum length difference between a CCS read and a target to consider them both part of a group of UMIs",
+)
+@click.option(
+    "--max-clr-length-diff",
+    type=int,
+    default=150,
+    show_default=True,
+    help="Maximum length difference between a CLR read and a target to consider them both part of a group of UMIs",
+)
+@click.option(
+    "--max-ccs-gc-diff",
+    type=float,
+    default=0.05,
+    show_default=True,
+    help="Maximum GC content difference between a CCS read and a target to consider them both part of a group of UMIs",
+)
+@click.option(
+    "--max-clr-gc-diff",
+    type=float,
+    default=0.15,
+    show_default=True,
+    help="Maximum GC content difference between a CLR read and a target to consider them both part of a group of UMIs",
+)
+@click.option(
+    "--max-ccs-umi-length-delta",
+    type=int,
+    default=3,
+    show_default=True,
+    help="Maximum length difference between the UMI of a CCS read and the given UMI length to be included in the loci "
+         "for possible correction.",
+)
+@click.option(
+    "--max-clr-umi-length-delta",
+    type=int,
+    default=4,
+    show_default=True,
+    help="Maximum length difference between the UMI of a CLR read and the given UMI length to be included in the loci "
+         "for possible correction.",
+)
+@click.option(
+    "--max-final-ccs-umi-length-delta",
+    type=int,
+    default=3,
+    show_default=True,
+    help="Maximum length difference between the final, corrected UMI of a CCS read and the given UMI length to be "
+         "included in the final good results file.",
+)
+@click.option(
+    "--max-final-clr-umi-length-delta",
+    type=int,
+    default=3,
+    show_default=True,
+    help="Maximum length difference between the final, corrected UMI of a CLR read and the given UMI length to be "
+         "included in the final good results file.",
+)
+@click.option(
+    "--min-back-seg-score",
+    type=int,
+    default=10,
+    show_default=True,
+    help="Minimum score of the back alignment tag for a read to be included in the final good results file."
+)
+@click.option(
+    "--umi-tag",
+    type=str,
+    default="JX",
+    show_default=True,
+    help="Tag from which to read in UMIs from the input bam file."
+)
+@click.option(
+    "--gene-tag",
+    type=str,
+    default="XG",
+    show_default=True,
+    help="Tag from which to read in gene IDs from the input bam file."
+)
+@click.option(
+    "--eq-class-tag",
+    type=str,
+    default="eq",
+    show_default=True,
+    help="Tag from which to read in read transcript equivalence classes (i.e. transcript IDs) from the input bam file."
+)
+@click.option(
+    "--final-umi-tag",
+    type=str,
+    default="BX",
+    show_default=True,
+    help="Tag into which to put final, corrected UMI values."
+)
+@click.option(
+    "--umi-corrected-tag",
+    type=str,
+    default="UX",
+    show_default=True,
+    help="Tag into which to put whether a given UMI was actually corrected."
+)
 @click.option(
     "-l",
     "--umi-length",
@@ -129,7 +221,10 @@ def PDEBUG(x):
               show_default=True,
               help='Whether the input file has been processed with `longbow extract`')
 @click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(umi_length, output_bam, reject_bam, force, pre_extracted, input_bam):
+def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, max_clr_length_diff, max_ccs_gc_diff,
+         max_clr_gc_diff, max_ccs_umi_length_delta, max_clr_umi_length_delta, max_final_ccs_umi_length_delta,
+         max_final_clr_umi_length_delta, min_back_seg_score, umi_tag, gene_tag, eq_class_tag, final_umi_tag,
+         umi_corrected_tag, output_bam, reject_bam, force, pre_extracted, input_bam):
     """Correct UMIs with Set Cover algorithm."""
     # This algorithm was originally developed by Victoria Popic and imported into Longbow by Jonn Smith.
 
@@ -156,7 +251,8 @@ def main(umi_length, output_bam, reject_bam, force, pre_extracted, input_bam):
 
     # split reads into groups by locus
     logger.info("Creating locus -> read map...")
-    locus2reads = create_read_loci(input_bam, umi_length, pre_extracted)
+    locus2reads = create_read_loci(input_bam, umi_length, pre_extracted, max_ccs_umi_length_delta,
+                                   max_clr_umi_length_delta, umi_tag, gene_tag, eq_class_tag)
     logger.info("Number of loci: %d", len(locus2reads))
 
     # Reset our position to the start of the input file for our second traversal:
@@ -167,7 +263,10 @@ def main(umi_length, output_bam, reject_bam, force, pre_extracted, input_bam):
     read2umi = {}
     for locus in tqdm(locus2reads, desc="Processing each locus", unit=" locus", colour="green",
                       file=sys.stderr, total=len(locus2reads), leave=False, disable=not sys.stdin.isatty()):
-        process_reads_at_locus(locus2reads[locus], read2umi, umi_length)
+        process_reads_at_locus(locus2reads[locus], read2umi, umi_length,
+                               max_ccs_edit_dist, max_clr_edit_dist,
+                               max_ccs_length_diff, max_clr_length_diff,
+                               max_ccs_gc_diff, max_clr_gc_diff)
 
     num_corrected = 0
     num_rejected = 0
@@ -181,13 +280,14 @@ def main(umi_length, output_bam, reject_bam, force, pre_extracted, input_bam):
                 for read in tqdm(input_bam_file, desc="Writing out UMI-corrected reads", unit=" read", colour="green",
                                  file=sys.stderr, total=num_reads, leave=False, disable=not sys.stdin.isatty()):
                     if read.qname in read2umi:
-                        read.set_tag(FINAL_UMI_TAG, read2umi[read.qname])
-                        read.set_tag(UMI_CORR_TAG, 1)
+                        read.set_tag(final_umi_tag, read2umi[read.qname])
+                        read.set_tag(umi_corrected_tag, 1)
                     else:
-                        read.set_tag(FINAL_UMI_TAG, read.get_tag(UMI_TAG))
-                        read.set_tag(UMI_CORR_TAG, 0)
+                        read.set_tag(final_umi_tag, read.get_tag(umi_tag))
+                        read.set_tag(umi_corrected_tag, 0)
 
-                    if read_passes_filters(read, umi_length):
+                    if read_passes_filters(read, umi_length, min_back_seg_score, max_final_ccs_umi_length_delta,
+                                           max_final_clr_umi_length_delta, final_umi_tag):
                         correct_umi_bam.write(read)
                         num_corrected += 1
                     else:
@@ -213,8 +313,8 @@ def get_read_type(read):
     return ReadType.CCS if read.get_tag(READ_QUALITY_TAG) != -1 else ReadType.CLR
 
 
-def get_read_locus(read):
-    return read.get_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG), read.get_tag(EQ_CLASS_TAG)
+def get_read_locus(read, eq_class_tag):
+    return read.get_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG), read.get_tag(eq_class_tag)
 
 
 def get_read_seq(read, pre_extracted):
@@ -229,47 +329,53 @@ def get_back_aln_score(read):
     return int(read.get_tag(BACK_ALIGNMENT_SCORE_TAG).split("/")[0])
 
 
-def valid_umi(read, umi_length):
+def valid_umi(read, umi_length, ccs_max_umi_len_delta, clr_max_umi_len_delta, umi_tag):
     # checks the deviation of the UMI length
-    return abs(len(read.get_tag(UMI_TAG)) - umi_length) <= MAX_UMI_DELTA[ReadType(get_read_type(read)).name]
+    if ReadType(get_read_type(read)) == ReadType.CCS:
+        return abs(len(read.get_tag(umi_tag)) - umi_length) <= ccs_max_umi_len_delta
+    else:
+        return abs(len(read.get_tag(umi_tag)) - umi_length) <= clr_max_umi_len_delta
 
 
-def valid_gene(read):
+def valid_gene(read, gene_tag):
     # requires either a MAS-seq or Gencode gene tag
-    return (MAS_GENE_PREFIX in read.get_tag(GENE_TAG)) or (GENCODE_GENE_PREFIX in read.get_tag(GENE_TAG))
+    return (MAS_GENE_PREFIX in read.get_tag(gene_tag)) or (GENCODE_GENE_PREFIX in read.get_tag(gene_tag))
 
 
-def valid_tags(read):
+def valid_tags(read, umi_tag, eq_class_tag):
     # checks for the presence of required tags
     return read.has_tag(READ_QUALITY_TAG) and read.has_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG) \
-           and read.has_tag(UMI_TAG) and read.has_tag(EQ_CLASS_TAG)
+           and read.has_tag(umi_tag) and read.has_tag(eq_class_tag)
 
 
-def read_passes_filters(read, umi_length):
+def read_passes_filters(read, umi_length, min_back_seg_score, max_final_ccs_umi_length_delta,
+                        max_final_clr_umi_length_delta, final_umi_tag):
     # filters the read based on the final UMI length and back alignment score
-    return get_back_aln_score(read) >= MIN_BACK_ALIGNMENT_SCORE and \
-           abs(len(read.get_tag(FINAL_UMI_TAG)) - umi_length) <= \
-           MAX_UMI_DELTA_FILTER[ReadType(get_read_type(read)).name]
+
+    max_umi_delta_filter = max_final_ccs_umi_length_delta \
+        if ReadType(get_read_type(read)) == ReadType.CCS else max_final_clr_umi_length_delta
+    return get_back_aln_score(read) >= min_back_seg_score and abs(len(read.get_tag(final_umi_tag)) - umi_length) <= max_umi_delta_filter
 
 
-def create_read_loci(input_bam_fname, umi_length, pre_extracted):
+def create_read_loci(input_bam_fname, umi_length, pre_extracted, ccs_max_umi_len_delta, clr_max_umi_len_delta, umi_tag,
+                     gene_tag, eq_class_tag):
     locus2reads = defaultdict(list)
     n_filtered_umi = 0
     n_filtered_gene = 0
     n_valid_reads = 0
     with pysam.AlignmentFile(input_bam_fname, "rb") as input_bam:
         for read in tqdm(input_bam, desc="Extracting Read Groups", unit=" read"):
-            if not valid_tags(read):
+            if not valid_tags(read, umi_tag, eq_class_tag):
                 continue
-            if not valid_gene(read):
+            if not valid_gene(read, gene_tag):
                 n_filtered_gene += 1
                 continue
-            if not valid_umi(read, umi_length):
+            if not valid_umi(read, umi_length, ccs_max_umi_len_delta, clr_max_umi_len_delta, umi_tag):
                 n_filtered_umi += 1
                 continue
             n_valid_reads += 1
-            locus = get_read_locus(read)
-            locus2reads[locus].append(ReadSnapshot(read, pre_extracted))
+            locus = get_read_locus(read, eq_class_tag)
+            locus2reads[locus].append(ReadSnapshot(read, pre_extracted, umi_tag))
         logger.info("Number of valid reads: %d", n_valid_reads)
         logger.info("Number of filtered by gene: %d", n_filtered_gene)
         logger.info("Number of filtered by UMI: %d", n_filtered_umi)
@@ -277,35 +383,40 @@ def create_read_loci(input_bam_fname, umi_length, pre_extracted):
 
 
 def get_conversion_type(source, target):
-    return "CCS" if ((source.type == target.type) and (source.type == ReadType.CCS)) else "CLR"
+    return ReadType.CCS if ((source.type == target.type) and (source.type == ReadType.CCS)) else ReadType.CLR
 
 
-def can_convert(source, target):
+def can_convert(source, target, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, max_clr_length_diff,
+                max_ccs_gc_diff, max_clr_gc_diff):
     conversion_type = get_conversion_type(source, target)
-    edit_dist = levenshtein(source.umi, target.umi, MAX_EDIT_DISTANCE[conversion_type])
-    if edit_dist > MAX_EDIT_DISTANCE[conversion_type]:
+    max_edit_dist = max_ccs_edit_dist if conversion_type == ReadType.CCS else max_clr_edit_dist
+
+    edit_dist = levenshtein(source.umi, target.umi, max_edit_dist)
+    if edit_dist > max_edit_dist:
         return False
+
     delta_len = abs(source.len - target.len)
     delta_gc = abs(source.gc - target.gc)
-    op = operator.and_
-    if op == "OR":
-        op = operator.or_
-    return op(delta_len <= MAX_LENGTH_DIFF[conversion_type],
-              delta_gc <= MAX_GC_CONTENT_DIFF[conversion_type])
+    max_len_diff = max_ccs_length_diff if conversion_type == ReadType.CCS else max_clr_length_diff
+    max_gc_diff = max_ccs_gc_diff if conversion_type == ReadType.CCS else max_clr_gc_diff
+
+    return (delta_len <= max_len_diff) and (delta_gc <= max_gc_diff)
 
 
 def get_unique_targets(reads):
     return list(set(reads))
 
 
-def build_graph(reads):
+def build_graph(reads, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, max_clr_length_diff, max_ccs_gc_diff,
+                max_clr_gc_diff):
     targets = get_unique_targets(reads)
     graph = defaultdict(list)
     target2umi_counts = defaultdict(Counter)
     target2umi_seq = {target_id: target.umi for target_id, target in enumerate(targets)}
     for read_id, read in enumerate(reads):
         for target_id, target in enumerate(targets):
-            if can_convert(read, target):
+            if can_convert(read, target, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, max_clr_length_diff,
+                           max_ccs_gc_diff, max_clr_gc_diff):
                 graph[target_id].append(read_id)
                 target2umi_counts[target_id][read.umi] += 1
     return graph, target2umi_counts, target2umi_seq
@@ -340,7 +451,10 @@ def min_vertex_cover(read_ids, graph, target2umi_counts, target2umi_seq):
     return umi_groups
 
 
-def process_reads_at_locus(reads, read2umi, umi_length):
+def process_reads_at_locus(reads, read2umi, umi_length,
+                           max_ccs_edit_dist, max_clr_edit_dist,
+                           max_ccs_length_diff, max_clr_length_diff,
+                           max_ccs_gc_diff, max_clr_gc_diff):
     if len(reads) < 2:
         return
 
@@ -348,7 +462,9 @@ def process_reads_at_locus(reads, read2umi, umi_length):
     if all(read.umi == reads[0].umi for read in reads):
         return
 
-    graph, target2umi_counts, target2umi_seq = build_graph(reads)
+    graph, target2umi_counts, target2umi_seq = build_graph(reads, max_ccs_edit_dist, max_clr_edit_dist,
+                                                           max_ccs_length_diff, max_clr_length_diff, max_ccs_gc_diff,
+                                                           max_clr_gc_diff)
 
     read_ids = list(range(len(reads)))
     umi_groups = min_vertex_cover(read_ids, graph, target2umi_counts, target2umi_seq)
