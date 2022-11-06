@@ -194,7 +194,7 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
     logger.info(
         f"Segmented {res['num_reads_segmented']} reads with {res['num_segments']} total segments."
     )
-    num_reads = res['num_reads_segmented']
+    num_reads = res['num_reads_segmented']+1
     num_segmented = res['num_segments']
     logger.info(f"MAS-seq gain factor: {num_segmented/num_reads:.02f}x")
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
