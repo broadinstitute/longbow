@@ -37,7 +37,7 @@ PB_READ_NAME_RE = re.compile("m[0-9]+e?_[0-9]{6}_[0-9]{6}/[0-9]+/.*")
 # Named tuple to store alignment information:
 class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"])):
 
-    _tag_regex = re.compile(r"(.*?):(\d+)-(\d+)")
+    _tag_regex = re.compile(r"(.*?):(\d+)-(-?\d+)")
 
     def __len__(self):
         # Must add 1 because the positions are inclusive coordinates:

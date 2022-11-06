@@ -270,7 +270,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
                         read.query_name,
                         logp,
                         " (RC)" if is_rc else "",
-                        ','.join(collapse_annotations(ppath))
+                        ','.join(list(map(lambda x: f'{x.name}:{x.start}-{x.end}', collapse_annotations(ppath))))
                     )
 
                 # Write our our read:
@@ -310,7 +310,7 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, lb_model, min_lengt
         )
 
         # Check for min/max length and min quality:
-        segment_info = None, None, None, None, None
+        segment_info = None, None, None, None
         if len(read.query_sequence) < min_length:
             logger.debug(f"Read is shorter than min length.  "
                          f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})")
