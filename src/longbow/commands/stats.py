@@ -144,7 +144,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         for read in bam_file:
             # Get our read segments:
             try:
-                _, segments = get_segments(read)
+                _, segments, _ = get_segments(read)
             except KeyError:
                 logger.error(f"Input bam file does not contain longbow segmented reads!  "
                              f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
