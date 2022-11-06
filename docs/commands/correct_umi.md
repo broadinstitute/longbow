@@ -25,10 +25,10 @@ Algorithm originally developed by Victoric Popic.
 
 The following tags are required in the input file:
 
-- `CB` Cell Barcode
+- `CB`
 - `JX` (Adjusted UMI - Configurable)
 - `eq` (Equivalence class assignment - Configurable)
-- `XG` (Gene assignment)
+- `XG` (Gene assignment - Configurable)
 - `rq` (Read Quality: [-1.0, 1.0])
 - `JB` (Back / UMI trailing segment Smith-Waterman alignment score - Configurable)
 
@@ -86,6 +86,8 @@ Options:
                                   results file.  [default: 10]
   --umi-tag TEXT                  Tag from which to read in UMIs from the
                                   input bam file.  [default: JX]
+  --gene-tag TEXT                 Tag from which to read in gene IDs from the
+                                  input bam file.  [default: XG]
   --eq-class-tag TEXT             Tag from which to read in read transcript
                                   equivalence classes (i.e. transcript IDs)
                                   from the input bam file.  [default: eq]
