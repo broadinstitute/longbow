@@ -329,11 +329,17 @@ def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, 
     t_end = time.time()
     logger.info(f"Done. Elapsed time: {t_end - t_start:2.2f}s. "
                 f"Overall processing rate: {total_reads / (t_end - t_start):2.2f} reads/s.")
-    logger.info(f"Number of reads with corrected UMIs: {num_corrected}/{total_reads} "
-                f"({100*(num_corrected/total_reads):2.2f}%)")
-    logger.info(f"Number of reads with uncorrectable UMIs: {num_rejected}/{total_reads} "
-                f"({100 * (num_rejected / total_reads):2.2f}%)")
     logger.info(f"Total Number of reads: {total_reads}")
+    if total_reads > 0:
+        logger.info(f"Number of reads with corrected UMIs: {num_corrected}/{total_reads} "
+                    f"({100*(num_corrected/total_reads):2.2f}%)")
+        logger.info(f"Number of reads with uncorrectable UMIs: {num_rejected}/{total_reads} "
+                    f"({100 * (num_rejected / total_reads):2.2f}%)")
+    else:
+        logger.info(f"Number of reads with corrected UMIs: {num_corrected}/{total_reads} "
+                    f"({0:2.2f}%)")
+        logger.info(f"Number of reads with uncorrectable UMIs: {num_rejected}/{total_reads} "
+                    f"({0:2.2f}%)")
 
 
 # ========================================================
