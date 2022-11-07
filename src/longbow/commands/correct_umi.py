@@ -8,6 +8,7 @@ import itertools
 import click
 import click_log
 from tqdm import tqdm
+import pickle
 import enum
 import operator
 
@@ -70,6 +71,13 @@ class ReadSnapshot:
 
 @click.command(name=logger.name)
 @click_log.simple_verbosity_option(logger)
+@click.option(
+    "--cache-read-loci",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Dump and read from a cache for the read loci, if possible."
+)
 @click.option(
     "--max-ccs-edit-dist",
     type=int,
@@ -224,7 +232,7 @@ class ReadSnapshot:
 def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, max_clr_length_diff, max_ccs_gc_diff,
          max_clr_gc_diff, max_ccs_umi_length_delta, max_clr_umi_length_delta, max_final_ccs_umi_length_delta,
          max_final_clr_umi_length_delta, min_back_seg_score, umi_tag, gene_tag, eq_class_tag, final_umi_tag,
-         umi_corrected_tag, output_bam, reject_bam, force, pre_extracted, input_bam):
+         umi_corrected_tag, output_bam, reject_bam, force, pre_extracted, cache_read_loci, input_bam):
     """Correct UMIs with Set Cover algorithm."""
     # This algorithm was originally developed by Victoria Popic and imported into Longbow by Jonn Smith.
 
@@ -249,10 +257,31 @@ def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, 
     logger.info(f"Writing UMI corrected reads to: {output_bam}")
     logger.info(f"Writing reads with uncorrectable UMIs to: {reject_bam}")
 
-    # split reads into groups by locus
-    logger.info("Creating locus -> read map...")
-    locus2reads = create_read_loci(input_bam, umi_length, pre_extracted, max_ccs_umi_length_delta,
-                                   max_clr_umi_length_delta, umi_tag, gene_tag, eq_class_tag)
+    # Split reads into groups by locus
+    cached_file_names = [f"{input_bam.name}.locus2reads.pickle",
+                         os.path.basename(f"{input_bam.name}.locus2reads.pickle")]
+
+    if cache_read_loci and input_bam.seekable() and any([os.path.exists(p) for p in cached_file_names]):
+        resolved_cache_name = [p for p in cached_file_names if os.path.exists(p)][0]
+        logger.info(f"Loading locus2reads cache: {resolved_cache_name}")
+        st = time.time()
+        locus2reads = pickle.load(open(f"{resolved_cache_name}", 'rb'))
+        et = time.time()
+        logger.info(f"done. (elapsed: {et - st}s)")
+
+    else:
+        logger.info("Creating locus -> read map...")
+        locus2reads = extract_read_groups(input_bam, umi_length, pre_extracted, max_ccs_umi_length_delta,
+                                          max_clr_umi_length_delta, umi_tag, gene_tag, eq_class_tag, num_reads)
+        if cache_read_loci:
+            # Cache the locus2reads data:
+            resolved_cache_name = os.path.basename(f"{input_bam.name}.locus2reads.pickle")
+            logger.info(f"Writing locus2reads cache: {resolved_cache_name}")
+            st = time.time()
+            pickle.dump(locus2reads, open(f"{resolved_cache_name}", 'wb'))
+            et = time.time()
+            logger.info(f"done. (elapsed: {et - st}s)")
+
     logger.info("Number of loci: %d", len(locus2reads))
 
     # Reset our position to the start of the input file for our second traversal:
@@ -261,7 +290,7 @@ def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, 
     # Correct reads at each locus
     logger.info("Correcting reads at each locus...")
     read2umi = {}
-    for locus in tqdm(locus2reads, desc="Processing each locus", unit=" locus", colour="green",
+    for locus in tqdm(locus2reads, desc="Processing each locus", unit=" locus", colour="green", position=1,
                       file=sys.stderr, total=len(locus2reads), leave=False, disable=not sys.stdin.isatty()):
         process_reads_at_locus(locus2reads[locus], read2umi, umi_length,
                                max_ccs_edit_dist, max_clr_edit_dist,
@@ -278,7 +307,8 @@ def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, 
 
                 # Output BAM with corrected UMIs
                 for read in tqdm(input_bam_file, desc="Writing out UMI-corrected reads", unit=" read", colour="green",
-                                 file=sys.stderr, total=num_reads, leave=False, disable=not sys.stdin.isatty()):
+                                 position=2, file=sys.stderr, total=num_reads, leave=False,
+                                 disable=not sys.stdin.isatty()):
                     if read.qname in read2umi:
                         read.set_tag(final_umi_tag, read2umi[read.qname])
                         read.set_tag(umi_corrected_tag, 1)
@@ -357,14 +387,15 @@ def read_passes_filters(read, umi_length, min_back_seg_score, max_final_ccs_umi_
     return get_back_aln_score(read) >= min_back_seg_score and abs(len(read.get_tag(final_umi_tag)) - umi_length) <= max_umi_delta_filter
 
 
-def create_read_loci(input_bam_fname, umi_length, pre_extracted, ccs_max_umi_len_delta, clr_max_umi_len_delta, umi_tag,
-                     gene_tag, eq_class_tag):
+def extract_read_groups(input_bam_fname, umi_length, pre_extracted, ccs_max_umi_len_delta, clr_max_umi_len_delta, umi_tag,
+                        gene_tag, eq_class_tag, total_num_reads=None):
     locus2reads = defaultdict(list)
     n_filtered_umi = 0
     n_filtered_gene = 0
     n_valid_reads = 0
+    n_total_reads = 0
     with pysam.AlignmentFile(input_bam_fname, "rb") as input_bam:
-        for read in tqdm(input_bam, desc="Extracting Read Groups", unit=" read"):
+        for read in tqdm(input_bam, desc="Extracting Read Groups", unit=" read", total=total_num_reads, position=0):
             if not valid_tags(read, umi_tag, eq_class_tag):
                 continue
             if not valid_gene(read, gene_tag):
@@ -376,6 +407,7 @@ def create_read_loci(input_bam_fname, umi_length, pre_extracted, ccs_max_umi_len
             n_valid_reads += 1
             locus = get_read_locus(read, eq_class_tag)
             locus2reads[locus].append(ReadSnapshot(read, pre_extracted, umi_tag))
+        logger.info("Number of reads: %d", n_total_reads)
         logger.info("Number of valid reads: %d", n_valid_reads)
         logger.info("Number of filtered by gene: %d", n_filtered_gene)
         logger.info("Number of filtered by UMI: %d", n_filtered_umi)
@@ -413,12 +445,23 @@ def build_graph(reads, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff
     graph = defaultdict(list)
     target2umi_counts = defaultdict(Counter)
     target2umi_seq = {target_id: target.umi for target_id, target in enumerate(targets)}
-    for read_id, read in enumerate(reads):
-        for target_id, target in enumerate(targets):
-            if can_convert(read, target, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, max_clr_length_diff,
-                           max_ccs_gc_diff, max_clr_gc_diff):
-                graph[target_id].append(read_id)
-                target2umi_counts[target_id][read.umi] += 1
+
+    # For very large groups we need to tell the user that somehting is actually happening:
+    if len(reads) * len(targets) < 1e6:
+        for read_id, read in enumerate(reads):
+            for target_id, target in enumerate(targets):
+                if can_convert(read, target, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff,
+                               max_clr_length_diff, max_ccs_gc_diff, max_clr_gc_diff):
+                    graph[target_id].append(read_id)
+                    target2umi_counts[target_id][read.umi] += 1
+    else:
+        for read_id, read in tqdm(enumerate(reads), desc="Building graph", position=2):
+            for target_id, target in enumerate(targets):
+                if can_convert(read, target, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff,
+                               max_clr_length_diff, max_ccs_gc_diff, max_clr_gc_diff):
+                    graph[target_id].append(read_id)
+                    target2umi_counts[target_id][read.umi] += 1
+
     return graph, target2umi_counts, target2umi_seq
 
 
