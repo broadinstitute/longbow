@@ -17,6 +17,11 @@ from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 from ..utils.bam_utils import SegmentInfo
 
+from ..utils.cli_utils import get_field_count_and_percent_string
+from ..utils.cli_utils import zero_safe_div
+
+from ..utils.constants import FFORMAT
+
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("filter")
 click_log.basic_config(logger)
@@ -170,19 +175,21 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                     num_failed += 1
 
     # Calc some stats:
-    pct_reads_passing = 100 * num_passed / (num_passed + num_failed) if (num_passed + num_failed) > 0 else 0
-    pct_reads_failing = 100 * num_failed / (num_passed + num_failed) if (num_passed + num_failed) > 0 else 0
-    mean_adapters_per_passing_read = tot_num_valid_adapters/num_passed if num_passed > 0 else 0
-    mean_adapters_per_failing_read = tot_num_failed_adapters/num_failed if num_failed > 0 else 0
+    total_reads = num_passed + num_failed
 
     # Yell at the user:
-    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: %{FFORMAT}s.", time.time() - t_start)
     logger.info(f"Total Reads Processed: %d", num_passed + num_failed)
-    logger.info(f"# Reads Passing Model Filter: %d (%2.2f%%)", num_passed, pct_reads_passing)
-    logger.info(f"# Reads Failing Model Filter: %d (%2.2f%%)", num_failed, pct_reads_failing)
+
+    count_str, pct_str = get_field_count_and_percent_string(num_passed, total_reads, FFORMAT)
+    logger.info(f"# Reads Passing Model Filter: %s %s", count_str, pct_str)
+
+    count_str, pct_str = get_field_count_and_percent_string(num_failed, total_reads, FFORMAT)
+    logger.info(f"# Reads Failing Model Filter: %s %s", count_str, pct_str)
+
     logger.info(f"Total # correctly ordered key adapters in passing reads: %d", tot_num_valid_adapters)
     logger.info(f"Total # correctly ordered key adapters in failing reads: %d", tot_num_failed_adapters)
-    logger.info(f"Avg # correctly ordered key adapters per passing read: %2.4f [%d]",
-                mean_adapters_per_passing_read, len(lb_model.key_adapters))
-    logger.info(f"Avg # correctly ordered key adapters per failing read: %2.4f [%d]",
-                mean_adapters_per_failing_read, len(lb_model.key_adapters))
+    logger.info(f"Avg # correctly ordered key adapters per passing read: %{FFORMAT} [%d]",
+                zero_safe_div(tot_num_valid_adapters, num_passed), len(lb_model.key_adapters))
+    logger.info(f"Avg # correctly ordered key adapters per failing read: %{FFORMAT} [%d]",
+                zero_safe_div(tot_num_failed_adapters, num_passed), len(lb_model.key_adapters))

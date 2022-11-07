@@ -16,6 +16,8 @@ from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 
 from ..utils.bam_utils import SegmentInfo, get_segments
+from ..utils.cli_utils import get_field_count_and_percent_string
+from ..utils.cli_utils import zero_safe_div
 
 from .segment import create_simple_delimiters
 from .segment import segment_read_with_simple_splitting
@@ -264,14 +266,13 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
         barcode_conf_file.close()
 
     # Calc some stats:
-    pct_reads_with_extracted_segments = 100 * num_reads_with_extracted_segments / num_reads if num_reads > 0 else 0
-    segs_per_read = num_segments_extracted / num_reads if num_reads > 0 else 0
+    count_str, pct_str = get_field_count_and_percent_string(num_reads_with_extracted_segments, num_reads)
+    segs_per_read = zero_safe_div(num_segments_extracted, num_reads)
 
     # Yell at the user:
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
     logger.info(f"Total # Reads Processed: %d", num_reads)
-    logger.info(f"# Reads Containing Extracted Segments: %d (%2.2f%%)",
-                num_reads_with_extracted_segments, pct_reads_with_extracted_segments)
+    logger.info(f"# Reads Containing Extracted Segments: %s %s", count_str, pct_str)
     logger.info(f"Total # Segments Extracted: %d", num_segments_extracted)
     logger.info(f"Total # Segments Skipped: %d", num_segments_skipped)
     logger.info(f"# Segments extracted per read: %2.2f", segs_per_read)

@@ -20,6 +20,9 @@ from ..utils import bam_utils
 from ..utils import plot_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
+from ..utils.constants import FFORMAT
+
+from ..utils.cli_utils import get_field_count_and_percent_string
 
 from . import segment
 
@@ -236,7 +239,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     logger.info("Writing reduced ligation matrix...")
     _create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({lb_model.name})")
 
-    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: %{FFORMAT}s.", time.time() - t_start)
 
 
 def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix,
@@ -436,7 +439,7 @@ def _write_summary_stats_file(input_bam,
         f.write(f"MAS-seq / Longbow Model:\t{lb_model.name}\n")
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
         f.write(f"Total Num Array Elements (Segmented Arrays):\t{num_array_elements}\n")
-        f.write(f"Output yield gain:\t{num_array_elements/len(array_lengths):.2f}x\n")
+        f.write(f"Output yield gain:\t{num_array_elements/len(array_lengths):{FFORMAT}}x\n")
         f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
         f.write("\n")
         f.write("#" + ("-" * 80) + "\n")
@@ -480,9 +483,14 @@ def _write_summary_stats_file(input_bam,
         logger.debug("Off Diagonal Count: %d", off_sub_diagonal_count)
         logger.debug("Sub Sub Diagonal Count: %d", sub_sub_diagonal_count)
 
-        f.write(_get_stat_and_percent_string_if_not_zero("Subdiagonal Count Total (correct segments)", sub_diagonal_count, total_count))
-        f.write(_get_stat_and_percent_string_if_not_zero("Off-Subdiagonal Count Total (segmentation / ligation errors)", off_sub_diagonal_count, total_count))
-        f.write(_get_stat_and_percent_string_if_not_zero("Sub-Subdiagonal Count Total (missed MAS-seq adapters)", sub_sub_diagonal_count, total_count))
+        _, pct_str = get_field_count_and_percent_string(sub_diagonal_count, total_count)
+        f.write(f"Subdiagonal Count Total (correct segments): {sub_diagonal_count} {pct_str}\n")
+
+        _, pct_str = get_field_count_and_percent_string(off_sub_diagonal_count, total_count)
+        f.write(f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count} {pct_str}\n")
+
+        _, pct_str = get_field_count_and_percent_string(sub_sub_diagonal_count, total_count)
+        f.write(f"Sub-Subdiagonal Count Total (missed MAS-seq adapters): {sub_sub_diagonal_count} {pct_str}\n")
         f.write("\n")
 
         f.write("#" + ("-" * 80) + "\n")
@@ -544,17 +552,6 @@ def _write_length_stats_to_file(f, name, count_hist, hist_bins, stat_min, stat_m
     f.write("\n")
 
 
-def _get_stat_and_percent_string_if_not_zero(description, stat, total):
-    if total == 0:
-        logger.warning(f"WARNING: total is zero for {description}: stat: {stat}, total: {total}")
-        return f"{description}: {stat} (0.0%)\n"
-    elif stat == 0:
-        logger.warning(f"WARNING: stat is zero for {description}: stat: {stat}, total: {total}")
-        return f"{description}: {stat} (0.0%)\n"
-    else:
-        return f"{description}: {stat} ({100 * stat / total:.2f}%)\n"
-
-
 def _write_heat_matrix(f, heat_matrix):
     """Write the given heat matrix to the given file"""
 
@@ -587,7 +584,7 @@ def _calculate_top_ligation_profiles(num_reads, ligation_profile_count_dict, num
 
     # Package up the data:
     data = [
-        [top_ligations[i], top_counts[i], f"{(top_counts[i] / num_reads) * 100:2.02f}%"]
+        [top_ligations[i], top_counts[i], f"{(top_counts[i] / num_reads) * 100:{FFORMAT}}%"]
         for i in range(len(top_counts) - 1, -1, -1)
     ]
     return data

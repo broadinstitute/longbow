@@ -24,6 +24,7 @@ from ..utils.bam_utils import SegmentInfo
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 from ..utils.model_utils import ModelBuilder
+from ..utils.cli_utils import zero_safe_div
 
 
 logging.basicConfig(stream=sys.stderr)
@@ -244,7 +245,8 @@ def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, m
     plot_model_counts(res, models)
     best_model, best_model_count = next(iter(res.items()))
 
-    logger.info(f"Overall most likely model: {best_model} (seen in {best_model_count} reads, {100.0*best_model_count/np.sum(list(res.values())):.1f}%)")
+    logger.info(f"Overall most likely model: {best_model} (seen in {best_model_count} reads, "
+                f"{100.0*zero_safe_div(best_model_count, np.sum(list(res.values()))):.1f}%)")
 
     with open(output_model if output_model != "-" else "/dev/stdout", "w") as wm:
         wm.write(f'{best_model}\n')
