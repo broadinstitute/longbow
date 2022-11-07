@@ -2,6 +2,8 @@
 # General / high-level constants:
 #######################################
 
+FFORMAT = "2.4f"
+
 DEFAULT_MODEL = "mas_15_sc_10x5p_single_none"
 DEFAULT_MAX_READ_LENGTH = 30000
 

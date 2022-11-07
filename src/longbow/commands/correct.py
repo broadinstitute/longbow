@@ -23,6 +23,7 @@ import longbow.utils.constants
 from ..utils import bam_utils, barcode_utils
 from ..utils.model import LibraryModel
 
+from ..utils.cli_utils import get_field_count_and_percent_string
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("correct")
@@ -272,93 +273,86 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
     logger.info(f"{stat_prefix}Total reads seen: {total_reads}")
 
     total_with_barcodes = res["num_ccs_with_barcodes"] + res["num_clr_with_barcodes"]
-    count_str, pct_str = _get_field_count_and_percent_string(total_with_barcodes, total_reads)
+    count_str, pct_str = get_field_count_and_percent_string(total_with_barcodes, total_reads)
     logger.info(f"{stat_prefix}Reads with {barcode_tag} barcodes: {count_str} {pct_str}")
 
     total_without_barcodes = total_reads - total_with_barcodes
-    count_str, pct_str = _get_field_count_and_percent_string(total_without_barcodes, total_reads)
+    count_str, pct_str = get_field_count_and_percent_string(total_without_barcodes, total_reads)
     logger.info(f"{stat_prefix}Reads without {barcode_tag} barcodes: {count_str} {pct_str}")
 
     total_corrected = res["num_ccs_reads_corrected"] + res["num_clr_reads_corrected"]
-    count_str, pct_str = _get_field_count_and_percent_string(total_corrected, total_reads)
+    count_str, pct_str = get_field_count_and_percent_string(total_corrected, total_reads)
     logger.info(f"{stat_prefix}Reads able to be corrected into {corrected_tag} tag: {count_str} {pct_str}")
 
     total_uncorrected = total_reads - (res["num_ccs_reads_corrected"] + res["num_clr_reads_corrected"])
-    count_str, pct_str = _get_field_count_and_percent_string(total_uncorrected, total_reads)
+    count_str, pct_str = get_field_count_and_percent_string(total_uncorrected, total_reads)
     logger.info(f"{stat_prefix}Reads unable to be corrected into {corrected_tag} tag: {count_str} {pct_str}")
 
     total_uncorrected_ambiguous = res["num_ccs_could_not_correct_ambiguous"] + res["num_clr_could_not_correct_ambiguous"]
-    count_str, pct_str = _get_field_count_and_percent_string(total_uncorrected_ambiguous, total_reads)
-    count_str2, pct_str2 = _get_field_count_and_percent_string(total_uncorrected_ambiguous, total_uncorrected)
+    count_str, pct_str = get_field_count_and_percent_string(total_uncorrected_ambiguous, total_reads)
+    count_str2, pct_str2 = get_field_count_and_percent_string(total_uncorrected_ambiguous, total_uncorrected)
     logger.info(f"{stat_prefix}Reads unable to be corrected into {corrected_tag} tag - Ambiguous (of total reads): {count_str} {pct_str}")
     logger.info(f"{stat_prefix}Reads unable to be corrected into {corrected_tag} tag - Ambiguous (of uncorrected reads): {count_str2} {pct_str2}")
 
     total_uncorrected_no_match = res["num_ccs_could_not_correct_no_match"] + res["num_clr_could_not_correct_no_match"]
-    count_str, pct_str = _get_field_count_and_percent_string(total_uncorrected_no_match, total_reads)
-    count_str2, pct_str2 = _get_field_count_and_percent_string(total_uncorrected_no_match, total_uncorrected)
+    count_str, pct_str = get_field_count_and_percent_string(total_uncorrected_no_match, total_reads)
+    count_str2, pct_str2 = get_field_count_and_percent_string(total_uncorrected_no_match, total_uncorrected)
     logger.info(f"{stat_prefix}Reads unable to be corrected into {corrected_tag} tag - No Match in Lev Dist (of total reads): {count_str} {pct_str}")
     logger.info(f"{stat_prefix}Reads unable to be corrected into {corrected_tag} tag - No Match in Lev Dist (of uncorrected reads): {count_str2} {pct_str2}")
 
     total_were_already_correct = res["num_ccs_reads_raw_was_correct"] + res["num_clr_reads_raw_was_correct"]
-    count_str, pct_str = _get_field_count_and_percent_string(total_were_already_correct, total_reads)
+    count_str, pct_str = get_field_count_and_percent_string(total_were_already_correct, total_reads)
     logger.info(f"{stat_prefix}Reads with already correct {barcode_tag} barcodes: {count_str} {pct_str}")
 
     for read_type in ['ccs', 'clr']:
 
         logger.info("=" * 80)
 
-        count_str, pct_str = _get_field_count_and_percent_string(res[f"num_{read_type}_reads"], total_reads)
+        count_str, pct_str = get_field_count_and_percent_string(res[f"num_{read_type}_reads"], total_reads)
         logger.info(f"{stat_prefix}{read_type.upper()} reads seen: {count_str} {pct_str}")
 
-        count_str, pct_str = _get_field_count_and_percent_string(res[f"num_{read_type}_with_barcodes"], total_reads)
-        count_str2, pct_str2 = _get_field_count_and_percent_string(res[f"num_{read_type}_with_barcodes"], res[f"num_{read_type}_reads"])
+        count_str, pct_str = get_field_count_and_percent_string(res[f"num_{read_type}_with_barcodes"], total_reads)
+        count_str2, pct_str2 = get_field_count_and_percent_string(res[f"num_{read_type}_with_barcodes"], res[f"num_{read_type}_reads"])
         logger.info(f"{stat_prefix}{read_type.upper()} reads with {barcode_tag} barcodes (of total reads): {count_str} {pct_str}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads with {barcode_tag} barcodes (of {read_type} reads): {count_str2} {pct_str2}")
 
-        count_str, pct_str = _get_field_count_and_percent_string(res[f"num_{read_type}_reads"] - res[f"num_{read_type}_with_barcodes"], total_reads)
-        count_str2, pct_str2 = _get_field_count_and_percent_string(res[f"num_{read_type}_reads"] - res[f"num_{read_type}_with_barcodes"], res[f"num_{read_type}_reads"])
+        count_str, pct_str = get_field_count_and_percent_string(res[f"num_{read_type}_reads"] - res[f"num_{read_type}_with_barcodes"], total_reads)
+        count_str2, pct_str2 = get_field_count_and_percent_string(res[f"num_{read_type}_reads"] - res[f"num_{read_type}_with_barcodes"], res[f"num_{read_type}_reads"])
         logger.info(f"{stat_prefix}{read_type.upper()} reads without {barcode_tag} barcodes (of total reads): {count_str} {pct_str}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads without {barcode_tag} barcodes (of {read_type} reads): {count_str2} {pct_str2}")
 
-        count_str, pct_str = _get_field_count_and_percent_string(res[f"num_{read_type}_reads_corrected"], total_reads)
-        count_str2, pct_str2 = _get_field_count_and_percent_string(res[f"num_{read_type}_reads_corrected"], res[f"num_{read_type}_reads"])
+        count_str, pct_str = get_field_count_and_percent_string(res[f"num_{read_type}_reads_corrected"], total_reads)
+        count_str2, pct_str2 = get_field_count_and_percent_string(res[f"num_{read_type}_reads_corrected"], res[f"num_{read_type}_reads"])
         logger.info(f"{stat_prefix}{read_type.upper()} reads able to be corrected into {corrected_tag} tag (of total reads): {count_str} {pct_str}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads able to be corrected into {corrected_tag} tag (of {read_type} reads): {count_str2} {pct_str2}")
 
-        count_str, pct_str = _get_field_count_and_percent_string(res[f"num_{read_type}_reads"] - res[f"num_{read_type}_reads_corrected"], total_reads)
-        count_str2, pct_str2 = _get_field_count_and_percent_string(res[f"num_{read_type}_reads"] - res[f"num_{read_type}_reads_corrected"], res[f"num_{read_type}_reads"])
+        count_str, pct_str = get_field_count_and_percent_string(res[f"num_{read_type}_reads"] - res[f"num_{read_type}_reads_corrected"], total_reads)
+        count_str2, pct_str2 = get_field_count_and_percent_string(res[f"num_{read_type}_reads"] - res[f"num_{read_type}_reads_corrected"], res[f"num_{read_type}_reads"])
         logger.info(f"{stat_prefix}{read_type.upper()} reads unable to be corrected into {corrected_tag} tag (of total reads): {count_str} {pct_str}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads unable to be corrected into {corrected_tag} tag (of {read_type} reads): {count_str2} {pct_str2}")
 
-        count_str, pct_str = _get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_ambiguous"], total_reads)
-        count_str2, pct_str2 = _get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_ambiguous"], res[f"num_{read_type}_reads"])
-        count_str3, pct_str3 = _get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_ambiguous"], res[f"num_{read_type}_reads"] - res[f"num_{read_type}_reads_corrected"])
+        count_str, pct_str = get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_ambiguous"], total_reads)
+        count_str2, pct_str2 = get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_ambiguous"], res[f"num_{read_type}_reads"])
+        count_str3, pct_str3 = get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_ambiguous"], res[f"num_{read_type}_reads"] - res[f"num_{read_type}_reads_corrected"])
         logger.info(f"{stat_prefix}{read_type.upper()} reads unable to be corrected into {corrected_tag} tag - Ambiguous (of total reads): {count_str} {pct_str}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads unable to be corrected into {corrected_tag} tag - Ambiguous (of {read_type} reads): {count_str2} {pct_str2}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads unable to be corrected into {corrected_tag} tag - Ambiguous (of {read_type} uncorrected reads): {count_str3} {pct_str3}")
 
-        count_str, pct_str = _get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_no_match"], total_reads)
-        count_str2, pct_str2 = _get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_no_match"], res[f"num_{read_type}_reads"])
-        count_str3, pct_str3 = _get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_no_match"], res[f"num_{read_type}_reads"] - res[f"num_{read_type}_reads_corrected"])
+        count_str, pct_str = get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_no_match"], total_reads)
+        count_str2, pct_str2 = get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_no_match"], res[f"num_{read_type}_reads"])
+        count_str3, pct_str3 = get_field_count_and_percent_string(res[f"num_{read_type}_could_not_correct_no_match"], res[f"num_{read_type}_reads"] - res[f"num_{read_type}_reads_corrected"])
         logger.info(f"{stat_prefix}{read_type.upper()} reads unable to be corrected into {corrected_tag} tag - No Match in Lev Dist (of total reads): {count_str} {pct_str}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads unable to be corrected into {corrected_tag} tag - No Match in Lev Dist (of {read_type} reads): {count_str2} {pct_str2}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads unable to be corrected into {corrected_tag} tag - No Match in Lev Dist (of {read_type} uncorrected reads): {count_str3} {pct_str3}")
 
-        count_str, pct_str = _get_field_count_and_percent_string(res[f"num_{read_type}_reads_raw_was_correct"], total_reads)
-        count_str2, pct_str2 = _get_field_count_and_percent_string(res[f"num_{read_type}_reads_raw_was_correct"], res[f"num_{read_type}_reads"])
+        count_str, pct_str = get_field_count_and_percent_string(res[f"num_{read_type}_reads_raw_was_correct"], total_reads)
+        count_str2, pct_str2 = get_field_count_and_percent_string(res[f"num_{read_type}_reads_raw_was_correct"], res[f"num_{read_type}_reads"])
         logger.info(f"{stat_prefix}{read_type.upper()} reads with already correct {corrected_tag} tag (of total reads): {count_str} {pct_str}")
         logger.info(f"{stat_prefix}{read_type.upper()} reads with already correct {corrected_tag} tag (of {read_type} reads): {count_str2} {pct_str2}")
 
     et = time.time()
     logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
                 f"Overall processing rate: {total_reads/(et - t_start):2.2f} reads/s.")
-
-
-def _get_field_count_and_percent_string(count, total):
-    count_str = f"{count}/{total}"
-    pct_str = f"({0:2.4f}%)" if total == 0 else f"({100.0*count/total:2.4f}%)"
-
-    return count_str, pct_str
 
 
 def _write_thread_fn(data_queue, out_bam_header, out_bam_file_name, barcode_uncorrectable_bam,

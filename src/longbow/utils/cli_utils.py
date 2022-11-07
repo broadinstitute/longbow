@@ -70,3 +70,13 @@ __        ___    ____  _   _ ___ _   _  ____
 
     return f"{header}{message}\n\n#############################################"
 
+
+def get_field_count_and_percent_string(count, total, fformat="2.4f"):
+    count_str = f"{count}/{total}"
+    pct_str = f"({100.0*zero_safe_div(count, total):{fformat}}%)"
+
+    return count_str, pct_str
+
+
+def zero_safe_div(n, d):
+    return 0 if d else n/d

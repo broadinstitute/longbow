@@ -18,6 +18,7 @@ import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
+from ..utils.cli_utils import zero_safe_div
 
 from ..utils.bam_utils import SegmentInfo, get_segments
 
@@ -196,10 +197,8 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
     )
     num_reads = res['num_reads_segmented']
     num_segmented = res['num_segments']
-    if num_reads > 0:
-        logger.info(f"MAS-seq gain factor: {num_segmented/num_reads:.02f}x")
-    else:
-        logger.info(f"MAS-seq gain factor: {0:.02f}x")
+
+    logger.info(f"MAS-seq gain factor: {zero_safe_div(num_segmented, num_reads):.02f}x")
     logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
 
 

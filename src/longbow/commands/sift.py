@@ -18,6 +18,8 @@ from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 from ..utils.bam_utils import SegmentInfo
 from ..utils.bam_utils import get_segments
+from ..utils.constants import FFORMAT
+from ..utils.cli_utils import zero_safe_div
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("sift")
@@ -201,9 +203,6 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
 
     # Calc some stats:
     tot_reads = num_passed + num_failed + num_ignored
-    pct_reads_passing = 100 * num_passed / tot_reads if tot_reads > 0 else 0
-    pct_reads_failing = 100 * num_failed / tot_reads if tot_reads > 0 else 0
-    pct_reads_ignored = 100 * num_ignored / tot_reads if tot_reads > 0 else 0
 
     # Yell at the user / write out summary stats:
     with open(summary_stats, 'w') as f:
@@ -211,19 +210,19 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
         f.write(f"{message}\n")
         logger.info(message)
 
-        message = f"# Reads Passing Model Filter:\t{num_passed:d}\t{pct_reads_passing:02.4f}"
+        message = f"# Reads Passing Model Filter:\t{num_passed:d}\t{100*zero_safe_div(num_passed, tot_reads):{FFORMAT}}"
         f.write(f"{message}\n")
         logger.info(message)
 
-        message = f"# Reads Failing Model Filter:\t{num_failed:d}\t{pct_reads_failing:02.4f}"
+        message = f"# Reads Failing Model Filter:\t{num_failed:d}\t{100*zero_safe_div(num_failed, tot_reads):{FFORMAT}}"
         f.write(f"{message}\n")
         logger.info(message)
 
-        message = f"# Reads Ignored:\t{num_ignored:d}\t{pct_reads_ignored:02.4f}"
+        message = f"# Reads Ignored:\t{num_ignored:d}\t{100*zero_safe_div(num_ignored, tot_reads):{FFORMAT}}"
         f.write(f"{message}\n")
         logger.info(message)
 
-    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: %{FFORMAT}s.", time.time() - t_start)
 
 
 def check_validity(lb_model, segment_ranges):
