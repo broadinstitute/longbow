@@ -45,7 +45,6 @@ class ReadType(enum.Enum):
 
 CODING_REGION = "cDNA"  # TODO: Make this take in / read in a model so that we don't have to specify this.
 READ_QUALITY_TAG = "rq"
-BACK_ALIGNMENT_SCORE_TAG = "JB"
 
 
 class ReadSnapshot:
@@ -198,6 +197,13 @@ class ReadSnapshot:
     help="Tag into which to put whether a given UMI was actually corrected."
 )
 @click.option(
+    "--back-alignment-score-tag",
+    type=str,
+    default="JB",
+    show_default=True,
+    help="Tag containing the back (trailing adapter) alignment score.",
+)
+@click.option(
     "-l",
     "--umi-length",
     type=int,
@@ -235,7 +241,8 @@ class ReadSnapshot:
 def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, max_clr_length_diff, max_ccs_gc_diff,
          max_clr_gc_diff, max_ccs_umi_length_delta, max_clr_umi_length_delta, max_final_ccs_umi_length_delta,
          max_final_clr_umi_length_delta, min_back_seg_score, umi_tag, gene_tag, eq_class_tag, final_umi_tag,
-         umi_corrected_tag, output_bam, reject_bam, force, pre_extracted, cache_read_loci, input_bam):
+         umi_corrected_tag, back_alignment_score_tag, output_bam, reject_bam, force, pre_extracted, cache_read_loci,
+         input_bam):
     """Correct UMIs with Set Cover algorithm."""
     # This algorithm was originally developed by Victoria Popic and imported into Longbow by Jonn Smith.
 
@@ -320,7 +327,7 @@ def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, 
                         read.set_tag(umi_corrected_tag, 0)
 
                     if read_passes_filters(read, umi_length, min_back_seg_score, max_final_ccs_umi_length_delta,
-                                           max_final_clr_umi_length_delta, final_umi_tag):
+                                           max_final_clr_umi_length_delta, final_umi_tag, back_alignment_score_tag):
                         correct_umi_bam.write(read)
                         num_corrected += 1
                     else:
@@ -360,8 +367,8 @@ def get_read_seq(read, pre_extracted):
         return read.query_sequence.upper()[seg.start:seg.end + 1]
 
 
-def get_back_aln_score(read):
-    return int(read.get_tag(BACK_ALIGNMENT_SCORE_TAG).split("/")[0])
+def get_back_aln_score(read, back_alignment_score_tag):
+    return int(read.get_tag(back_alignment_score_tag).split("/")[0])
 
 
 def valid_umi(read, umi_length, ccs_max_umi_len_delta, clr_max_umi_len_delta, umi_tag):
@@ -384,12 +391,12 @@ def valid_tags(read, umi_tag, eq_class_tag):
 
 
 def read_passes_filters(read, umi_length, min_back_seg_score, max_final_ccs_umi_length_delta,
-                        max_final_clr_umi_length_delta, final_umi_tag):
+                        max_final_clr_umi_length_delta, final_umi_tag, back_alignment_score_tag):
     # filters the read based on the final UMI length and back alignment score
 
     max_umi_delta_filter = max_final_ccs_umi_length_delta \
         if ReadType(get_read_type(read)) == ReadType.CCS else max_final_clr_umi_length_delta
-    return get_back_aln_score(read) >= min_back_seg_score and abs(len(read.get_tag(final_umi_tag)) - umi_length) <= max_umi_delta_filter
+    return get_back_aln_score(read, back_alignment_score_tag) >= min_back_seg_score and abs(len(read.get_tag(final_umi_tag)) - umi_length) <= max_umi_delta_filter
 
 
 def extract_read_groups(input_bam_fname, umi_length, pre_extracted, ccs_max_umi_len_delta, clr_max_umi_len_delta, umi_tag,

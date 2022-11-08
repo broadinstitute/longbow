@@ -97,6 +97,9 @@ Options:
                                   values.  [default: BX]
   --umi-corrected-tag TEXT        Tag into which to put whether a given UMI
                                   was actually corrected.  [default: UX]
+  --back-alignment-score-tag TEXT
+                                  Tag containing the back (trailing adapter)
+                                  alignment score.  [default: JB]
   -l, --umi-length INTEGER        Length of the UMI for this sample.
                                   [default: 10]
   -o, --output-bam PATH           Corrected UMI bam output [default: stdout].
