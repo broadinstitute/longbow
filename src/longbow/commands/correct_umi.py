@@ -406,7 +406,7 @@ def extract_read_groups(input_bam_fname, umi_length, pre_extracted, ccs_max_umi_
     n_filtered_gene = 0
     n_valid_reads = 0
     n_total_reads = 0
-    with pysam.AlignmentFile(input_bam_fname, "rb") as input_bam:
+    with pysam.AlignmentFile(input_bam_fname, "rb", check_sq=False, require_index=False) as input_bam:
         for read in tqdm(input_bam, desc="Extracting Read Groups", unit=" read", total=total_num_reads, position=0):
             if not valid_tags(read, umi_tag, eq_class_tag):
                 continue
