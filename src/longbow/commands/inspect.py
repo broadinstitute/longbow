@@ -117,7 +117,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     required=False,
     help="Store annotations from a downstream BAM file so they can be displayed on reads from previous processing steps."
 )
-@click.argument("input-bam", type=click.Path(exists=True))
+@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
 def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min_rq, quick, annotated_bam, input_bam):
     """Inspect the classification results on specified reads."""
 
