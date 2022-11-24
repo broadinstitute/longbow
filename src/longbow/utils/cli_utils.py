@@ -79,4 +79,4 @@ def get_field_count_and_percent_string(count, total, fformat="2.4f"):
 
 
 def zero_safe_div(n, d):
-    return 0 if d else n/d
+    return 0 if not d else n/d

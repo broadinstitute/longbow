@@ -1,0 +1,108 @@
+{
+    "name": "mas_16+sc_10x3p",
+    "description": "16-element MAS-ISO-seq array, single-cell 10x 3' kit",
+    "array": {
+        "description": "16-element MAS-ISO-seq array",
+        "version": "3.0.0",
+        "structure": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F",
+            "G",
+            "H",
+            "I",
+            "J",
+            "K",
+            "L",
+            "M",
+            "N",
+            "O",
+            "P",
+            "Q"
+        ],
+        "adapters": {
+            "A": "AGCTTACTTGTGAAGA",
+            "B": "ACTTGTAAGCTGTCTA",
+            "C": "ACTCTGTCAGGTCCGA",
+            "D": "ACCTCCTCCTCCAGAA",
+            "E": "AACCGGACACACTTAG",
+            "F": "AGAGTCCAATTCGCAG",
+            "G": "AATCAAGGCTTAACGG",
+            "H": "ATGTTGAATCCTAGCG",
+            "I": "AGTGCGTTGCGAATTG",
+            "J": "AATTGCGTAGTTGGCC",
+            "K": "ACACTTGGTCGCAATC",
+            "L": "AGTAAGCCTTCGTGTC",
+            "M": "ACCTAGATCAGAGCCT",
+            "N": "AGGTATGCCGGTTAAG",
+            "O": "AAGTCACCGGCACCTT",
+            "P": "ATGAAGTGGCTCGAGA",
+            "Q": "AGTAGCTGTGTGCA"
+        },
+        "deprecated": false,
+        "name": "mas_16"
+    },
+    "cdna": {
+        "description": "single-cell 10x 3' kit",
+        "version": "3.0.0",
+        "structure": [
+            "5p_Adapter",
+            "CBC",
+            "UMI",
+            "Poly_T",
+            "cDNA",
+            "3p_Adapter"
+        ],
+        "adapters": {
+            "5p_Adapter": "TCTACACGACGCTCTTCCGATCT",
+            "CBC": {
+                "FixedLengthRandomBases": 16
+            },
+            "UMI": {
+                "FixedLengthRandomBases": 12
+            },
+            "Poly_T": {
+                "HomopolymerRepeat": [
+                    "T",
+                    30
+                ]
+            },
+            "cDNA": "random",
+            "3p_Adapter": "CCCATGTACTCTGCGTTGATACCACTGCTT"
+        },
+        "named_random_segments": [
+            "CBC",
+            "UMI",
+            "cDNA"
+        ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+            "UMI": [
+                [
+                    "ZU",
+                    "XU"
+                ],
+                [
+                    "XM",
+                    "XU"
+                ]
+            ],
+            "CBC": [
+                [
+                    "CR",
+                    "XB"
+                ],
+                [
+                    "XC",
+                    "XB"
+                ]
+            ]
+        },
+        "deprecated": false,
+        "name": "sc_10x3p"
+    }
+}
+
