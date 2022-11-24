@@ -352,6 +352,33 @@ class ModelBuilder:
 
     pre_configured_models = {
         'array': {
+            "mas_16": {
+                "description": "16-element MAS-ISO-seq array",
+                "version": "3.0.0",
+                "structure": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q"],
+                "adapters": {
+                    "A": "AGCTTACTTGTGAAGA",
+                    "B": "ACTTGTAAGCTGTCTA",
+                    "C": "ACTCTGTCAGGTCCGA",
+                    "D": "ACCTCCTCCTCCAGAA",
+                    "E": "AACCGGACACACTTAG",
+                    "F": "AGAGTCCAATTCGCAG",
+                    "G": "AATCAAGGCTTAACGG",
+                    "H": "ATGTTGAATCCTAGCG",
+                    "I": "AGTGCGTTGCGAATTG",
+                    "J": "AATTGCGTAGTTGGCC",
+                    "K": "ACACTTGGTCGCAATC",
+                    "L": "AGTAAGCCTTCGTGTC",
+                    "M": "ACCTAGATCAGAGCCT",
+                    "N": "AGGTATGCCGGTTAAG",
+                    "O": "AAGTCACCGGCACCTT",
+                    "P": "ATGAAGTGGCTCGAGA",
+                    "Q": "AGTAGCTGTGTGCA",
+                },
+                "deprecated": False,
+                "name": "mas_16",
+            },
+
             "mas_15": {
                 "description": "15-element MAS-ISO-seq array",
                 "version": "3.0.0",
