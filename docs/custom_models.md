@@ -1,9 +1,8 @@
 ---
 layout: default
-title: Commands
+title: Custom models
 description: "Custom models."
 nav_order: 6
-has_children: true
 ---
 
 # Custom models
