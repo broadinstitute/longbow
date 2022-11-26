@@ -8,62 +8,122 @@ has_children: true
 
 # Custom models
 
-Longbow allows for a custom annotation model to be specified, enabling new array and/or cDNA designs to be utilized and automatically benefit from the model-based array and cDNA filtering commands.
+Longbow allows for a custom annotation model to be specified, enabling new array and/or cDNA designs to be utilized and automatically benefit from Longbow's model-based array and cDNA filtering commands. This also helps prepare data with BAM tags containing extracted sequence information that may be needed for the data to be used with downstream tools.
+
+A custom model is a [JSON file](https://www.json.org/json-en.html) containing the name and description for the combined model and two high-level sections: (1) the array model specification, and (2) the cDNA model specification. (Note that future versions will also permit multiplexing models to be provided.) When Longbow reads a custom model file, it will automatically build a hidden Markov model with the whole cDNA model interlaced between the adapters in the array model.
 
 This feature is under continuous improvement and may change as we head towards a finalized API for the future 1.0.0 release. [Feedback is welcome](https://github.com/broadinstitute/longbow/issues)!
 
-## Example model file
+## Example
 
-A custom model is a [JSON file](https://www.json.org/json-en.html) containing the name and description for the combined model and two high-level sections: (1) the array model specification, and (2) the cDNA model specification. (Note that future versions will also permit multiplexing models to be provided.)
+### Creating a fake read to annotate
 
-When Longbow reads a custom model file, it will automatically build a hidden Markov model with the whole cDNA model interlaced between the adapters in the array model.
+To demonstrate this feature, we shall make a fake read that comes from a hypothetical 2-element MAS-seq array and a simplified 10x 5' single-cell library prep.  Here's a script to create the read and store it in the file "fake_read.bam":
 
-Let's look at a small example: a model with a 2-element MAS-seq array and 10x 5' single-cell cDNA model. The model file is as follows:
+```shell
+#!/bin/bash
+
+# MAS-seq adapters
+A="AGCTT"
+B="ACTTG"
+C="ACTCT"
+
+# Single-cell adapters
+Adapter5p="TCTACACG"
+SLS="TTTGGG"
+Poly_A="AAAAAA"
+Adapter3p="GTACTCTG"
+
+# Transcript 1 (with cell barcode and UMI)
+CBC1="CAGTCA"
+UMI1="ACG"
+cDNA1="ATGGTGTCATGATTCGTATGATCATCGTAG"
+
+# Transcript 2 (with cell barcode and UMI)
+CBC2="ACTGAC"
+UMI2="GAC"
+cDNA2="ATGGTGCTATACATGCATTAG"
+
+# Create a valid BAM file
+echo "$A$Adapter5p$CBC1$UMI1$SLS$cDNA1$Poly_A$Adapter3p$B$Adapter5p$CBC2$UMI2$SLS$cDNA2$Poly_A$Adapter3p$C" | \
+	awk '{ a=$1; gsub(".", "!", a); print "@HD VN:1.5 SO:unknown\n@RG ID:abcdef12 SM:testsample\nm99999_221126_010101/1/ccs 4 * 0 255 * * 0 0", $1, a, "np:i:10 rq:f:1.0 zm:i:1 RG:Z:abcdef12" }' | \
+	sed 's/ /\t/g' | \
+	samtools view -b --no-PG > fake_read.bam
+```
+
+### Creating a custom model to annotate the fake read
+
+We wish to annotate the constituent pieces of this read. To do so, we need to prepare a custom model specifying all of the adapters and unknown sequences that Longbow should annotate. Our custom model file ("fake_model.json") is as follows:
 
     {
-      "name": "mas_2+sc_10x5p",
-      "description": "2-element MAS-ISO-seq array, single-cell 10x 5' kit",
+      "name": "mas_2+fake_10x5p",
+      "description": "2-element MAS-ISO-seq array, fake single-cell 10x 5' kit",
 
       "array": {
-          "description": "2-element MAS-ISO-seq array",
-          "version": "3.0.0",
-          "structure": [ "A", "B", "C" ],
-          "adapters": {
-              "A": "AGCTTACTTGTGAAGA",
-              "B": "ACTTGTAAGCTGTCTA",
-              "C": "ACTCTGTCAGGTCCGA"
-          },
-          "deprecated": false,
-          "name": "mas_3"
+        "name": "mas_2",
+        "description": "2-element MAS-ISO-seq array",
+        "version": "0.0.1",
+        "deprecated": false,
+
+        "structure": [ "A", "B", "C" ],
+        "adapters": {
+          "A": "AGCTT",
+          "B": "ACTTG",
+          "C": "ACTCT"
+        }
       },
 
       "cdna": {
-          "description": "single-cell 10x 5' kit",
-          "version": "3.0.0",
-          "structure": [ "5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter" ],
-          "adapters": {
-              "5p_Adapter":   "TCTACACGACGCTCTTCCGATCT",
-              "CBC":        { "FixedLengthRandomBases": 16 },
-              "UMI":        { "FixedLengthRandomBases": 10 },
-              "SLS":          "TTTCTTATATGGG",
-              "cDNA":         "random",
-              "Poly_A":     { "HomopolymerRepeat": [ "A", 30 ] },
-              "3p_Adapter":   "GTACTCTGCGTTGATACCACTGCTT"
-          },
-          "named_random_segments": [ "CBC", "UMI", "cDNA" ],
-          "coding_region": "cDNA",
-          "annotation_segments": {
-              "UMI": [ [ "ZU", "XU" ], [ "XM", "XU" ] ],
-              "CBC": [ [ "CR", "XB" ], [ "XC", "XB" ] ]
-          },
-          "deprecated": false,
-          "name": "sc_10x5p"
+        "name": "fake_10x5p",
+        "description": "fake single-cell 10x 5' kit",
+        "version": "0.0.1",
+        "deprecated": false,
+
+        "structure": [ "5p_Adapter", "CBC", "UMI", "SLS", "cDNA", "Poly_A", "3p_Adapter" ],
+        "adapters": {
+          "5p_Adapter":   "TCTACACG",
+          "CBC":        { "FixedLengthRandomBases": 6 },
+          "UMI":        { "FixedLengthRandomBases": 3 },
+          "SLS":          "TTTGGG",
+          "cDNA":         "random",
+          "Poly_A":     { "HomopolymerRepeat": [ "A", 6 ] },
+          "3p_Adapter":   "GTACTCTG"
+        },
+
+        "named_random_segments": [ "CBC", "UMI", "cDNA" ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+          "UMI": [ [ "ZU", "XU" ] ],
+          "CBC": [ [ "CR", "XB" ] ]
+        }
       }
     }
 
-The layout for this model is diagrammed below using the [JSON Crack](https://jsoncrack.com/editor) editor:
+To help with understanding how this file is laid out, we've diagrammed the model below using the [JSON Crack](https://jsoncrack.com/editor) editor:
 
 ![](figures/example_model_graph.png)
+
+### Visualizing the annotation of the fake read with our custom model
+
+To see how our custom model fares in annotating this read, we can use Longbow's `inspect` command as follows:
+
+```shell
+$ longbow inspect -m fake_model.json -o images fake_read.bam
+[INFO 2022-11-26 15:44:01  inspect] Invoked via: longbow inspect -m fake_model.json -o images fake_read.bam
+[INFO 2022-11-26 15:44:01  inspect] Using mas_2+fake_10x5p: 2-element MAS-ISO-seq array, fake single-cell 10x 5' kit
+[INFO 2022-11-26 15:44:01  inspect] Figure drawing mode: extended
+[INFO 2022-11-26 15:44:01  inspect] No read names given. Inspecting every read in the input bam file.
+[INFO 2022-11-26 15:44:01  inspect] Drawing read 'm99999_221126_010101/1/ccs' to 'images/m99999_221126_010101_1_ccs.pdf'
+[INFO 2022-11-26 15:44:04  inspect] Done. Elapsed time: 2.37s.
+```
+
+This results in a figure that displays how each base in the read was annotated:
+
+![](figures/m99999_221126_010101_1_ccs.png)
+
+As depicted in the figure, the MAS-seq and single-cell adapters have been successfully annotated. (Note that the under-annotation of the cDNA sequence by a single base at the start of the sequence is a known issue and will be addressed prior to the 1.0 release).
+
+### Behind the scenes
 
 Internally to Longbow, this results in an HMM that looks (approximately) as follows:
 
