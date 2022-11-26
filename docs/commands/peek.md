@@ -1,6 +1,6 @@
 ---
 layout: default
-title: pad
+title: peek
 description: "Guess the best pre-built array model to use for annotation."
 nav_order: 11
 parent: Commands

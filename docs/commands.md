@@ -2,7 +2,7 @@
 layout: default
 title: Commands
 description: "Longbow commands."
-nav_order: 6
+nav_order: 7
 has_children: true
 ---
 
