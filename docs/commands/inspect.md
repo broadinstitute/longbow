@@ -25,43 +25,50 @@ Usage: longbow inspect [OPTIONS] INPUT_BAM
   Inspect the classification results on specified reads.
 
 Options:
-  -v, --verbosity LVL          Either CRITICAL, ERROR, WARNING, INFO or DEBUG
-  -r, --read-names TEXT        read names (or file(s) of read names) to
-                               inspect
-  -p, --pbi PATH               BAM .pbi index file
-  -f, --file-format [png|pdf]  Image file format
-  -o, --outdir PATH            Output directory
-  -m, --model TEXT             The model to use for annotation.  If the given
-                               value is a pre-configured model name, then that
-                               model will be used.  Otherwise, the given value
-                               will be treated as a file name and Longbow will
-                               attempt to read in the file and create a
-                               LibraryModel from it.  Longbow will assume the
-                               contents are the configuration of a
-                               LibraryModel as per LibraryModel.to_json().
-                               [default: mas15]
-  --seg-score                  Display alignment score for annotated segments.
-                               [default: False]
-  --max-length INTEGER         Maximum length of a read to process.  Reads
-                               beyond this length will not be annotated.  If
-                               the input file has already been annotated, this
-                               parameter is ignored.  [default: 60000]
-  --min-rq FLOAT               Minimum ccs-determined read quality for a read
-                               to be annotated.  CCS read quality range is
-                               [-1,1].  If the input file has already been
-                               annotated, this parameter is ignored.
-                               [default: -2.0]
-  --help                       Show this message and exit.
+  -v, --verbosity LVL           Either CRITICAL, ERROR, WARNING, INFO or DEBUG
+  -r, --read-names TEXT         read names (or file(s) of read names) to
+                                inspect
+  -p, --pbi PATH                BAM .pbi index file
+  -f, --file-format [png|pdf]   Image file format  [default: pdf]
+  -o, --outdir PATH             Output directory  [default: .]
+  -m, --model TEXT              The model to use for annotation.  If the given
+                                value is a pre-configured model name, then
+                                that model will be used.  Otherwise, the given
+                                value will be treated as a file name and
+                                Longbow will attempt to read in the file and
+                                create a LibraryModel from it.  Longbow will
+                                assume the contents are the configuration of a
+                                LibraryModel as per LibraryModel.to_json().
+  --seg-score                   Display alignment score for annotated
+                                segments.  (--quick mode only)  [default:
+                                False]
+  --max-length INTEGER          Maximum length of a read to process.  Reads
+                                beyond this length will not be annotated.  If
+                                the input file has already been annotated,
+                                this parameter is ignored.  [default: 30000]
+  --min-rq FLOAT                Minimum ccs-determined read quality for a read
+                                to be annotated.  CCS read quality range is
+                                [-1,1].  If the input file has already been
+                                annotated, this parameter is ignored.
+                                [default: -2]
+  -q, --quick                   Create quick (simplified) inspection figures.
+                                [default: False]
+  -a, --annotated-bam FILENAME  Store annotations from a downstream BAM file
+                                so they can be displayed on reads from
+                                previous processing steps.
+  --help                        Show this message and exit.
 ```
 
 ## Example
 
 ```shell
-$ longbow inspect -r m64020_201213_022403/25/ccs --seg-score -o images tests/test_data/mas15_test_input.bam
-[INFO 2021-08-09 11:13:37  inspect] Invoked via: longbow inspect -r m64020_201213_022403/25/ccs --seg-score -o images tests/test_data/mas15_test_input.bam
-[INFO 2021-08-09 11:13:37  inspect] Using The standard MAS-seq 15 array element model.
-[INFO 2021-08-09 11:13:40  inspect] Drawing read 'm64020_201213_022403/25/ccs' to 'images/m64020_201213_022403_25_ccs.png'
-[INFO 2021-08-09 11:13:44  inspect] Done. Elapsed time: 7.00s.
+$ longbow inspect -m mas_15+sc_10x5p -r m64020_201213_022403/25/ccs -o images tests/test_data/mas15_test_input.bam
+[INFO 2022-11-25 20:29:36  inspect] Invoked via: longbow inspect -m mas_15+sc_10x5p -r m64020_201213_022403/25/ccs -o images tests/test_data/mas15_test_input.bam
+[INFO 2022-11-25 20:29:37  inspect] Using mas_15+sc_10x5p: 15-element MAS-ISO-seq array, single-cell 10x 5' kit
+[INFO 2022-11-25 20:29:37  inspect] Figure drawing mode: extended
+[INFO 2022-11-25 20:29:37  inspect] No .pbi file available. Inspecting whole input bam file until we find specified reads.
+[INFO 2022-11-25 20:29:37  inspect] Drawing read 'm64020_201213_022403/25/ccs' to 'images/m64020_201213_022403_25_ccs.pdf'
+[INFO 2022-11-25 20:31:18  inspect] Done. Elapsed time: 101.38s.
 ```
 
 An example screenshot from the `longbow inspect` command can be found below.  Note that for visual clarity, `random` model sections are drawn as gray read sections.  Only adapter sequences and poly-A tails are labeled and color-coded.
