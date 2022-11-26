@@ -712,7 +712,6 @@ class LibraryModel:
 
     @staticmethod
     def has_prebuilt_model(model_name):
-        print(model_name)
         model_name_pieces = MODEL_NAME_REGEX.split(model_name)
 
         if len(model_name_pieces) == 2:
