@@ -352,6 +352,34 @@ class ModelBuilder:
 
     pre_configured_models = {
         'array': {
+            "probes": {
+                "description": "Probes",
+                "version": "3.0.0",
+                "structure": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R"],
+                "adapters": {
+                    "A": "TGGGAGCTGTAGACCGGAGCTGTTCCTATTCGGCCATCTT",
+                    "B": "ACCTCAGATGGAAATGCAGAAATCACCGTCTTCTGCGTCG",
+                    "C": "TGTTCTGTTGCTGGTGAGGAACTGCGTTCCTTTGGAGGAG",
+                    "D": "GTCCTCCCGTAGCTCAGAGTAATTTGATCGTCTGAAGCCT",
+                    "E": "CACTTGAGGAGGCAGTCTGCCCGTTCTCAGATCTCCAGCT",
+                    "F": "GCTGTCAGACAGGGACACTTAAGTCTGCAGAGGTTACTGC",
+                    "G": "GAGGGTAACCCGACCTTTCTCTCTGGCTGCCCTTAACATT",
+                    "H": "ACTCTCTTCTGGCTTGTAGGGTTTCTGCCGAGAGATCCGC",
+                    "I": "GAGATGGGTTTCCTGAATACAGCACACTGATGGGTCTTGA",
+                    "J": "CCAACTTGCCAGTCTGTGTCTTTTAATTGCAGAATTTAGTCC",
+                    "K": "AATTTCCCTCTACACACTGCTTTGAATGCGTCCCAGAGAT",
+                    "L": "TTCTTGCCTTCTGCTAGCTTTTGAATGTGTTTGCTCTTGC",
+                    "M": "CATCCCTGTCTTGTGCCGGTTTTCAAAGGGAATGCTTCCA",
+                    "N": "TCAGTATGATATTGGCTGTGGGTTTGTCATAGATAGCTCT",
+                    "O": "TGGGTTGGTTCCAAGTCTTTGCTATTGTGAATAGTGCCGC",
+                    "P": "ACTCATTTGGGTATATACCCAGTAATGGGATGGCTGGGTC",
+                    "Q": "CCCAGAGTGTGATATTCCCCTTCCTGTGTCCATGTGATCT",
+                    "R": "TGGTGCGCTGCACCCACTAATGTGTCATCTAGCATTAGGT",
+                },
+                "deprecated": False,
+                "name": "probes",
+            },
+
             "mas_16": {
                 "description": "16-element MAS-ISO-seq array",
                 "version": "3.0.0",
@@ -440,6 +468,22 @@ class ModelBuilder:
         },
 
         'cdna': {
+            "empty": {
+                "description": "empty",
+                "version": "3.0.0",
+                "structure": ["PAD1", "cDNA", "PAD2"],
+                "adapters": {
+                    "PAD1": "A",
+                    "cDNA": RANDOM_SEGMENT_NAME,
+                    "PAD2": "A",
+                },
+                "named_random_segments": ["cDNA"],
+                "coding_region": "cDNA",
+                "annotation_segments": {},
+                "deprecated": False,
+                "name": "empty",
+            },
+
             "sc_10x3p": {
                 "description": "single-cell 10x 3' kit",
                 "version": "3.0.0",

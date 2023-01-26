@@ -305,6 +305,10 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, lb_model, min_lengt
 
         # Unpack our data here:
         read = raw_data
+
+        # Convert to unaligned read:
+        
+
         read = pysam.AlignedSegment.fromstring(
             read, pysam.AlignmentHeader.from_dict(dict())
         )
