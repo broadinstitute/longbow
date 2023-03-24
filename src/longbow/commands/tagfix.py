@@ -12,8 +12,6 @@ import tqdm
 import pysam
 import multiprocessing as mp
 
-from construct import *
-
 import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils.cli_utils import format_obnoxious_warning_message
@@ -77,7 +75,7 @@ def main(threads, output_bam, force, input_bam):
     if not num_reads:
         num_reads = bam_utils.get_read_count_from_bam_index(input_bam)
     if num_reads:
-        logger.info(f"About to tagfix %d reads.", num_reads)
+        logger.info(f"About to tagfix {num_reads} reads.")
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(

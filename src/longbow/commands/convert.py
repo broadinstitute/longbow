@@ -1,6 +1,5 @@
 import logging
 import sys
-import itertools
 import time
 import os
 

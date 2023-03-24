@@ -1,17 +1,12 @@
 import logging
-import time
 import sys
-import re
 
 import pickle
 
 import click
 import click_log
 
-import multiprocessing as mp
-
 import networkx as nx
-from networkx.drawing.nx_pydot import write_dot
 
 import matplotlib.pyplot as plt
 
@@ -83,7 +78,7 @@ def main(list_models, dump):
             model_name=model_name
         )
 
-        logger.info(f"Dumping %s: %s", lb.name, lb.description)
+        logger.info(f"Dumping {lb.name}: {lb.description}")
 
         model_dump_base_name = f"longbow_model-{lb.name}-Av{lb.array_version}_Cv{lb.cdna_version}"
 

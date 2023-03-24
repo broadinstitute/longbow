@@ -13,8 +13,6 @@ import concurrent.futures
 import pysam
 
 import longbow.utils.constants
-from ..utils import model as LongbowModel
-from ..utils.model import LibraryModel
 
 from ..utils import bam_utils
 
@@ -81,7 +79,7 @@ def main(
 
     # Get our model:
     m = bam_utils.load_model(model, training_bam)
-    logger.info(f"Using %s: %s", m.name, m.description)
+    logger.info(f"Using {m.name}: {m.description}")
 
     training_seqs = load_training_seqs(m, num_training_samples, threads, training_bam)
 
@@ -100,7 +98,7 @@ def main(
     with open(output_yaml, "w") as model_file:
         print(improvement.to_yaml(), file=model_file)
 
-    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: {time.time() - t_start:2.2f}s.")
 
 
 def load_training_seqs(m, num_training_samples, threads, training_bam):

@@ -1,10 +1,9 @@
 import sys
 import re
 import logging
+import json
 
 import click_log
-
-from pomegranate import *
 
 import longbow.utils.model_utils
 from .model_utils import ModelBuilder
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 click_log.basic_config(logger)
 
 # NOTE: The backslash here is because the delimiter itself is a plus sign.
-MODEL_NAME_REGEX = re.compile(f"\{MODEL_DESC_DELIMITER}")
+MODEL_NAME_REGEX = re.compile(f"\\{MODEL_DESC_DELIMITER}")
 
 
 class LibraryModel:
@@ -450,8 +449,8 @@ class LibraryModel:
             raise RuntimeError(message)
 
         if len(json_data) > len(required_fields):
-            logger.warning(f"Model JSON data has additional fields that are not required.  "
-                           f"These fields will be ignored: ")
+            logger.warning("Model JSON data has additional fields that are not required.  "
+                           "These fields will be ignored: ")
 
     @staticmethod
     def from_json_file(json_file):
@@ -542,11 +541,7 @@ class LibraryModel:
         named_node_state_maps[RANDOM_SEGMENT_NAME] = []
 
         with open(out_file_name, 'w') as f:
-            f.write(f"digraph ")
-            f.write(f"{self.name}")
-            f.write(" {\n")
-
-            f.write("\n")
+            f.write(f"digraph {self.name} {{\n\n")
 
             # Write out the nodes:
             f.write("    // States:\n")
@@ -595,11 +590,7 @@ class LibraryModel:
         named_node_state_maps[RANDOM_SEGMENT_NAME] = []
 
         with open(out_file_name, 'w') as f:
-            f.write(f"digraph ")
-            f.write(f"{self.name}")
-            f.write(" {\n")
-
-            f.write("\n")
+            f.write(f"digraph {self.name} {{\n\n")
 
             # Write out the nodes:
             f.write("    // States:\n")

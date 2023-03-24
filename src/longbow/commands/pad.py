@@ -1,29 +1,19 @@
 import logging
-import math
 import sys
 import itertools
 import re
 import time
 import os
-from collections import defaultdict
 
 import click
 import click_log
 import tqdm
 
-import ssw
-
 import pysam
 import multiprocessing as mp
 
-import gzip
-from construct import *
-
 import longbow.utils.constants
-from ..utils import bam_utils, barcode_utils
-from ..utils.bam_utils import SegmentInfo
-from ..utils import model as LongbowModel
-from ..utils.model import LibraryModel
+from ..utils import bam_utils
 from ..utils.cli_utils import format_obnoxious_warning_message
 
 
@@ -110,11 +100,11 @@ def main(threads, output_bam, model, force, barcode_tag, new_barcode_tag, expand
     if not num_reads:
         num_reads = bam_utils.get_read_count_from_bam_index(input_bam)
     if num_reads:
-        logger.info(f"About to pad %d reads.", num_reads)
+        logger.info(f"About to pad {num_reads} reads.")
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+    logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.

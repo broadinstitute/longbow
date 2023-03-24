@@ -265,7 +265,7 @@ class ModelBuilder:
 
     @staticmethod
     def make_random_repeat_model():
-        logger.debug(f"Making Model: RANDOM REPEAT")
+        logger.debug("Making Model: RANDOM REPEAT")
         model = HiddenMarkovModel(name=RANDOM_SEGMENT_NAME)
 
         # add states

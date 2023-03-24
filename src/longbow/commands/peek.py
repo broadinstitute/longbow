@@ -1,4 +1,3 @@
-from cmath import inf
 import logging
 import math
 import sys
@@ -15,13 +14,8 @@ import numpy as np
 import pysam
 import multiprocessing as mp
 
-import gzip
-from construct import *
-
 import longbow.utils.constants
 from ..utils import bam_utils
-from ..utils.bam_utils import SegmentInfo
-from ..utils import model as LongbowModel
 from ..utils.model import LibraryModel
 from ..utils.model_utils import ModelBuilder
 from ..utils.cli_utils import zero_safe_div
@@ -352,7 +346,7 @@ def _worker_attempt_segmentations_fn(in_queue, out_queue, worker_num, min_length
         out_queue.put(best_model)
         num_reads_segmented += 1
 
-    logger.debug(f"Worker %d: Num reads segmented: %d", worker_num, num_reads_segmented)
+    logger.debug(f"Worker {worker_num}: Num reads segmented: {num_reads_segmented}")
 
 
 def _get_best_model(read, models):

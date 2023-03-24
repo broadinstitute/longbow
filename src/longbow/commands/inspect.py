@@ -18,7 +18,6 @@ from polyleven import levenshtein
 import ssw
 
 from collections import OrderedDict
-from collections import Counter
 
 from construct import *
 
@@ -26,8 +25,6 @@ import matplotlib.pyplot as plt
 from matplotlib import transforms
 
 import longbow.utils.constants
-from ..utils import model
-from ..utils.model import LibraryModel
 from ..utils import bam_utils
 
 logging.basicConfig(stream=sys.stderr)
@@ -134,16 +131,16 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+    logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     # Open our bam file:
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
 
-        logger.info(f"Figure drawing mode: %s", 'simplified' if quick else 'extended')
+        logger.info(f"Figure drawing mode: {'simplified' if quick else 'extended'}")
 
         if seg_score and not quick:
-            logger.warning(f"Seg score selected, but not using quick mode.  Ignoring --seg-score.")
+            logger.warning("Seg score selected, but not using quick mode.  Ignoring --seg-score.")
 
         # If we have read names, we should use them to inspect the file:
         if len(read_names) > 0:
@@ -173,7 +170,7 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
             for read in bam_file:
                 __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, anns, name_map)
 
-    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: {time.time() - t_start:2.2f}s.")
 
 
 def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, anns, name_map):

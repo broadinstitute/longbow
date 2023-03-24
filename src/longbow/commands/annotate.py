@@ -10,12 +10,8 @@ import click
 import click_log
 import tqdm
 
-import ssw
-
 import pysam
 import multiprocessing as mp
-
-from construct import *
 
 import longbow.utils
 import longbow.utils.constants
@@ -119,7 +115,7 @@ def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq,
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+    logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
@@ -232,8 +228,6 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_file_name, disable_pbar,
 
     out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
-    ssw_aligner = ssw.Aligner()
-
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
     ) as out_bam_file, tqdm.tqdm(
@@ -328,8 +322,9 @@ def _worker_segmentation_fn(in_queue, out_queue, worker_num, lb_model, min_lengt
         out_queue.put(segment_info)
         num_reads_processed += 1
 
-    logger.debug(f"Worker %d: Num reads segmented/processed: %d/%d", worker_num, num_reads_segmented,
-                 num_reads_processed)
+    logger.debug(
+        f"Worker {worker_num}: Num reads segmented/processed: {num_reads_segmented}/{num_reads_processed}"
+    )
 
 
 def _annotate_and_assign_read_to_model(read, model):

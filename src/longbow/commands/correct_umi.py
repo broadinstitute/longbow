@@ -1,22 +1,17 @@
 import logging
 import os
-import re
 import time
 import sys
-import itertools
 
 import click
 import click_log
 from tqdm import tqdm
 import pickle
 import enum
-import operator
 
 from polyleven import levenshtein
 
 import pysam
-
-from construct import *
 
 from collections import defaultdict
 from collections import Counter
@@ -259,7 +254,7 @@ def main(umi_length, max_ccs_edit_dist, max_clr_edit_dist, max_ccs_length_diff, 
     if not num_reads:
         num_reads = bam_utils.get_read_count_from_bam_index(input_bam)
     if num_reads:
-        logger.info(f"About to correct umis in %d reads.", num_reads)
+        logger.info(f"About to correct umis in {num_reads} reads.")
 
     # silence message about the .bai file not being found
     pysam.set_verbosity(0)
