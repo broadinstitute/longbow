@@ -3,21 +3,16 @@ import sys
 import itertools
 import time
 import os
-import math
 
 import click
 import click_log
 import tqdm
 
-import ssw
-
 import pysam
 import multiprocessing as mp
 
 from ..utils import bam_utils
-from ..utils.model import LibraryModel
 
-import longbow.utils.constants
 
 logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger("demultiplex")
@@ -229,4 +224,4 @@ def _worker_demux_fn(in_queue, out_queue, worker_num, demux_on_tag):
 
         num_reads_processed += 1
 
-    logger.debug(f"Worker %d: Num reads processed: %d", worker_num, num_reads_processed)
+    logger.debug(f"Worker {worker_num}: Num reads processed: {num_reads_processed}")

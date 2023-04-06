@@ -1,5 +1,4 @@
 import logging
-import queue
 import time
 import sys
 import os
@@ -17,11 +16,8 @@ from collections import defaultdict
 
 from tqdm import tqdm
 
-from construct import *
-
 import longbow.utils.constants
 from ..utils import bam_utils, barcode_utils
-from ..utils.model import LibraryModel
 
 from ..utils.cli_utils import get_field_count_and_percent_string
 
@@ -195,7 +191,7 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+    logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
@@ -434,7 +430,7 @@ def _correct_barcode_fn(in_queue, out_queue, bam_header_dict, barcode_tag, corre
     bam_header = pysam.AlignmentHeader.from_dict(bam_header_dict)
 
     # Create the sym spell index here (in the sub-process) to reduce memory overhead / copying.
-    logger.info(f"Generating barcode index...")
+    logger.info("Generating barcode index...")
     st = time.time()
     sym_spell_index = barcode_utils.generate_symspell_index(barcode_freqs, max(max_hifi_dist, max_clr_dist),
                                                             barcode_length)

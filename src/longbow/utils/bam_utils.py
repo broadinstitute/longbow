@@ -4,7 +4,6 @@ import gzip
 import logging
 import click_log
 import re
-from numpy import isin
 import pysam
 import sys
 import array
@@ -133,7 +132,6 @@ def compute_shard_offsets(pbi_file, num_shards):
 
     # Make a list of bgzf virtual file offsets for sharding and store ZMW counts.
     file_offsets_hash = OrderedDict()
-    last_offset = 0
     zmw_count_hash = dict()
     with gzip.open(pbi_file, "rb") as f:
         idx_contents = fmt.parse_stream(f)
@@ -143,8 +141,6 @@ def compute_shard_offsets(pbi_file, num_shards):
             # that shard boundaries always keep reads from the same ZMW together.
             if idx_contents.holeNumber[j] not in file_offsets_hash:
                 file_offsets_hash[idx_contents.holeNumber[j]] = idx_contents.fileOffset[j]
-
-            last_offset = idx_contents.fileOffset[j]
 
             try:
                 zmw_count_hash[idx_contents.holeNumber[j]] += 1
@@ -375,7 +371,7 @@ def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file, ssw_alig
     if total_max_score != 0:
         read.set_tag(READ_APPROX_QUAL_TAG, f"{total_score / total_max_score:.4f}")
     else:
-        read.set_tag(READ_APPROX_QUAL_TAG, f"0.0")
+        read.set_tag(READ_APPROX_QUAL_TAG, "0.0")
 
     out_bam_file.write(read)
 

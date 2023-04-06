@@ -18,8 +18,6 @@ import matplotlib.pyplot as plt
 import longbow.utils.constants
 from ..utils import bam_utils
 from ..utils import plot_utils
-from ..utils import model as LongbowModel
-from ..utils.model import LibraryModel
 from ..utils.constants import FFORMAT
 
 from ..utils.cli_utils import get_field_count_and_percent_string
@@ -90,7 +88,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+    logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     if do_simple_splitting:
         logger.warning("Simple splitting is now the default.  \"-s\" / \"--do-simple-splitting\" is now DEPRECATED.")
@@ -120,7 +118,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
 
         # Prepare our delimiters for segmentation below:
         delimiters = segment.create_simple_delimiters(lb_model)
-        logger.debug(f"Splitting delimiters: %s", str(delimiters))
+        logger.debug(f"Splitting delimiters: {delimiters}")
 
         # Get our adapter names:
         mas_adapter_names = [array_element_adapters[0] for array_element_adapters in lb_model.array_element_structure]
@@ -380,19 +378,19 @@ def _write_summary_stats_file(input_bam,
         f.write(f"#Time: {datetime.datetime.fromtimestamp(current_timestamp)} {timezone} ")
         f.write(f"({current_timestamp})\n")
         f.write(f"#Input file: {input_bam}\n")
-        f.write(f"#Splitting algorithm: ")
+        f.write("#Splitting algorithm: ")
         if do_simple_splitting:
-            f.write(f"Simple Splitting")
+            f.write("Simple Splitting")
         else:
-            f.write(f"Bounded Region")
+            f.write("Bounded Region")
         f.write("\n")
         f.write("#")
         f.write("=" * 80)
         f.write("\n")
         f.write("\n")
 
-        logger.debug("Number of reads processed: %d", len(array_lengths))
-        logger.debug("Number of array elements found: %d", len(array_element_lengths))
+        logger.debug(f"Number of reads processed: {len(array_lengths)}")
+        logger.debug(f"Number of array elements found: {len(array_element_lengths)}")
 
         if len(array_element_lengths) == 0:
             logger.warning("No array elements were found.  Either something went horribly wrong in library prep or "
@@ -525,7 +523,7 @@ def _write_summary_stats_file(input_bam,
         for profile in ligation_profile_data:
             for i, c in enumerate(profile):
                 f.write(f"{c:{field_widths[i]}}\t")
-            f.write(f"\n")
+            f.write("\n")
 
 
 def _write_length_stats_to_file(f, name, count_hist, hist_bins, stat_min, stat_max, stat_mean, stat_median, stat_std, do_outliers=False):
@@ -540,7 +538,7 @@ def _write_length_stats_to_file(f, name, count_hist, hist_bins, stat_min, stat_m
     if len(count_hist) > 0:
         f.write("#" + ("-" * 80) + "\n")
         f.write(f"{name} Hist:\n")
-        f.write(f"Length   Count\n")
+        f.write("Length   Count\n")
         fstring = 'd' if (isinstance(hist_bins[0], np.signedinteger) or isinstance(hist_bins[0], np.unsignedinteger)) else 'f'
         for i, h in enumerate(count_hist[:-1]):
             f.write(f"{hist_bins[i]:2{fstring}}:\t{h}\n")

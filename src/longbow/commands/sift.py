@@ -1,4 +1,3 @@
-import json
 import logging
 import time
 import os
@@ -10,13 +9,9 @@ import click_log
 
 import tqdm
 import pysam
-from construct import *
 
 import longbow.utils.constants
 from ..utils import bam_utils
-from ..utils import model as LongbowModel
-from ..utils.model import LibraryModel
-from ..utils.bam_utils import SegmentInfo
 from ..utils.bam_utils import get_segments
 from ..utils.constants import FFORMAT
 from ..utils.cli_utils import zero_safe_div
@@ -109,7 +104,7 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+    logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     reads_to_ignore = set()
     if ignore_list and os.path.exists(ignore_list):

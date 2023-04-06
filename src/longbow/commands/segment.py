@@ -16,8 +16,6 @@ import numpy as np
 
 import longbow.utils.constants
 from ..utils import bam_utils
-from ..utils import model as LongbowModel
-from ..utils.model import LibraryModel
 from ..utils.cli_utils import zero_safe_div
 
 from ..utils.bam_utils import SegmentInfo, get_segments
@@ -102,11 +100,11 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
     if not total_reads:
         total_reads = bam_utils.get_read_count_from_bam_index(input_bam)
     if total_reads:
-        logger.info(f"About to segment %d reads.", total_reads)
+        logger.info(f"About to segment {total_reads} reads.")
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+    logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
@@ -199,7 +197,7 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
     num_segmented = res['num_segments']
 
     logger.info(f"MAS-seq gain factor: {zero_safe_div(num_segmented, num_reads):.02f}x")
-    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: {time.time() - t_start:2.2f}s.")
 
 
 def _sub_process_work_fn(in_queue, out_queue):
@@ -238,7 +236,7 @@ def _sub_process_write_fn(
     """Thread / process fn to write out all our data."""
 
     delimiters = create_simple_delimiters(model)
-    logger.debug(f"Delimiter sequences for simple delimiters: %s", delimiters)
+    logger.debug("Delimiter sequences for simple delimiters: {delimiters}")
     out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     barcode_conf_file = None
@@ -247,8 +245,8 @@ def _sub_process_write_fn(
             logger.info(f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}")
             barcode_conf_file = open(longbow.utils.constants.BARCODE_CONF_FILE_NAME, 'w')
         else:
-            logger.warning(f"Model does not have a barcode output, but barcode creation flag was given.  "
-                           f"Barcode confidence file will NOT be created.")
+            logger.warning("Model does not have a barcode output, but barcode creation flag was given.  "
+                           "Barcode confidence file will NOT be created.")
 
     model_annotates_cbc = model.has_cell_barcode_annotation
     model_annotates_umi = model.has_umi_annotation

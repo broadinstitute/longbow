@@ -8,12 +8,9 @@ import click_log
 
 import tqdm
 import pysam
-from construct import *
 
 import longbow.utils.constants
 from ..utils import bam_utils
-from ..utils import model as LongbowModel
-from ..utils.model import LibraryModel
 
 from ..utils.bam_utils import SegmentInfo, get_segments
 from ..utils.cli_utils import get_field_count_and_percent_string
@@ -143,7 +140,7 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using %s: %s", lb_model.name, lb_model.description)
+    logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     # Open our input bam file:
     pysam.set_verbosity(0)
@@ -181,8 +178,8 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
                 logger.info(f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}")
                 barcode_conf_file = open(longbow.utils.constants.BARCODE_CONF_FILE_NAME, 'w')
             else:
-                logger.warning(f"Model does not have a barcode output, but barcode creation flag was given.  "
-                               f"Barcode confidence file will NOT be created.")
+                logger.warning("Model does not have a barcode output, but barcode creation flag was given.  "
+                               "Barcode confidence file will NOT be created.")
 
         # Get our delimiters here just in case we have to split the reads later:
         delimiters = create_simple_delimiters(lb_model)
@@ -270,12 +267,12 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
     segs_per_read = zero_safe_div(num_segments_extracted, num_reads)
 
     # Yell at the user:
-    logger.info(f"Done. Elapsed time: %2.2fs.", time.time() - t_start)
-    logger.info(f"Total # Reads Processed: %d", num_reads)
-    logger.info(f"# Reads Containing Extracted Segments: %s %s", count_str, pct_str)
-    logger.info(f"Total # Segments Extracted: %d", num_segments_extracted)
-    logger.info(f"Total # Segments Skipped: %d", num_segments_skipped)
-    logger.info(f"# Segments extracted per read: %2.2f", segs_per_read)
+    logger.info(f"Done. Elapsed time: {time.time() - t_start:2.2f}s.")
+    logger.info(f"Total # Reads Processed: {num_reads}")
+    logger.info(f"# Reads Containing Extracted Segments: {count_str} {pct_str}")
+    logger.info(f"Total # Segments Extracted: {num_segments_extracted}")
+    logger.info(f"Total # Segments Skipped: {num_segments_skipped}")
+    logger.info(f"# Segments extracted per read: {segs_per_read:2.2f}")
 
 
 def _get_segments_only(read):
@@ -304,12 +301,12 @@ def _extract_region_from_model_without_coding_region(array_element_read, segment
     end_marker_list = [(i, s) for i, s in enumerate(segments) if s.name == trailing_adapter]
 
     if len(start_marker_list) != len(end_marker_list):
-        logger.warning(f"Found %d start markers and %d end markers.  Only looking at first %d pairs.  "
-                       f"(starts: %s, ends: %s)",
-                       len(start_marker_list), len(end_marker_list),
-                       min(len(start_marker_list), len(end_marker_list)),
-                       " ".join([f"{i}:{s.name}" for i, s in start_marker_list]),
-                       " ".join([f"{i}:{s.name}" for i, s in end_marker_list]))
+        logger.warning(
+            f"Found {len(start_marker_list)} start markers and {len(end_marker_list)} end markers. "
+            f"Only looking at first {min(len(start_marker_list), len(end_marker_list))} pairs. "
+            f"(starts: {' '.join(f'{i}:{s.name}' for i, s in start_marker_list)}, "
+            f" ends: {' '.join(f'{i}:{s.name}' for i, s in end_marker_list)})",
+        )
 
     extracted_segment = False
 
@@ -372,14 +369,16 @@ def _extract_region_from_model_with_coding_region(array_element_read, segment_ra
             extraction_quals.append(segment_quals[i])
 
     if len(extraction_segments) == 0:
-        logger.debug(f"Did not find coding region in read: %s: %s", array_element_read.query_name, segment_ranges)
+        logger.debug(f"Did not find coding region in read: {array_element_read.query_name}:, {segment_ranges}")
         return False, 0, 1
 
     else:
         if len(extraction_segments) > 1:
-            logger.debug(f"Found %d coding regions in read %s: %s.  Only looking at first coding region.  "
-                         f"All Segments: %s",
-                         len(extraction_segments), array_element_read.query_name, extraction_segments, segment_ranges)
+            logger.debug(
+                f"Found {len(extraction_segments)} coding regions in read "
+                f"{array_element_read.query_name}: {extraction_segments}. "
+                f"Only looking at first coding region. All Segments: {segment_ranges}"
+            )
 
         # Create an AlignedSegment to output:
         aligned_segment = _create_extracted_aligned_segment(
