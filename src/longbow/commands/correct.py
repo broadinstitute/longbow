@@ -7,7 +7,6 @@ import tempfile
 import enum
 
 import click
-import click_log
 
 import pysam
 import multiprocessing as mp
@@ -17,13 +16,13 @@ from collections import defaultdict
 from tqdm import tqdm
 
 import longbow.utils.constants
-from ..utils import bam_utils, barcode_utils
-
+from ..utils import bam_utils
+from ..utils import barcode_utils
+from ..utils import cli_utils
 from ..utils.cli_utils import get_field_count_and_percent_string
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("correct")
-click_log.basic_config(logger)
+
+logger = logging.getLogger(__name__)
 
 
 class BarcodeResolutionFailure(enum.Enum):
@@ -32,48 +31,11 @@ class BarcodeResolutionFailure(enum.Enum):
     NO_MATCH_IN_LEV_DIST = enum.auto()
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(),
-    help="BAM .pbi index file",
-)
-@click.option(
-    "-t",
-    "--threads",
-    type=int,
-    default=1,
-    show_default=True,
-    help="number of threads to use (0 for all)",
-)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="annotated bam output  [default: stdout]",
-)
-@click.option(
-    "-m",
-    "--model",
-    help="The model to use for annotation.  If not specified, it will be autodetected from "
-         "the BAM header.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name "
-         "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
-         "Longbow will assume the contents are the configuration of a LibraryModel as per "
-         "LibraryModel.to_json()."
-)
-@click.option(
-    '-f',
-    '--force',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist."
-)
+@click.command()
+@cli_utils.input_pbi
+@cli_utils.output_bam("annotated bam output")
+@cli_utils.model
+@cli_utils.force_overwrite
 @click.option(
     '-r',
     '--restrict-to-allowlist',
@@ -142,14 +104,13 @@ class BarcodeResolutionFailure(enum.Enum):
     type=click.Path(exists=False),
     help="File to which to write all reads with barcodes that could not be corrected.",
 )
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_tag, corrected_tag, allow_list,
+@cli_utils.input_bam
+@click.pass_context
+def main(ctx, pbi, output_bam, model, force, restrict_to_allowlist, barcode_tag, corrected_tag, allow_list,
          barcode_freqs, max_hifi_dist, max_clr_dist, ccs_corrected_rq_threshold, barcode_uncorrectable_bam, input_bam):
     """Correct tag to values provided in barcode allowlist."""
 
     t_start = time.time()
-
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
@@ -160,12 +121,11 @@ def main(pbi, threads, output_bam, model, force, restrict_to_allowlist, barcode_
     logger.info(f"Writing reads with corrected barcodes to: {output_bam}")
     logger.info(f"Writing reads with barcodes that could not be corrected to: {barcode_uncorrectable_bam}")
 
-    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
+    threads = ctx.obj["THREADS"]
     if threads > 1:
         logger.warning("You have selected %d threads.  Each thread can use a very large amount of memory.  "
                        "In the case of the 3' barcode list, each thread will use about 30Gb of ram.  "
                        "You probably do not want to do this.", threads)
-    logger.info(f"Running with {threads} worker subprocess(es)")
 
     logger.info(f"Using CCS Levenshtein distance threshold: {max_hifi_dist}")
     logger.info(f"Using CLR Levenshtein distance threshold: {max_clr_dist}")

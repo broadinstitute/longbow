@@ -5,38 +5,23 @@ import sys
 from collections import Counter
 
 import click
-import click_log
 
 import tqdm
 import pysam
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils.bam_utils import get_segments
 from ..utils.constants import FFORMAT
 from ..utils.cli_utils import zero_safe_div
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("sift")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(exists=True),
-    help="BAM .pbi index file",
-)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="filtered bam output (passing reads only)  [default: stdout]",
-)
+@click.command()
+@cli_utils.input_pbi
+@cli_utils.output_bam("filtered bam output (passing reads only)")
 @click.option(
     "-x",
     "--reject-bam",
@@ -44,24 +29,8 @@ click_log.basic_config(logger)
     type=click.Path(exists=False),
     help="Filtered bam output (failing reads only)  [default: /dev/null]",
 )
-@click.option(
-    "-m",
-    "--model",
-    help="The model to use for annotation.  If not specified, it will be autodetected from "
-         "the BAM header.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name "
-         "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
-         "Longbow will assume the contents are the configuration of a LibraryModel as per "
-         "LibraryModel.to_json()."
-)
-@click.option(
-    '-f',
-    '--force',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist."
-)
+@cli_utils.model
+@cli_utils.force_overwrite
 @click.option(
     "-s",
     "--stats",
@@ -85,13 +54,11 @@ click_log.basic_config(logger)
     type=click.Path(exists=True),
     help="Txt file containing a list of read names to ignore.",
 )
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
+@cli_utils.input_bam
 def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore_list, input_bam):
     """Filter segmented reads by conformation to expected cDNA design."""
 
     t_start = time.time()
-
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     if os.path.exists(pbi):

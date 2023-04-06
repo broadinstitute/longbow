@@ -7,25 +7,16 @@ import click
 import click_log
 
 from ..utils import bam_utils
-from ..meta import VERSION
+from ..utils import cli_utils
 
 import pysam
 
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("convert")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="bam output  [default: stdout]",
-)
+@click.command()
+@cli_utils.output_bam("bam output")
 @click.option(
     "-q",
     "--default-rq",
@@ -76,8 +67,6 @@ def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_len
     """Convert reads from fastq{,.gz} files for use with `annotate`."""
 
     t_start = time.time()
-
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)

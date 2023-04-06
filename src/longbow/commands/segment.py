@@ -7,7 +7,6 @@ import re
 import time
 
 import click
-import click_log
 import tqdm
 
 import pysam
@@ -16,32 +15,17 @@ import numpy as np
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils.cli_utils import zero_safe_div
 
 from ..utils.bam_utils import SegmentInfo, get_segments
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("segment")
-click_log.basic_config(logger)
+
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-t",
-    "--threads",
-    type=int,
-    default=mp.cpu_count() - 1,
-    show_default=True,
-    help="number of threads to use (0 for all)",
-)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="segment-annotated bam output  [default: stdout]",
-)
+@click.command()
+@cli_utils.output_bam("segment-annotated bam output")
 @click.option(
     "-b",
     "--create-barcode-conf-file",
@@ -52,16 +36,7 @@ click_log.basic_config(logger)
          f"This only applies for models that have annotation_segments where one such segment "
          f"is annotated into the raw barcode field ({longbow.utils.constants.READ_RAW_BARCODE_TAG})",
 )
-@click.option(
-    "-m",
-    "--model",
-    help="The model to use for annotation.  If not specified, it will be autodetected from "
-         "the BAM header.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name "
-         "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
-         "Longbow will assume the contents are the configuration of a LibraryModel as per "
-         "LibraryModel.to_json()."
-)
+@cli_utils.model
 @click.option(
     '-i',
     '--ignore-cbc-and-umi',
@@ -70,27 +45,18 @@ click_log.basic_config(logger)
     show_default=True,
     help="Do not require passing reads to have CBC and UMI."
 )
-@click.option(
-    '-f',
-    '--force',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist."
-)
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_umi, force, input_bam):
+@cli_utils.force_overwrite
+@cli_utils.input_bam
+@click.pass_context
+def main(ctx, output_bam, create_barcode_conf_file, model, ignore_cbc_and_umi, force, input_bam):
     """Segment pre-annotated reads from an input BAM file."""
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
-    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} worker subprocess(es)")
+    threads = ctx.obj["THREADS"]
 
     logger.info("Using simple splitting mode.")
 

@@ -6,7 +6,6 @@ import sys
 import itertools
 
 import click
-import click_log
 import tqdm
 
 import pysam
@@ -14,54 +13,29 @@ import multiprocessing as mp
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils.cli_utils import format_obnoxious_warning_message
 
 
 PROG_NAME = "tagfix"
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger(PROG_NAME)
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-t",
-    "--threads",
-    type=int,
-    default=mp.cpu_count() - 1,
-    show_default=True,
-    help="number of threads to use (0 for all)",
-)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="annotated bam output  [default: stdout]",
-)
-@click.option(
-    '-f',
-    '--force',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist."
-)
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, force, input_bam):
+@click.command()
+@cli_utils.output_bam("annotated bam output")
+@cli_utils.force_overwrite
+@cli_utils.input_bam
+@click.pass_context
+def main(ctx, output_bam, force, input_bam):
     """Update longbow read tags after alignment."""
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
-    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} worker subprocess(es)")
+    threads = ctx.obj["THREADS"]
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.

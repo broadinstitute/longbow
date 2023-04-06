@@ -7,7 +7,6 @@ import time
 import os
 
 import click
-import click_log
 import tqdm
 
 import numpy as np
@@ -16,39 +15,24 @@ import multiprocessing as mp
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils.model import LibraryModel
 from ..utils.model_utils import ModelBuilder
 from ..utils.cli_utils import zero_safe_div
 
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("peek")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(),
-    help="BAM .pbi index file",
-)
-@click.option(
-    "-t",
-    "--threads",
-    type=int,
-    default=mp.cpu_count() - 1,
-    show_default=True,
-    help="number of threads to use (0 for all)",
-)
+@click.command()
+@cli_utils.input_pbi
 @click.option(
     "-o",
     "--output-model",
     default="-",
+    show_default=True,
     type=click.Path(exists=False),
-    help="model name output  [default: stdout]",
+    help="model name output",
 )
 @click.option(
     "-c",
@@ -93,14 +77,7 @@ click_log.basic_config(logger)
     required=False,
     help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1]."
 )
-@click.option(
-    '-f',
-    '--force',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist."
-)
+@cli_utils.force_overwrite
 @click.option(
     "-d",
     "--include-deprecated-models",
@@ -109,19 +86,17 @@ click_log.basic_config(logger)
     show_default=True,
     help="Examine the deprecated built-in models as well",
 )
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_model, chunk, num_reads, min_length, max_length, min_rq, force, include_deprecated_models, input_bam):
+@cli_utils.input_bam
+@click.pass_context
+def main(ctx, pbi, output_model, chunk, num_reads, min_length, max_length, min_rq, force, include_deprecated_models, input_bam):
     """Guess the best pre-built array model to use for annotation."""
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files(output_model, exist_ok=force)
 
-    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} worker subprocess(es)")
+    threads = ctx.obj["THREADS"]
 
     # Make all prebuilt models
     models = {}

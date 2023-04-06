@@ -7,7 +7,6 @@ import sys
 import os
 
 import click
-import click_log
 import tqdm
 
 import pysam
@@ -16,37 +15,16 @@ import multiprocessing as mp
 import longbow.utils
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils.bam_utils import collapse_annotations
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("annotate")
-click_log.basic_config(logger)
+
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(),
-    help="BAM .pbi index file",
-)
-@click.option(
-    "-t",
-    "--threads",
-    type=int,
-    default=mp.cpu_count() - 1,
-    show_default=True,
-    help="number of threads to use (0 for all)",
-)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="annotated bam output  [default: stdout]",
-)
+@click.command()
+@cli_utils.input_pbi
+@cli_utils.output_bam("annotated bam output")
 @click.option(
     "-m",
     "--model",
@@ -91,27 +69,18 @@ click_log.basic_config(logger)
     required=False,
     help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1]."
 )
-@click.option(
-    '-f',
-    '--force',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist."
-)
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, output_bam, model, chunk, min_length, max_length, min_rq, force, input_bam):
+@cli_utils.force_overwrite
+@cli_utils.input_bam
+@click.pass_context
+def main(ctx, pbi, output_bam, model, chunk, min_length, max_length, min_rq, force, input_bam):
     """Annotate reads in a BAM file with segments from the model."""
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
-    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} worker subprocess(es)")
+    threads = ctx.obj["THREADS"]
 
     # Get our model:
     lb_model = bam_utils.load_model(model, input_bam)
@@ -363,4 +332,3 @@ def _annotate_read(read, model):
         is_rc = True
 
     return read.to_string(), ppath, logp, is_rc
-

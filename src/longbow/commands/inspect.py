@@ -7,7 +7,6 @@ import math
 from functools import reduce
 
 import click
-import click_log
 
 import gzip
 
@@ -26,16 +25,15 @@ from matplotlib import transforms
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("inspect")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
+
 
 DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
+@click.command()
 @click.option(
     "-r",
     "--read-names",
@@ -43,13 +41,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     multiple=True,
     help="read names (or file(s) of read names) to inspect",
 )
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(exists=True),
-    help="BAM .pbi index file",
-)
+@cli_utils.input_pbi
 @click.option(
     "-f",
     "--file-format",
@@ -114,13 +106,11 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     required=False,
     help="Store annotations from a downstream BAM file so they can be displayed on reads from previous processing steps."
 )
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
+@cli_utils.input_bam
 def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min_rq, quick, annotated_bam, input_bam):
     """Inspect the classification results on specified reads."""
 
     t_start = time.time()
-
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
