@@ -1,0 +1,42 @@
+{
+    "cdna": {
+        "description": "Lexogen TeloPrime V2 kit",
+        "version": "3.0.0",
+        "structure": [
+            "TPV2_adapter",
+            "cDNA",
+            "Poly_A",
+            "idx",
+            "rev_bind"
+        ],
+        "adapters": {
+            "TPV2_adapter": "CTACACGACGCTCTTCCGATCTTGGATTGATATGTAATACGACTCACTATAG",
+            "cDNA": "random",
+            "Poly_A": {
+                "HomopolymerRepeat": [
+                    "A",
+                    30
+                ]
+            },
+            "idx": {
+                "FixedLengthRandomBases": 10
+            },
+            "rev_bind": "CTCTGCGTTGATACCACTGCTT"
+        },
+        "named_random_segments": [
+            "idx",
+            "cDNA"
+        ],
+        "coding_region": "cDNA",
+        "annotation_segments": {
+            "idx": [
+                [
+                    "BC",
+                    "XB"
+                ]
+            ]
+        },
+        "deprecated": false,
+        "name": "bulk_teloprimeV2"
+    }
+}
