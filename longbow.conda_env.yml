@@ -10,4 +10,4 @@ dependencies:
   - pbmm2
   - pip
   - pip:
-    - maslongbow==0.6.12
+    - maslongbow==0.6.13
