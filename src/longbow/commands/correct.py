@@ -166,14 +166,14 @@ def main(
     # process_input_data_queue = manager.Queue()
     results = manager.Queue()
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
+
         # Get our barcode length:
         barcode_length = _get_barcode_tag_length_from_model(lb_model, barcode_tag)
 

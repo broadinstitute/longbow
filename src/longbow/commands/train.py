@@ -61,8 +61,9 @@ def main(
     threads = ctx.obj["THREADS"]
 
     # Get our model:
-    m = bam_utils.load_model(model, training_bam)
-    logger.info(f"Using {m.name}: {m.description}")
+    with pysam.AlignmentFile(training_bam, "rb", check_sq=False, require_index=False) as bam_file:
+        m = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {m.name}: {m.description}")
 
     training_seqs = load_training_seqs(m, num_training_samples, threads, training_bam)
 

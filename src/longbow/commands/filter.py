@@ -84,18 +84,23 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files([output_bam, reject_bam], exist_ok=force)
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
-    logger.info(f"Writing reads that conform to the model to: {output_bam}")
-    logger.info(f"Writing reads that do not conform to the model to: {reject_bam}")
-
     # Open our input bam file:
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
+
+        logger.info(f"Writing reads that conform to the model to: {output_bam}")
+        logger.info(f"Writing reads that do not conform to the model to: {reject_bam}")
+
+        logger.info(
+            f"Filtering according to {lb_model.name} model ordered key adapters: "
+            f"{', '.join(lb_model.key_adapters)}"
+        )
+
         logger.info(
             f"Filtering according to {lb_model.name} model ordered key adapters: "
             f"{', '.join(lb_model.key_adapters)}"

@@ -78,10 +78,6 @@ def main(
         if read_count:
             logger.info("About to Sift %d reads", read_count)
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     reads_to_ignore = set()
     if ignore_list and os.path.exists(ignore_list):
         logger.info(f"Ingesting read ignore list: {ignore_list}")

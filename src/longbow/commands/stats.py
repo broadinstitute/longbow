@@ -67,10 +67,6 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     if read_count:
         logger.info("Collecting stats on %d reads", read_count)
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     if do_simple_splitting:
         logger.warning(
             'Simple splitting is now the default.  "-s" / "--do-simple-splitting" is now DEPRECATED.'
@@ -98,6 +94,10 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
+
         # Prepare our delimiters for segmentation below:
         delimiters = segment.create_simple_delimiters(lb_model)
         logger.debug(f"Splitting delimiters: {delimiters}")

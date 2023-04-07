@@ -138,15 +138,15 @@ def main(
     if annotated_bam is not None:
         anns, name_map = _load_annotations(annotated_bam)
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     # Open our bam file:
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
+
         logger.info(f"Figure drawing mode: {'simplified' if quick else 'extended'}")
 
         if seg_score and not quick:

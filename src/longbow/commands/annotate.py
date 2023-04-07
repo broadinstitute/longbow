@@ -82,10 +82,6 @@ def main(
 
     threads = ctx.obj["THREADS"]
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
     read_num = 0
@@ -137,25 +133,6 @@ def main(
     input_data_queue = manager.Queue(maxsize=queue_size)
     results = manager.Queue()
 
-    # Start worker sub-processes:
-    worker_pool = []
-
-    for i in range(threads):
-        p = mp.Process(
-            target=_worker_segmentation_fn,
-            args=(
-                input_data_queue,
-                results,
-                i,
-                lb_model,
-                min_length,
-                max_length,
-                min_rq,
-            ),
-        )
-        p.start()
-        worker_pool.append(p)
-
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam if start_offset == 0 else input_bam.name,
@@ -163,6 +140,29 @@ def main(
         check_sq=False,
         require_index=False,
     ) as bam_file:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
+
+        # Start worker sub-processes:
+        worker_pool = []
+
+        for i in range(threads):
+            p = mp.Process(
+                target=_worker_segmentation_fn,
+                args=(
+                    input_data_queue,
+                    results,
+                    i,
+                    lb_model,
+                    min_length,
+                    max_length,
+                    min_rq,
+                ),
+            )
+            p.start()
+            worker_pool.append(p)
+
         # If we're chunking, advance to the specified virtual file offset.
         if start_offset > 0:
             bam_file.seek(start_offset)

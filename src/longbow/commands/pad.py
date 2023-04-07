@@ -63,10 +63,6 @@ def main(
     if num_reads:
         logger.info(f"About to pad {num_reads} reads.")
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -92,6 +88,10 @@ def main(
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
+
         # Verify that the given model actually has the barcode to change:
         if not lb_model.has_annotation_tag(barcode_tag):
             print(
