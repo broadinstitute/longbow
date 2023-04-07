@@ -138,13 +138,12 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
         if read_count:
             logger.info("About to Extract segments from %d reads", read_count)
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     # Open our input bam file:
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
         # Validate our command line arguments:
         if lb_model.has_coding_region:

@@ -102,10 +102,6 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
         if read_count:
             logger.info("About to Sift %d reads", read_count)
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     reads_to_ignore = set()
     if ignore_list and os.path.exists(ignore_list):
         logger.info(f"Ingesting read ignore list: {ignore_list}")
@@ -125,6 +121,9 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
     # Open our input bam file:
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
         # Get our header from the input bam file:
         out_header = pysam.AlignmentHeader.from_dict(
