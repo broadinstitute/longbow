@@ -1,0 +1,32 @@
+{
+    "description": "10-element MAS-ISO-seq array",
+    "version": "3.0.0",
+    "structure": [
+        "Q",
+        "C",
+        "M",
+        "I",
+        "O",
+        "J",
+        "B",
+        "D",
+        "K",
+        "H",
+        "R"
+    ],
+    "adapters": {
+        "Q": "AAGCACCATAATGTGT",
+        "C": "ACTCTGTCAGGTCCGA",
+        "M": "ACCTAGATCAGAGCCT",
+        "I": "AGTGCGTTGCGAATTG",
+        "O": "AAGTCACCGGCACCTT",
+        "J": "AATTGCGTAGTTGGCC",
+        "B": "ACTTGTAAGCTGTCTA",
+        "D": "ACCTCCTCCTCCAGAA",
+        "K": "ACACTTGGTCGCAATC",
+        "H": "ATGTTGAATCCTAGCG",
+        "R": "AACCGGACACACTTAG"
+    },
+    "deprecated": false,
+    "name": "mas_10"
+}
