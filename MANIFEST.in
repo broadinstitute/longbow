@@ -4,7 +4,7 @@ graft src
 include README.rst
 include LICENSE.txt
 include tox.ini .travis.yml
-include src/longbow/preconfigured_models/**/*.json
+include src/longbow/models/*.json
 
 prune **/.hypothesis
 

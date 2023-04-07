@@ -23,21 +23,19 @@ click_log.basic_config(logger)
 starts_with_number_re = re.compile(r"^\d")
 
 
-def load_preconfigured_models():
-    pre_configured_models = {"array": {}, "cdna": {}}
+def load_models():
+    models = {"array": {}, "cdna": {}}
 
-    with importlib.resources.path("longbow", "preconfigured_models") as model_dir:
-        for json_file in (model_dir / "array").glob("*json"):
+    with importlib.resources.path("longbow", "models") as model_dir:
+        for json_file in model_dir.glob("*json"):
             with json_file.open() as fh:
                 m = json.load(fh)
-                pre_configured_models["array"][m["name"]] = m
+                if "array" in m:
+                    models["array"][m["array"]["name"]] = m["array"]
+                if "cdna" in m:
+                    models["cdna"][m["cdna"]["name"]] = m["cdna"]
 
-        for json_file in (model_dir / "cdna").glob("*json"):
-            with json_file.open() as fh:
-                m = json.load(fh)
-                pre_configured_models["cdna"][m["name"]] = m
-
-    return pre_configured_models
+    return models
 
 
 class ModelBuilder:
@@ -79,7 +77,7 @@ class ModelBuilder:
     SUDDEN_END_PROB = 0.01
     MATCH_END_PROB = 0.1
 
-    pre_configured_models = load_preconfigured_models()
+    pre_configured_models = load_models()
 
     @staticmethod
     def make_global_alignment_model(target, name=None):
