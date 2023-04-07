@@ -13,7 +13,19 @@ import operator
 
 from functools import reduce
 from collections import OrderedDict
-from construct import *
+from construct import (
+    Array,
+    Const,
+    Int8ul,
+    Int16ul,
+    Int32sl,
+    Int32ul,
+    Int64sl,
+    Padding,
+    StopIf,
+    Struct,
+    this,
+)
 from inspect import currentframe, getdoc
 
 import ssw
@@ -31,6 +43,36 @@ logger = logging.getLogger("bam_utils")
 click_log.basic_config(logger)
 
 PB_READ_NAME_RE = re.compile("m[0-9]+e?_[0-9]{6}_[0-9]{6}/[0-9]+/.*")
+
+
+def get_pbi_format(short_form: bool = False):
+    """Create a struct for parsing the PB index file
+    
+    More on index format at
+        https://pacbiofileformats.readthedocs.io/en/9.0/PacBioBamIndex.html
+    """
+
+    return Struct(
+        # Header
+        "magic" / Const(b"PBI\x01"),
+        "version_patch" / Int8ul,
+        "version_minor" / Int8ul,
+        "version_major" / Int8ul,
+        "version_empty" / Int8ul,
+        "pbi_flags" / Int16ul,
+        "n_reads" / Int32ul,
+        StopIf(short_form),  # potentially stop here
+        "reserved" / Padding(18),
+
+        # Basic information section (columnar format)
+        "rgId" / Padding(this.n_reads * 4),
+        "qStart" / Padding(this.n_reads * 4),
+        "qEnd" / Padding(this.n_reads * 4),
+        "holeNumber" / Array(this.n_reads, Int32sl),
+        "readQual" / Padding(this.n_reads * 4),
+        "ctxtFlag" / Padding(this.n_reads * 1),
+        "fileOffset" / Array(this.n_reads, Int64sl),
+    )
 
 
 # Named tuple to store alignment information:
@@ -82,18 +124,7 @@ def load_read_count(pbi_file):
 
     # Decode PacBio .pbi file.  This is not a full decode of the index, only the parts we need
     # until we get to the read count.
-    # More on index format at https://pacbiofileformats.readthedocs.io/en/9.0/PacBioBamIndex.html .
-
-    fmt = Struct(
-        # Header
-        "magic" / Const(b"PBI\x01"),
-        "version_patch" / Int8ul,
-        "version_minor" / Int8ul,
-        "version_major" / Int8ul,
-        "version_empty" / Int8ul,
-        "pbi_flags" / Int16ul,
-        "n_reads" / Int32ul,
-        )
+    fmt = get_pbi_format(True)
 
     with gzip.open(pbi_file, "rb") as f:
         idx_contents = fmt.parse_stream(f)
@@ -107,28 +138,7 @@ def compute_shard_offsets(pbi_file, num_shards):
     """
 
     # Decode PacBio .pbi file.  This is not a full decode of the index, only the parts we need for sharding.
-    # More on index format at https://pacbiofileformats.readthedocs.io/en/9.0/PacBioBamIndex.html .
-
-    fmt = Struct(
-        # Header
-        "magic" / Const(b"PBI\x01"),
-        "version_patch" / Int8ul,
-        "version_minor" / Int8ul,
-        "version_major" / Int8ul,
-        "version_empty" / Int8ul,
-        "pbi_flags" / Int16ul,
-        "n_reads" / Int32ul,
-        "reserved" / Padding(18),
-
-        # Basic information section (columnar format)
-        "rgId" / Padding(this.n_reads * 4),
-        "qStart" / Padding(this.n_reads * 4),
-        "qEnd" / Padding(this.n_reads * 4),
-        "holeNumber" / Array(this.n_reads, Int32sl),
-        "readQual" / Padding(this.n_reads * 4),
-        "ctxtFlag" / Padding(this.n_reads * 1),
-        "fileOffset" / Array(this.n_reads, Int64sl),
-        )
+    fmt = get_pbi_format()
 
     # Make a list of bgzf virtual file offsets for sharding and store ZMW counts.
     file_offsets_hash = OrderedDict()
