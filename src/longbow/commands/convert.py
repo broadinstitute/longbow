@@ -1,16 +1,12 @@
 import logging
-import sys
-import time
 import os
+import time
 
 import click
-import click_log
-
-from ..utils import bam_utils
-from ..utils import cli_utils
-
 import pysam
 
+from ..meta import VERSION
+from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +20,11 @@ logger = logging.getLogger(__name__)
     default=-1,
     show_default=True,
     required=False,
-    help="Default read quality for ingested reads (ranging from [-1,1])"
+    help="Default read quality for ingested reads (ranging from [-1,1])",
 )
+@click.option("-g", "--read-group-id", type=str, help="Read group ID to set")
 @click.option(
-    "-g",
-    "--read-group-id",
-    type=str,
-    help="Read group ID to set"
-)
-@click.option(
-    "-s",
-    "--sample-name",
-    type=str,
-    help="Sample name to set in the read group"
+    "-s", "--sample-name", type=str, help="Sample name to set in the read group"
 )
 @click.option(
     "-l",
@@ -44,7 +32,7 @@ logger = logging.getLogger(__name__)
     type=int,
     default=0,
     required=False,
-    help="Minimum length of reads to process"
+    help="Minimum length of reads to process",
 )
 @click.option(
     "-L",
@@ -52,18 +40,27 @@ logger = logging.getLogger(__name__)
     type=int,
     default=30000,
     required=False,
-    help="Maximum length of reads to process"
+    help="Maximum length of reads to process",
 )
 @click.option(
-    '-f',
-    '--force',
+    "-f",
+    "--force",
     is_flag=True,
     default=False,
     show_default=True,
-    help="Force overwrite of the output files if they exist."
+    help="Force overwrite of the output files if they exist.",
 )
 @click.argument("input-spec", required=True, type=click.Path(exists=True))
-def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_length, force, input_spec):
+def main(
+    output_bam,
+    default_rq,
+    read_group_id,
+    sample_name,
+    min_length,
+    max_length,
+    force,
+    input_spec,
+):
     """Convert reads from fastq{,.gz} files for use with `annotate`."""
 
     t_start = time.time()
@@ -78,10 +75,12 @@ def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_len
     h = pysam.AlignmentHeader.from_dict(
         bam_utils.create_bam_header_with_program_group(
             logger.name,
-            pysam.AlignmentHeader().from_dict({
-                "HD": {"VN": f"{VERSION}"},
-                "RG": [{"ID": read_group_id, "SM": sample_name}],
-            })
+            pysam.AlignmentHeader().from_dict(
+                {
+                    "HD": {"VN": f"{VERSION}"},
+                    "RG": [{"ID": read_group_id, "SM": sample_name}],
+                }
+            ),
         )
     )
 
@@ -92,7 +91,10 @@ def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_len
                 for entry in fh:
                     num_reads_seen += 1
 
-                    if len(entry.sequence) >= min_length and len(entry.sequence) <= max_length:
+                    if (
+                        len(entry.sequence) >= min_length
+                        and len(entry.sequence) <= max_length
+                    ):
                         r = pysam.AlignedSegment()
                         r.query_name = entry.name
                         r.query_sequence = entry.sequence
@@ -108,8 +110,10 @@ def main(output_bam, default_rq, read_group_id, sample_name, min_length, max_len
                         num_reads_written += 1
 
     et = time.time()
-    logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
-                f"Reads seen: {num_reads_seen}. Reads written: {num_reads_written}.")
+    logger.info(
+        f"Done. Elapsed time: {et - t_start:2.2f}s. "
+        f"Reads seen: {num_reads_seen}. Reads written: {num_reads_written}."
+    )
 
 
 def _get_files(user_input):

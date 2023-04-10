@@ -1,25 +1,23 @@
+import itertools
 import logging
 import math
-import sys
-import itertools
-import re
-import time
+import multiprocessing as mp
 import os
+import re
+import sys
+import time
 
 import click
-import tqdm
-
 import numpy as np
 import pysam
-import multiprocessing as mp
+import tqdm
 
 import longbow.utils.constants
-from ..utils import bam_utils
-from ..utils import cli_utils
+
+from ..utils import bam_utils, cli_utils
+from ..utils.cli_utils import zero_safe_div
 from ..utils.model import LibraryModel
 from ..utils.model_utils import ModelBuilder
-from ..utils.cli_utils import zero_safe_div
-
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +39,7 @@ logger = logging.getLogger(__name__)
     default="",
     required=False,
     help="Process a single chunk of data (e.g. specify '2/4' to process the second of four equally-sized "
-         "chunks across the dataset)"
+    "chunks across the dataset)",
 )
 @click.option(
     "-n",
@@ -49,7 +47,7 @@ logger = logging.getLogger(__name__)
     type=int,
     default=100,
     required=False,
-    help="Number of reads to examine when trying to guess the array model"
+    help="Number of reads to examine when trying to guess the array model",
 )
 @click.option(
     "-l",
@@ -58,7 +56,7 @@ logger = logging.getLogger(__name__)
     default=0,
     show_default=True,
     required=False,
-    help="Minimum length of a read to process.  Reads shorter than this length will not be annotated."
+    help="Minimum length of a read to process.  Reads shorter than this length will not be annotated.",
 )
 @click.option(
     "-L",
@@ -67,7 +65,7 @@ logger = logging.getLogger(__name__)
     default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
     show_default=True,
     required=False,
-    help="Maximum length of a read to process.  Reads longer than this length will not be annotated."
+    help="Maximum length of a read to process.  Reads longer than this length will not be annotated.",
 )
 @click.option(
     "--min-rq",
@@ -75,7 +73,7 @@ logger = logging.getLogger(__name__)
     default=-2,
     show_default=True,
     required=False,
-    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1]."
+    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].",
 )
 @cli_utils.force_overwrite
 @click.option(
@@ -88,7 +86,19 @@ logger = logging.getLogger(__name__)
 )
 @cli_utils.input_bam
 @click.pass_context
-def main(ctx, pbi, output_model, chunk, num_reads, min_length, max_length, min_rq, force, include_deprecated_models, input_bam):
+def main(
+    ctx,
+    pbi,
+    output_model,
+    chunk,
+    num_reads,
+    min_length,
+    max_length,
+    min_rq,
+    force,
+    include_deprecated_models,
+    input_bam,
+):
     """Guess the best pre-built array model to use for annotation."""
 
     t_start = time.time()
@@ -100,11 +110,17 @@ def main(ctx, pbi, output_model, chunk, num_reads, min_length, max_length, min_r
 
     # Make all prebuilt models
     models = {}
-    for array_model_name in ModelBuilder.pre_configured_models['array']:
-        for cdna_model_name in ModelBuilder.pre_configured_models['cdna']:
-            if not ModelBuilder.pre_configured_models['array'][array_model_name]['deprecated'] and \
-               not ModelBuilder.pre_configured_models['cdna'][cdna_model_name]['deprecated']:
-                model_name = f'{array_model_name}+{cdna_model_name}'
+    for array_model_name in ModelBuilder.pre_configured_models["array"]:
+        for cdna_model_name in ModelBuilder.pre_configured_models["cdna"]:
+            if (
+                not ModelBuilder.pre_configured_models["array"][array_model_name][
+                    "deprecated"
+                ]
+                and not ModelBuilder.pre_configured_models["cdna"][cdna_model_name][
+                    "deprecated"
+                ]
+            ):
+                model_name = f"{array_model_name}+{cdna_model_name}"
                 m = LibraryModel.build_pre_configured_model(model_name)
                 models[model_name] = m
 
@@ -124,14 +140,27 @@ def main(ctx, pbi, output_model, chunk, num_reads, min_length, max_length, min_r
             num_chunks = int(num_chunks)
 
             # Decode PacBio .pbi file and determine the shard offsets.
-            offsets, zmw_counts, read_count, read_counts_per_chunk, read_nums = bam_utils.compute_shard_offsets(pbi, num_chunks)
+            (
+                offsets,
+                zmw_counts,
+                read_count,
+                read_counts_per_chunk,
+                read_nums,
+            ) = bam_utils.compute_shard_offsets(pbi, num_chunks)
 
             start_offset = offsets[chunk - 1]
             end_offset = offsets[chunk] if chunk < len(offsets) else offsets[chunk - 1]
             read_count = read_counts_per_chunk[chunk - 1] if chunk < len(offsets) else 0
             read_num = read_nums[chunk - 1] if chunk < len(offsets) else 0
 
-            logger.info("Detecting best model in %d reads from chunk %d/%d (reads %d-%d)", min(read_count, num_reads), chunk, num_chunks, read_num, read_num + read_count - 1)
+            logger.info(
+                "Detecting best model in %d reads from chunk %d/%d (reads %d-%d)",
+                min(read_count, num_reads),
+                chunk,
+                num_chunks,
+                read_num,
+                read_num + read_count - 1,
+            )
         else:
             read_count = bam_utils.load_read_count(pbi)
             logger.info("Detecting best model in %d reads", min(read_count, num_reads))
@@ -149,14 +178,18 @@ def main(ctx, pbi, output_model, chunk, num_reads, min_length, max_length, min_r
 
     for i in range(threads):
         p = mp.Process(
-            target=_worker_attempt_segmentations_fn, args=(input_data_queue, results, i, min_length, max_length, min_rq, models)
+            target=_worker_attempt_segmentations_fn,
+            args=(input_data_queue, results, i, min_length, max_length, min_rq, models),
         )
         p.start()
         worker_pool.append(p)
 
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
-        input_bam if start_offset == 0 else input_bam.name, "rb", check_sq=False, require_index=False
+        input_bam if start_offset == 0 else input_bam.name,
+        "rb",
+        check_sq=False,
+        require_index=False,
     ) as bam_file:
 
         # If we're chunking, advance to the specified virtual file offset.
@@ -167,7 +200,13 @@ def main(ctx, pbi, output_model, chunk, num_reads, min_length, max_length, min_r
         res = manager.dict()
         output_worker = mp.Process(
             target=_collect_thread_fn,
-            args=(results, output_model, not sys.stdin.isatty(), res, num_reads if read_count is None else min(read_count, num_reads))
+            args=(
+                results,
+                output_model,
+                not sys.stdin.isatty(),
+                res,
+                num_reads if read_count is None else min(read_count, num_reads),
+            ),
         )
         output_worker.start()
 
@@ -214,20 +253,24 @@ def main(ctx, pbi, output_model, chunk, num_reads, min_length, max_length, min_r
     plot_model_counts(res, models)
     best_model, best_model_count = next(iter(res.items()))
 
-    logger.info(f"Overall most likely model: {best_model} (seen in {best_model_count} reads, "
-                f"{100.0*zero_safe_div(best_model_count, np.sum(list(res.values()))):.1f}%)")
+    logger.info(
+        f"Overall most likely model: {best_model} (seen in {best_model_count} reads, "
+        f"{100.0*zero_safe_div(best_model_count, np.sum(list(res.values()))):.1f}%)"
+    )
 
     with open(output_model if output_model != "-" else "/dev/stdout", "w") as wm:
-        wm.write(f'{best_model}\n')
+        wm.write(f"{best_model}\n")
 
     et = time.time()
-    logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
-                f"Overall processing rate: {reads_seen/(et - t_start):2.2f} reads/s.")
+    logger.info(
+        f"Done. Elapsed time: {et - t_start:2.2f}s. "
+        f"Overall processing rate: {reads_seen/(et - t_start):2.2f} reads/s."
+    )
 
 
 def plot_model_counts(res, models, max_width=50.0):
-    big_block_char = u"\u2588"
-    small_block_char = u"\u258F"
+    big_block_char = "\u2588"
+    small_block_char = "\u258F"
 
     model_tot = np.sum(list(res.values()))
     max_label_width = np.max(list(map(lambda x: len(x), models.keys())))
@@ -235,24 +278,28 @@ def plot_model_counts(res, models, max_width=50.0):
         pct = 100.0 * res[model_name] / model_tot
         num_blocks = int(res[model_name] * max_width / model_tot)
 
-        logger.info(f"  {model_name:>{max_label_width}} {big_block_char*(num_blocks+1)} {res[model_name]} ({pct:.1f}%)")
+        logger.info(
+            f"  {model_name:>{max_label_width}} {big_block_char*(num_blocks+1)} {res[model_name]} ({pct:.1f}%)"
+        )
 
     for model_name in models:
         if model_name not in res:
-            logger.info(f"  {model_name:>{max_label_width}} {small_block_char} 0 (0.0%)")
+            logger.info(
+                f"  {model_name:>{max_label_width}} {small_block_char} 0 (0.0%)"
+            )
 
 
 def _collect_thread_fn(out_queue, out_bam_file_name, disable_pbar, res, read_count):
     """Thread / process fn to write out all our data."""
 
     with tqdm.tqdm(
-            desc="Progress",
-            unit=" read",
-            colour="green",
-            file=sys.stderr,
-            disable=disable_pbar,
-            total=read_count
-        ) as pbar:
+        desc="Progress",
+        unit=" read",
+        colour="green",
+        file=sys.stderr,
+        disable=disable_pbar,
+        total=read_count,
+    ) as pbar:
 
         while True:
             # Wait for some output data:
@@ -275,7 +322,9 @@ def _collect_thread_fn(out_queue, out_bam_file_name, disable_pbar, res, read_cou
             pbar.update(1)
 
 
-def _worker_attempt_segmentations_fn(in_queue, out_queue, worker_num, min_length, max_length, min_rq, models):
+def _worker_attempt_segmentations_fn(
+    in_queue, out_queue, worker_num, min_length, max_length, min_rq, models
+):
     """Function to run in each subthread / subprocess.
     Segments each read and place the segments in the output queue."""
 
@@ -303,16 +352,22 @@ def _worker_attempt_segmentations_fn(in_queue, out_queue, worker_num, min_length
 
         # Check for min/max length and min quality:
         if len(read.query_sequence) < min_length:
-            logger.debug(f"Read is shorter than min length.  "
-                           f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})")
+            logger.debug(
+                f"Read is shorter than min length.  "
+                f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})"
+            )
             continue
         elif len(read.query_sequence) > max_length:
-            logger.debug(f"Read is longer than max length.  "
-                           f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
+            logger.debug(
+                f"Read is longer than max length.  "
+                f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})"
+            )
             continue
         elif read.get_tag("rq") < min_rq:
-            logger.debug(f"Read quality is below the minimum.  "
-                           f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
+            logger.debug(
+                f"Read quality is below the minimum.  "
+                f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})"
+            )
             continue
 
         # Process and place our data on the output queue:
@@ -332,12 +387,14 @@ def _get_best_model(read, models):
         fw_logp, _ = model.annotate(read.query_sequence)
         rc_logp, _ = model.annotate(bam_utils.reverse_complement(read.query_sequence))
 
-        model_scores[f'{model_name}:fw'] = fw_logp
-        model_scores[f'{model_name}:rc'] = rc_logp
+        model_scores[f"{model_name}:fw"] = fw_logp
+        model_scores[f"{model_name}:rc"] = rc_logp
 
-    model_scores = dict(sorted(model_scores.items(), key=lambda item: item[1], reverse=True))
+    model_scores = dict(
+        sorted(model_scores.items(), key=lambda item: item[1], reverse=True)
+    )
 
     best_model_full = next(iter(model_scores))
-    best_model = re.sub(':.*$', '', best_model_full)
+    best_model = re.sub(":.*$", "", best_model_full)
 
     return best_model

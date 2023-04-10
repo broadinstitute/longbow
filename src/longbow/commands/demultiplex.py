@@ -1,18 +1,15 @@
-import logging
-import sys
 import itertools
-import time
+import logging
+import multiprocessing as mp
 import os
+import sys
+import time
 
 import click
+import pysam
 import tqdm
 
-import pysam
-import multiprocessing as mp
-
-from ..utils import bam_utils
-from ..utils import cli_utils
-
+from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +32,7 @@ logger = logging.getLogger(__name__)
     default="YN",
     show_default=True,
     required=False,
-    help="BAM tag on which to demultiplex (e.g. YN, BC)"
+    help="BAM tag on which to demultiplex (e.g. YN, BC)",
 )
 @cli_utils.input_bam
 @click.pass_context
@@ -80,12 +77,15 @@ def main(ctx, pbi, out_base_name, demux_on_tag, input_bam):
     ) as bam_file:
 
         # Get our header from the input bam file:
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
+        out_header = bam_utils.create_bam_header_with_program_group(
+            logger.name, bam_file.header
+        )
 
         # Start output worker:
         res = manager.dict({"num_reads_demultiplexed": 0, "num_reads_discarded": 0})
         output_worker = mp.Process(
-            target=_write_thread_fn, args=(results, out_header, out_base_name, res, read_count)
+            target=_write_thread_fn,
+            args=(results, out_header, out_base_name, res, read_count),
         )
         output_worker.start()
 
@@ -118,8 +118,10 @@ def main(ctx, pbi, out_base_name, demux_on_tag, input_bam):
     )
 
     et = time.time()
-    logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
-                f"Overall processing rate: {(res['num_reads_demultiplexed']+res['num_reads_discarded'])/(et - t_start):2.2f} reads/s.")
+    logger.info(
+        f"Done. Elapsed time: {et - t_start:2.2f}s. "
+        f"Overall processing rate: {(res['num_reads_demultiplexed']+res['num_reads_discarded'])/(et - t_start):2.2f} reads/s."
+    )
 
 
 def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, res, read_count):
@@ -134,7 +136,7 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, res, read_cou
             unit=" read",
             colour="green",
             file=sys.stderr,
-            total=read_count
+            total=read_count,
         ) as pbar:
 
             while True:
@@ -156,9 +158,9 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, res, read_cou
 
                     if tag_value not in out_file_dict:
                         out_file_dict[tag_value] = pysam.AlignmentFile(
-                            f'{out_bam_base_name}.{tag_value}.bam',
+                            f"{out_bam_base_name}.{tag_value}.bam",
                             "wb",
-                            header=out_bam_header
+                            header=out_bam_header,
                         )
 
                     out_file_dict[tag_value].write(read)

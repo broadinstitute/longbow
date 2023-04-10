@@ -1,14 +1,12 @@
+import concurrent.futures
 import logging
-import time
 import math
 import sys
+import time
 
 import click
-import tqdm
-
-import concurrent.futures
-
 import pysam
+import tqdm
 
 import longbow.utils.constants
 
@@ -47,9 +45,9 @@ logger = logging.getLogger(__name__)
     default=longbow.utils.constants.DEFAULT_MODEL,
     show_default=True,
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-         "of a LibraryModel as per LibraryModel.to_json()."
+    "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+    "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+    "of a LibraryModel as per LibraryModel.to_json().",
 )
 @click.argument("training-bam", type=click.Path(exists=True))
 @click.pass_context

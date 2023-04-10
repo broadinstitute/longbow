@@ -1,17 +1,16 @@
+import importlib
 import logging
 import multiprocessing as mp
+import pkgutil
+import sys
 
 import click
 import click_log
 
-import importlib
-import sys
-import pkgutil
-
 import longbow
 import longbow.commands
-from .meta import VERSION
 
+from .meta import VERSION
 
 logger = logging.getLogger("version")
 click_log.basic_config(logger)

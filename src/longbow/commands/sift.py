@@ -1,20 +1,19 @@
 import logging
-import time
 import os
 import sys
+import time
 from collections import Counter
 
 import click
-
-import tqdm
 import pysam
+import tqdm
 
 import longbow.utils.constants
-from ..utils import bam_utils
-from ..utils import cli_utils
+
+from ..utils import bam_utils, cli_utils
 from ..utils.bam_utils import get_segments
-from ..utils.constants import FFORMAT
 from ..utils.cli_utils import zero_safe_div
+from ..utils.constants import FFORMAT
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ logger = logging.getLogger(__name__)
     default="/dev/null",
     type=click.Path(exists=False),
     help="Table describing the ways in which the reads do not conform to expectation (failing reads only)"
-         "[default: /dev/null]",
+    "[default: /dev/null]",
 )
 @click.option(
     "-u",
@@ -45,7 +44,7 @@ logger = logging.getLogger(__name__)
     default="/dev/null",
     type=click.Path(exists=False),
     help="Table containing summary statistics for the sifted reads that are output."
-         "[default: /dev/null]",
+    "[default: /dev/null]",
 )
 @click.option(
     "-k",
@@ -55,7 +54,17 @@ logger = logging.getLogger(__name__)
     help="Txt file containing a list of read names to ignore.",
 )
 @cli_utils.input_bam
-def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore_list, input_bam):
+def main(
+    pbi,
+    output_bam,
+    reject_bam,
+    model,
+    force,
+    stats,
+    summary_stats,
+    ignore_list,
+    input_bam,
+):
     """Filter segmented reads by conformation to expected cDNA design."""
 
     t_start = time.time()
@@ -76,7 +85,7 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
     reads_to_ignore = set()
     if ignore_list and os.path.exists(ignore_list):
         logger.info(f"Ingesting read ignore list: {ignore_list}")
-        with open(ignore_list, 'r') as f:
+        with open(ignore_list, "r") as f:
             for line in f:
                 read_name = line.strip()
                 if len(read_name) > 0:
@@ -91,7 +100,9 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
 
     # Open our input bam file:
     pysam.set_verbosity(0)
-    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
+    with pysam.AlignmentFile(
+        input_bam, "rb", check_sq=False, require_index=False
+    ) as bam_file:
 
         # Get our header from the input bam file:
         out_header = pysam.AlignmentHeader.from_dict(
@@ -105,20 +116,35 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
             hard_print_interval = 100000
 
         # Setup output files:
-        with pysam.AlignmentFile(output_bam, "wb", header=out_header) as passing_bam_file, \
-                pysam.AlignmentFile(reject_bam, "wb", header=out_header) as failing_bam_file, \
-                open(stats, 'w') as stats_file:
+        with pysam.AlignmentFile(
+            output_bam, "wb", header=out_header
+        ) as passing_bam_file, pysam.AlignmentFile(
+            reject_bam, "wb", header=out_header
+        ) as failing_bam_file, open(
+            stats, "w"
+        ) as stats_file:
 
             num_passed = 0
             num_failed = 0
             num_ignored = 0
 
-            all_model_states = sorted(lb_model.cdna_model['structure'] + lb_model.key_adapters + ["random"])
+            all_model_states = sorted(
+                lb_model.cdna_model["structure"] + lb_model.key_adapters + ["random"]
+            )
 
-            stats_file.write('\t'.join(all_model_states) + '\n')
+            stats_file.write("\t".join(all_model_states) + "\n")
 
-            for i, read in enumerate(tqdm.tqdm(bam_file, desc="Progress", unit=" read", colour="green", file=sys.stderr,
-                                               disable=not sys.stdin.isatty(), total=read_count)):
+            for i, read in enumerate(
+                tqdm.tqdm(
+                    bam_file,
+                    desc="Progress",
+                    unit=" read",
+                    colour="green",
+                    file=sys.stderr,
+                    disable=not sys.stdin.isatty(),
+                    total=read_count,
+                )
+            ):
 
                 if read.query_name in reads_to_ignore:
                     logger.debug(f"Ignoring read: {read.query_name}")
@@ -129,37 +155,47 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
                 try:
                     seq, segment_ranges, segment_cigars = get_segments(read)
                 except KeyError:
-                    logger.error(f"Input bam file does not contain longbow segmented reads!  "
-                                 f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
+                    logger.error(
+                        f"Input bam file does not contain longbow segmented reads!  "
+                        f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
+                    )
                     sys.exit(1)
 
-                is_valid, actual_element_counts = check_validity(lb_model, segment_ranges)
+                is_valid, actual_element_counts = check_validity(
+                    lb_model, segment_ranges
+                )
 
                 if is_valid:
-                    logger.debug("Read is %s valid: %s",
-                                 lb_model.name,
-                                 read.query_name)
+                    logger.debug("Read is %s valid: %s", lb_model.name, read.query_name)
 
                     passing_bam_file.write(read)
                     num_passed += 1
                 else:
                     if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug("Read is not %s valid: %s",
-                                     lb_model.name,
-                                     read.query_name)
+                        logger.debug(
+                            "Read is not %s valid: %s", lb_model.name, read.query_name
+                        )
 
                     failing_bam_file.write(read)
 
                     # Write out read info to stats file:
-                    stats_file.write('\t'.join(
-                        [str(actual_element_counts[s]) for s in all_model_states]
-                    ) + '\n')
+                    stats_file.write(
+                        "\t".join(
+                            [str(actual_element_counts[s]) for s in all_model_states]
+                        )
+                        + "\n"
+                    )
 
                     num_failed += 1
 
                 if (i % hard_print_interval) == 0:
                     if read_count:
-                        logger.info("Sifted %d/%d (%2.2f%%) reads.", i, read_count, 100*(i/read_count))
+                        logger.info(
+                            "Sifted %d/%d (%2.2f%%) reads.",
+                            i,
+                            read_count,
+                            100 * (i / read_count),
+                        )
                     else:
                         logger.info("Sifted %d reads.", i)
 
@@ -167,7 +203,7 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
     tot_reads = num_passed + num_failed + num_ignored
 
     # Yell at the user / write out summary stats:
-    with open(summary_stats, 'w') as f:
+    with open(summary_stats, "w") as f:
         message = f"Total Reads Processed:\t{tot_reads:d}"
         f.write(f"{message}\n")
         logger.info(message)
@@ -188,7 +224,7 @@ def main(pbi, output_bam, reject_bam, model, force, stats, summary_stats, ignore
 
 
 def check_validity(lb_model, segment_ranges):
-    expected_elements = lb_model.cdna_model['structure']
+    expected_elements = lb_model.cdna_model["structure"]
 
     actual_elements = []
     for s in segment_ranges:
@@ -199,9 +235,12 @@ def check_validity(lb_model, segment_ranges):
         i = actual_elements.index(expected_elements[0])
 
         for j in range(len(expected_elements)):
-            valid &= i+j < len(actual_elements) and expected_elements[j] == actual_elements[i+j]
+            valid &= (
+                i + j < len(actual_elements)
+                and expected_elements[j] == actual_elements[i + j]
+            )
 
-    valid &= 'random' not in actual_elements
+    valid &= "random" not in actual_elements
 
     c = Counter(actual_elements)
     for e in expected_elements:

@@ -1,27 +1,21 @@
+import datetime
 import logging
+import os
 import re
 import sys
-import os
-
 import time
-import datetime
 
 import click
+import matplotlib.pyplot as plt
+import numpy as np
+import pysam
 import tqdm
 
-import pysam
-
-import numpy as np
-import matplotlib.pyplot as plt
-
 import longbow.utils.constants
-from ..utils import bam_utils
-from ..utils import cli_utils
-from ..utils import plot_utils
-from ..utils.constants import FFORMAT
 
+from ..utils import bam_utils, cli_utils, plot_utils
 from ..utils.cli_utils import get_field_count_and_percent_string
-
+from ..utils.constants import FFORMAT
 from . import segment
 
 plot_title_path_regex = re.compile(r".*/([^/].*?)/*$")
@@ -43,9 +37,9 @@ logger = logging.getLogger(__name__)
     "-m",
     "--model",
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-         "of a LibraryModel as per LibraryModel.to_json()."
+    "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+    "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+    "of a LibraryModel as per LibraryModel.to_json().",
 )
 @click.option(
     "-s",
@@ -78,7 +72,9 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
     if do_simple_splitting:
-        logger.warning("Simple splitting is now the default.  \"-s\" / \"--do-simple-splitting\" is now DEPRECATED.")
+        logger.warning(
+            'Simple splitting is now the default.  "-s" / "--do-simple-splitting" is now DEPRECATED.'
+        )
     do_simple_splitting = True
     logger.info("Using simple splitting mode.")
 
@@ -108,13 +104,18 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         logger.debug(f"Splitting delimiters: {delimiters}")
 
         # Get our adapter names:
-        mas_adapter_names = [array_element_adapters[0] for array_element_adapters in lb_model.array_element_structure]
+        mas_adapter_names = [
+            array_element_adapters[0]
+            for array_element_adapters in lb_model.array_element_structure
+        ]
         # Manually add in the last adapter which is the array end marker:
         mas_adapter_names.append(lb_model.array_element_structure[-1][-1])
         mas_adapter_name_set = set(mas_adapter_names)
 
         # Create storage point for heatmap data:
-        ligation_heat_matrix = np.zeros((len(mas_adapter_names) * 2, len(mas_adapter_names) * 2), dtype=int)
+        ligation_heat_matrix = np.zeros(
+            (len(mas_adapter_names) * 2, len(mas_adapter_names) * 2), dtype=int
+        )
         index_map = dict()
         for i, name in enumerate(mas_adapter_names):
             index_map[name] = i
@@ -134,38 +135,60 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             try:
                 _, segments, _ = bam_utils.get_segments(read)
             except KeyError:
-                logger.error(f"Input bam file does not contain longbow segmented reads!  "
-                             f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")
+                logger.error(
+                    f"Input bam file does not contain longbow segmented reads!  "
+                    f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
+                )
                 sys.exit(1)
 
             # Get the list of MAS-seq adapters in the segments and adjust for missing first adapters:
-            read_mas_seq_adapters = [s.name for s in segments if s.name in mas_adapter_name_set]
-            if segments[0].name not in mas_adapter_name_set and \
-                    segments[0].name == lb_model.array_element_structure[0][1] and \
-                    len(read_mas_seq_adapters) > 1 and \
-                    read_mas_seq_adapters[0] == lb_model.array_element_structure[1][0]:
+            read_mas_seq_adapters = [
+                s.name for s in segments if s.name in mas_adapter_name_set
+            ]
+            if (
+                segments[0].name not in mas_adapter_name_set
+                and segments[0].name == lb_model.array_element_structure[0][1]
+                and len(read_mas_seq_adapters) > 1
+                and read_mas_seq_adapters[0] == lb_model.array_element_structure[1][0]
+            ):
                 read_mas_seq_adapters.insert(0, lb_model.array_element_structure[0][0])
             # NOTE: here model.array_element_structure[0][1] corresponds to "5p_Adapter"
             #       that we use as our second segment in each array element.
 
             # Segment the array into segments using our actual segmentation algorithm so we have accurate counts:
             if do_simple_splitting:
-                segment_tuples = segment.segment_read_with_simple_splitting(read, delimiters, segments)
+                segment_tuples = segment.segment_read_with_simple_splitting(
+                    read, delimiters, segments
+                )
                 array_len = len(segment_tuples)
                 logger.debug(f"Split for {read.query_name}: {array_len} segments:")
                 # Track segment lengths:
                 for seg_tup in segment_tuples:
                     array_element_lengths.append(seg_tup[3] - seg_tup[2] + 1)
             else:
-                delimiter_found, delimiter_segments = segment.segment_read_with_bounded_region_algorithm(read, lb_model, segments)
+                (
+                    delimiter_found,
+                    delimiter_segments,
+                ) = segment.segment_read_with_bounded_region_algorithm(
+                    read, lb_model, segments
+                )
                 array_len = sum(delimiter_found)
                 # Track segment lengths:
                 segment_tuples = []
                 for i, seg_list in enumerate(delimiter_segments):
                     if delimiter_found[i]:
-                        array_element_lengths.append(seg_list[-1].end - seg_list[0].start + 1)
+                        array_element_lengths.append(
+                            seg_list[-1].end - seg_list[0].start + 1
+                        )
                         segment_tuples.append(
-                            tuple([seg_list[0].name, seg_list[-1].name, seg_list[0].start, seg_list[-1].end])
+                            tuple(
+                                [
+                                    seg_list[0].name,
+                                    seg_list[-1].name,
+                                    seg_list[0].start,
+                                    seg_list[-1].end,
+                                ]
+                            )
                         )
 
             # Here we need to adjust for our segmentation array count.
@@ -184,22 +207,30 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
 
             # Adjust names for segmented direction:
             if read.get_tag(longbow.utils.constants.SEGMENTS_RC_TAG) == 1:
-                read_mas_seq_adapters = [a + rc_decorator for a in read_mas_seq_adapters]
+                read_mas_seq_adapters = [
+                    a + rc_decorator for a in read_mas_seq_adapters
+                ]
 
             # Add our tally for our heatmap:
             if len(read_mas_seq_adapters) > 1:
                 cur_adapter = read_mas_seq_adapters[0]
                 for next_adapter in read_mas_seq_adapters[1:]:
-                    ligation_heat_matrix[index_map[cur_adapter]][index_map[next_adapter]] += 1
+                    ligation_heat_matrix[index_map[cur_adapter]][
+                        index_map[next_adapter]
+                    ] += 1
                     cur_adapter = next_adapter
 
             # Track our ligation profile:
             if array_len == 0:
                 # Create a string that is descriptive for the non-marker bases:
-                ligation_profile_string = "EMPTY (" + " ".join([s.name + rc_decorator for s in segments]) + ")"
+                ligation_profile_string = (
+                    "EMPTY ("
+                    + " ".join([s.name + rc_decorator for s in segments])
+                    + ")"
+                )
             else:
                 ligation_profile_string = " ".join(read_mas_seq_adapters)
-                
+
             try:
                 ligation_profile_count_dict[ligation_profile_string] += 1
             except KeyError:
@@ -216,24 +247,53 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     array_element_lengths = np.array(array_element_lengths)
 
     # Write our stats out to the appropriate files:
-    _write_stats(input_bam.name, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix, lb_model, output_prefix, do_simple_splitting)
+    _write_stats(
+        input_bam.name,
+        array_lengths,
+        array_element_lengths,
+        ligation_profile_count_dict,
+        ligation_heat_matrix,
+        lb_model,
+        output_prefix,
+        do_simple_splitting,
+    )
 
     logger.info("Writing complete ligation matrix...")
-    _create_ligation_heatmap(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({lb_model.name})")
+    _create_ligation_heatmap(
+        output_prefix,
+        ligation_heat_matrix,
+        index_map,
+        f"MAS-seq Ligations\n({lb_model.name})",
+    )
 
     logger.info("Writing reduced ligation matrix...")
-    _create_ligation_heatmap_reduced(output_prefix, ligation_heat_matrix, index_map, f"MAS-seq Ligations\n({lb_model.name})")
+    _create_ligation_heatmap_reduced(
+        output_prefix,
+        ligation_heat_matrix,
+        index_map,
+        f"MAS-seq Ligations\n({lb_model.name})",
+    )
 
     logger.info(f"Done. Elapsed time: %{FFORMAT}s.", time.time() - t_start)
 
 
-def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profile_count_dict, ligation_heat_matrix,
-                 lb_model, output_prefix, do_simple_splitting):
+def _write_stats(
+    input_bam,
+    array_lengths,
+    array_element_lengths,
+    ligation_profile_count_dict,
+    ligation_heat_matrix,
+    lb_model,
+    output_prefix,
+    do_simple_splitting,
+):
     """Write out all basic statistics for the data in the input file."""
 
     # Calculate histogram of array lengths.  Bins are created around integer values.
-    array_length_hist_bins = np.arange(int(np.max(array_lengths))+2)
-    array_length_count_hist, _ = np.histogram(array_lengths, bins=array_length_hist_bins-.5)
+    array_length_hist_bins = np.arange(int(np.max(array_lengths)) + 2)
+    array_length_count_hist, _ = np.histogram(
+        array_lengths, bins=array_length_hist_bins - 0.5
+    )
     array_length_hist_bins = array_length_hist_bins[:-1]
 
     # Calculate some necessary summary stats on array lengths:
@@ -264,10 +324,14 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
         # Make sure we don't lose the left-hand tail:
         min_bin = 0
 
-        array_element_length_hist_bins = np.arange(min_bin, max_bin, bin_width, dtype=int)
+        array_element_length_hist_bins = np.arange(
+            min_bin, max_bin, bin_width, dtype=int
+        )
         array_element_length_hist_bins[-1] = array_element_length_bin_max + 1
-        array_element_length_count_hist, _ = np.histogram(array_element_lengths,
-                                                          bins=array_element_length_hist_bins-(bin_width * .5))
+        array_element_length_count_hist, _ = np.histogram(
+            array_element_lengths,
+            bins=array_element_length_hist_bins - (bin_width * 0.5),
+        )
 
         array_element_length_hist_bins = array_element_length_hist_bins[:-1]
         array_element_length_hist_bins = array_element_length_hist_bins.astype(int)
@@ -278,52 +342,60 @@ def _write_stats(input_bam, array_lengths, array_element_lengths, ligation_profi
         array_element_length_count_hist = []
 
     logger.info("Writing summary stats file...")
-    _write_summary_stats_file(input_bam,
-                              lb_model,
-                              output_prefix,
-                              do_simple_splitting,
-                              array_lengths,
-                              array_length_count_hist,
-                              array_length_hist_bins,
-                              array_element_lengths,
-                              array_element_length_count_hist,
-                              array_element_length_hist_bins,
-                              ligation_profile_count_dict,
-                              ligation_heat_matrix)
+    _write_summary_stats_file(
+        input_bam,
+        lb_model,
+        output_prefix,
+        do_simple_splitting,
+        array_lengths,
+        array_length_count_hist,
+        array_length_hist_bins,
+        array_element_lengths,
+        array_element_length_count_hist,
+        array_element_length_hist_bins,
+        ligation_profile_count_dict,
+        ligation_heat_matrix,
+    )
 
     logger.info("Writing read stat histograms...")
-    _create_array_length_histogram(output_prefix,
-                                   "Array Length",
-                                   len(array_lengths),
-                                   array_length_count_hist,
-                                   array_length_hist_bins,
-                                   array_length_mean,
-                                   array_length_median,
-                                   lb_model.name)
+    _create_array_length_histogram(
+        output_prefix,
+        "Array Length",
+        len(array_lengths),
+        array_length_count_hist,
+        array_length_hist_bins,
+        array_length_mean,
+        array_length_median,
+        lb_model.name,
+    )
 
     logger.info("Writing array element stat histograms...")
-    _create_array_element_length_histogram(output_prefix,
-                                           "Array Element Length",
-                                           array_element_length_count_hist,
-                                           array_element_length_hist_bins,
-                                           array_element_length_mean,
-                                           array_element_length_median,
-                                           lb_model.name)
+    _create_array_element_length_histogram(
+        output_prefix,
+        "Array Element Length",
+        array_element_length_count_hist,
+        array_element_length_hist_bins,
+        array_element_length_mean,
+        array_element_length_median,
+        lb_model.name,
+    )
 
 
-def _write_summary_stats_file(input_bam,
-                              lb_model,
-                              output_prefix,
-                              do_simple_splitting,
-                              array_lengths,
-                              array_length_count_hist,
-                              array_length_hist_bins,
-                              array_element_lengths,
-                              array_element_length_count_hist,
-                              array_element_length_hist_bins,
-                              ligation_profile_count_dict,
-                              ligation_heat_matrix,
-                              num_ligation_profiles_to_show=40):
+def _write_summary_stats_file(
+    input_bam,
+    lb_model,
+    output_prefix,
+    do_simple_splitting,
+    array_lengths,
+    array_length_count_hist,
+    array_length_hist_bins,
+    array_element_lengths,
+    array_element_length_count_hist,
+    array_element_length_hist_bins,
+    ligation_profile_count_dict,
+    ligation_heat_matrix,
+    num_ligation_profiles_to_show=40,
+):
     """Write summary statistics for the given input bam to a file."""
 
     # Calculate summary stats on array lengths:
@@ -349,20 +421,22 @@ def _write_summary_stats_file(input_bam,
         array_element_length_std = np.std(array_element_lengths)
 
     logger.debug("Calculating ligation profiles...")
-    ligation_profile_data = _calculate_top_ligation_profiles(len(array_lengths),
-                                                             ligation_profile_count_dict,
-                                                             num_ligation_profiles_to_show)
+    ligation_profile_data = _calculate_top_ligation_profiles(
+        len(array_lengths), ligation_profile_count_dict, num_ligation_profiles_to_show
+    )
 
     # We need to rotate and flip our count matrix:
     ligation_heat_matrix = np.rot90(np.fliplr(ligation_heat_matrix))
 
     current_timestamp = time.time()
     timezone = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
-    with open(output_prefix + "_summary_stats.txt", 'w') as f:
+    with open(output_prefix + "_summary_stats.txt", "w") as f:
         f.write("#")
         f.write("=" * 80)
         f.write("\n")
-        f.write(f"#Time: {datetime.datetime.fromtimestamp(current_timestamp)} {timezone} ")
+        f.write(
+            f"#Time: {datetime.datetime.fromtimestamp(current_timestamp)} {timezone} "
+        )
         f.write(f"({current_timestamp})\n")
         f.write(f"#Input file: {input_bam}\n")
         f.write("#Splitting algorithm: ")
@@ -380,43 +454,81 @@ def _write_summary_stats_file(input_bam,
         logger.debug(f"Number of array elements found: {len(array_element_lengths)}")
 
         if len(array_element_lengths) == 0:
-            logger.warning("No array elements were found.  Either something went horribly wrong in library prep or "
-                           "you used the wrong model when running `longbow stats` (and the latter is more likely - "
-                           "CHECK YOUR INPUTS!).")
+            logger.warning(
+                "No array elements were found.  Either something went horribly wrong in library prep or "
+                "you used the wrong model when running `longbow stats` (and the latter is more likely - "
+                "CHECK YOUR INPUTS!)."
+            )
             f.write("\n")
             f.write("#" + ("=" * 80) + "\n")
-            f.write("""#                 __        ___    ____  _   _ ___ _   _  ____\n""")
-            f.write("""#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n""")
-            f.write("""#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n""")
-            f.write("""#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n""")
-            f.write("""#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n""")
+            f.write(
+                """#                 __        ___    ____  _   _ ___ _   _  ____\n"""
+            )
+            f.write(
+                """#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n"""
+            )
+            f.write(
+                """#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n"""
+            )
+            f.write(
+                """#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n"""
+            )
+            f.write(
+                """#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n"""
+            )
             f.write("#\n")
             f.write("WARNING:                  No array elements were found.\n")
-            f.write("WARNING:        Either something went horribly wrong in library prep\n")
+            f.write(
+                "WARNING:        Either something went horribly wrong in library prep\n"
+            )
             f.write("WARNING:                               or\n")
-            f.write("WARNING:        You used the wrong model when running `longbow stats`.\n")
-            f.write("WARNING:        The latter is more likely. CHECK YOUR INPUTS!!!!!!!!!!\n")
+            f.write(
+                "WARNING:        You used the wrong model when running `longbow stats`.\n"
+            )
+            f.write(
+                "WARNING:        The latter is more likely. CHECK YOUR INPUTS!!!!!!!!!!\n"
+            )
             f.write("#" + ("=" * 80) + "\n")
             f.write("\n")
 
         if len(array_lengths) == len(array_element_lengths):
-            logger.warning("The number of array elements found was the same as the number of array reads processed.  "
-                           "Either something went horribly wrong in library prep or you used the wrong model when "
-                           "running `longbow stats` (and the latter is more likely - CHECK YOUR INPUTS!).")
+            logger.warning(
+                "The number of array elements found was the same as the number of array reads processed.  "
+                "Either something went horribly wrong in library prep or you used the wrong model when "
+                "running `longbow stats` (and the latter is more likely - CHECK YOUR INPUTS!)."
+            )
             f.write("\n")
             f.write("#" + ("=" * 80) + "\n")
-            f.write("""#                 __        ___    ____  _   _ ___ _   _  ____\n""")
-            f.write("""#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n""")
-            f.write("""#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n""")
-            f.write("""#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n""")
-            f.write("""#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n""")
+            f.write(
+                """#                 __        ___    ____  _   _ ___ _   _  ____\n"""
+            )
+            f.write(
+                """#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n"""
+            )
+            f.write(
+                """#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n"""
+            )
+            f.write(
+                """#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n"""
+            )
+            f.write(
+                """#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n"""
+            )
             f.write("#\n")
-            f.write("WARNING:   The number of array elements found was the same as the number of\n")
+            f.write(
+                "WARNING:   The number of array elements found was the same as the number of\n"
+            )
             f.write("WARNING:                        array reads processed.\n")
-            f.write("WARNING:        Either something went horribly wrong in library prep\n")
+            f.write(
+                "WARNING:        Either something went horribly wrong in library prep\n"
+            )
             f.write("WARNING:                               or\n")
-            f.write("WARNING:        You used the wrong model when running `longbow stats`.\n")
-            f.write("WARNING:        The latter is more likely. CHECK YOUR INPUTS!!!!!!!!!!\n")
+            f.write(
+                "WARNING:        You used the wrong model when running `longbow stats`.\n"
+            )
+            f.write(
+                "WARNING:        The latter is more likely. CHECK YOUR INPUTS!!!!!!!!!!\n"
+            )
             f.write("#" + ("=" * 80) + "\n")
             f.write("\n")
 
@@ -424,7 +536,9 @@ def _write_summary_stats_file(input_bam,
         f.write(f"MAS-seq / Longbow Model:\t{lb_model.name}\n")
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
         f.write(f"Total Num Array Elements (Segmented Arrays):\t{num_array_elements}\n")
-        f.write(f"Output yield gain:\t{num_array_elements/len(array_lengths):{FFORMAT}}x\n")
+        f.write(
+            f"Output yield gain:\t{num_array_elements/len(array_lengths):{FFORMAT}}x\n"
+        )
         f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
         f.write("\n")
         f.write("#" + ("-" * 80) + "\n")
@@ -434,19 +548,39 @@ def _write_summary_stats_file(input_bam,
             f.write(f"\t{s}\n")
         f.write("\n")
 
-        _write_length_stats_to_file(f, "Array Length", array_length_count_hist,
-                                    array_length_hist_bins, array_length_min, array_length_max,
-                                    array_length_mean, array_length_median, array_length_std)
+        _write_length_stats_to_file(
+            f,
+            "Array Length",
+            array_length_count_hist,
+            array_length_hist_bins,
+            array_length_min,
+            array_length_max,
+            array_length_mean,
+            array_length_median,
+            array_length_std,
+        )
 
         f.write("#" + ("-" * 80) + "\n")
         if do_simple_splitting:
-            f.write("#REMINDER: Array splitting performed with Simple Splitting algorithm.\n")
+            f.write(
+                "#REMINDER: Array splitting performed with Simple Splitting algorithm.\n"
+            )
         else:
-            f.write("#REMINDER: Array splitting performed with Bounded Region algorithm.\n")
-        _write_length_stats_to_file(f, "Array Element Length", array_element_length_count_hist,
-                                    array_element_length_hist_bins, array_element_length_min, array_element_length_max,
-                                    array_element_length_mean, array_element_length_median, array_element_length_std,
-                                    do_outliers=True)
+            f.write(
+                "#REMINDER: Array splitting performed with Bounded Region algorithm.\n"
+            )
+        _write_length_stats_to_file(
+            f,
+            "Array Element Length",
+            array_element_length_count_hist,
+            array_element_length_hist_bins,
+            array_element_length_min,
+            array_element_length_max,
+            array_element_length_mean,
+            array_element_length_median,
+            array_element_length_std,
+            do_outliers=True,
+        )
 
         f.write("#" + ("-" * 80) + "\n")
         f.write("Ligation Matrix Statistics:\n")
@@ -455,12 +589,12 @@ def _write_summary_stats_file(input_bam,
 
         sub_diagonal_count = 0
         for i in range(1, ligation_heat_matrix.shape[0]):
-            sub_diagonal_count += ligation_heat_matrix[i, i-1]
+            sub_diagonal_count += ligation_heat_matrix[i, i - 1]
         off_sub_diagonal_count = total_count - sub_diagonal_count
 
         sub_sub_diagonal_count = 0
         for i in range(2, ligation_heat_matrix.shape[0]):
-            sub_sub_diagonal_count += ligation_heat_matrix[i, i-2]
+            sub_sub_diagonal_count += ligation_heat_matrix[i, i - 2]
 
         logger.debug("Heat Matrix Counts:")
         logger.debug("Total Count: %d", total_count)
@@ -469,13 +603,23 @@ def _write_summary_stats_file(input_bam,
         logger.debug("Sub Sub Diagonal Count: %d", sub_sub_diagonal_count)
 
         _, pct_str = get_field_count_and_percent_string(sub_diagonal_count, total_count)
-        f.write(f"Subdiagonal Count Total (correct segments): {sub_diagonal_count} {pct_str}\n")
+        f.write(
+            f"Subdiagonal Count Total (correct segments): {sub_diagonal_count} {pct_str}\n"
+        )
 
-        _, pct_str = get_field_count_and_percent_string(off_sub_diagonal_count, total_count)
-        f.write(f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count} {pct_str}\n")
+        _, pct_str = get_field_count_and_percent_string(
+            off_sub_diagonal_count, total_count
+        )
+        f.write(
+            f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count} {pct_str}\n"
+        )
 
-        _, pct_str = get_field_count_and_percent_string(sub_sub_diagonal_count, total_count)
-        f.write(f"Sub-Subdiagonal Count Total (missed MAS-seq adapters): {sub_sub_diagonal_count} {pct_str}\n")
+        _, pct_str = get_field_count_and_percent_string(
+            sub_sub_diagonal_count, total_count
+        )
+        f.write(
+            f"Sub-Subdiagonal Count Total (missed MAS-seq adapters): {sub_sub_diagonal_count} {pct_str}\n"
+        )
         f.write("\n")
 
         f.write("#" + ("-" * 80) + "\n")
@@ -488,7 +632,7 @@ def _write_summary_stats_file(input_bam,
 
         reduced_heat_matrix, _ = reduce_heatmap(
             ligation_heat_matrix,
-            {i: i for i in range(int(ligation_heat_matrix.shape[0]/2))}
+            {i: i for i in range(int(ligation_heat_matrix.shape[0] / 2))},
         )
         _write_heat_matrix(f, reduced_heat_matrix)
         f.write("\n")
@@ -513,7 +657,18 @@ def _write_summary_stats_file(input_bam,
             f.write("\n")
 
 
-def _write_length_stats_to_file(f, name, count_hist, hist_bins, stat_min, stat_max, stat_mean, stat_median, stat_std, do_outliers=False):
+def _write_length_stats_to_file(
+    f,
+    name,
+    count_hist,
+    hist_bins,
+    stat_min,
+    stat_max,
+    stat_mean,
+    stat_median,
+    stat_std,
+    do_outliers=False,
+):
     f.write("#" + ("-" * 80) + "\n")
     f.write(f"{name} Stats:\n")
     f.write(f"min:\t{stat_min}\n")
@@ -526,7 +681,14 @@ def _write_length_stats_to_file(f, name, count_hist, hist_bins, stat_min, stat_m
         f.write("#" + ("-" * 80) + "\n")
         f.write(f"{name} Hist:\n")
         f.write("Length   Count\n")
-        fstring = 'd' if (isinstance(hist_bins[0], np.signedinteger) or isinstance(hist_bins[0], np.unsignedinteger)) else 'f'
+        fstring = (
+            "d"
+            if (
+                isinstance(hist_bins[0], np.signedinteger)
+                or isinstance(hist_bins[0], np.unsignedinteger)
+            )
+            else "f"
+        )
         for i, h in enumerate(count_hist[:-1]):
             f.write(f"{hist_bins[i]:2{fstring}}:\t{h}\n")
         if do_outliers:
@@ -549,7 +711,9 @@ def _write_heat_matrix(f, heat_matrix):
     f.write("\n")
 
 
-def _calculate_top_ligation_profiles(num_reads, ligation_profile_count_dict, num_ligation_profiles_to_show):
+def _calculate_top_ligation_profiles(
+    num_reads, ligation_profile_count_dict, num_ligation_profiles_to_show
+):
 
     ligation_profiles, profile_counts = zip(*ligation_profile_count_dict.items())
     ligation_profiles = np.array(ligation_profiles)
@@ -558,7 +722,9 @@ def _calculate_top_ligation_profiles(num_reads, ligation_profile_count_dict, num
     # Show the top molecular arrangements:
     if num_ligation_profiles_to_show > len(profile_counts):
         num_ligation_profiles_to_show = len(profile_counts)
-    indices = np.argpartition(profile_counts, -num_ligation_profiles_to_show)[-num_ligation_profiles_to_show:]
+    indices = np.argpartition(profile_counts, -num_ligation_profiles_to_show)[
+        -num_ligation_profiles_to_show:
+    ]
 
     # Sort the indices:
     top_counts = profile_counts[indices]
@@ -569,20 +735,26 @@ def _calculate_top_ligation_profiles(num_reads, ligation_profile_count_dict, num
 
     # Package up the data:
     data = [
-        [top_ligations[i], top_counts[i], f"{(top_counts[i] / num_reads) * 100:{FFORMAT}}%"]
+        [
+            top_ligations[i],
+            top_counts[i],
+            f"{(top_counts[i] / num_reads) * 100:{FFORMAT}}%",
+        ]
         for i in range(len(top_counts) - 1, -1, -1)
     ]
     return data
 
 
-def _create_array_length_histogram(output_prefix,
-                                   stat_name,
-                                   num_data_points,
-                                   count_hist,
-                                   hist_bins,
-                                   stat_mean,
-                                   stat_median,
-                                   model_name):
+def _create_array_length_histogram(
+    output_prefix,
+    stat_name,
+    num_data_points,
+    count_hist,
+    hist_bins,
+    stat_mean,
+    stat_median,
+    model_name,
+):
     """Create a histogram displaying the length distribution of all arrays."""
 
     handles = []
@@ -595,7 +767,7 @@ def _create_array_length_histogram(output_prefix,
     else:
         tic_width = 1
 
-    bar_width = tic_width*0.8
+    bar_width = tic_width * 0.8
     h = ax.bar(hist_bins, count_hist, width=bar_width, label=f"{stat_name}s")
     handles.append(h)
 
@@ -604,31 +776,36 @@ def _create_array_length_histogram(output_prefix,
     ymin, ymax = ax.get_ylim()
     yrange = ymax - ymin
 
-    h, = ax.plot(
+    (h,) = ax.plot(
         [stat_mean, stat_mean],
-        [ymin - (yrange * .1), ymax + (yrange * .2)],
+        [ymin - (yrange * 0.1), ymax + (yrange * 0.2)],
         "--",
-        color=[.4] * 3,
-        label=f"Mean {stat_name} = {stat_mean:.02f}"
+        color=[0.4] * 3,
+        label=f"Mean {stat_name} = {stat_mean:.02f}",
     )
     handles.append(h)
 
-    h, = ax.plot(
+    (h,) = ax.plot(
         [stat_median, stat_median],
-        [ymin - (yrange * .1), ymax + (yrange * .2)],
+        [ymin - (yrange * 0.1), ymax + (yrange * 0.2)],
         "--",
         color=[0] * 3,
-        label=f"Median {stat_name} = {stat_median}"
+        label=f"Median {stat_name} = {stat_median}",
     )
     handles.append(h)
 
     ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax + (yrange * .1))
+    ax.set_ylim(ymin, ymax + (yrange * 0.1))
 
     # Add the labels for the bars:
-    yoff = (ymax - ymin) * .025
+    yoff = (ymax - ymin) * 0.025
     for count, length in zip(count_hist, hist_bins):
-        h = ax.text(length, count + yoff, f"{count}\n{count / num_data_points * 100:.02f}%", horizontalalignment='center')
+        h = ax.text(
+            length,
+            count + yoff,
+            f"{count}\n{count / num_data_points * 100:.02f}%",
+            horizontalalignment="center",
+        )
 
     prefix_title = output_prefix
     if "/" in output_prefix:
@@ -641,7 +818,7 @@ def _create_array_length_histogram(output_prefix,
     ax.set_xlabel(stat_name)
     ax.set_ylabel("Number of Reads")
 
-    ax.set_xticks([x for x in range(0, 1+int(max(hist_bins)), tic_width)])
+    ax.set_xticks([x for x in range(0, 1 + int(max(hist_bins)), tic_width)])
 
     fig.legend(handles=handles, loc="upper right")
     plot_utils.fix_plot_visuals(fig)
@@ -649,13 +826,9 @@ def _create_array_length_histogram(output_prefix,
     plot_utils.save_figure(fig, name=t, prefix=output_prefix)
 
 
-def _create_array_element_length_histogram(output_prefix,
-                                           stat_name,
-                                           count_hist,
-                                           hist_bins,
-                                           stat_mean,
-                                           stat_median,
-                                           model_name):
+def _create_array_element_length_histogram(
+    output_prefix, stat_name, count_hist, hist_bins, stat_mean, stat_median, model_name
+):
     """Create a histogram displaying the length distribution of all arrays."""
 
     handles = []
@@ -664,7 +837,7 @@ def _create_array_element_length_histogram(output_prefix,
 
     # Plot the bar graph:
     ax.plot(hist_bins, count_hist, "-b", label=f"{stat_name}s")
-    h, = ax.plot(hist_bins, count_hist, "ob", label=f"{stat_name}s")
+    (h,) = ax.plot(hist_bins, count_hist, "ob", label=f"{stat_name}s")
     handles.append(h)
 
     # Plot the mean line:
@@ -672,36 +845,36 @@ def _create_array_element_length_histogram(output_prefix,
     ymin, ymax = ax.get_ylim()
     yrange = ymax - ymin
 
-    h, = ax.plot(
+    (h,) = ax.plot(
         [stat_mean, stat_mean],
-        [ymin - (yrange * .1), ymax + (yrange * .2)],
+        [ymin - (yrange * 0.1), ymax + (yrange * 0.2)],
         "--",
-        color=[.4] * 3,
-        label=f"Mean {stat_name} = {stat_mean:.02f}"
+        color=[0.4] * 3,
+        label=f"Mean {stat_name} = {stat_mean:.02f}",
     )
     handles.append(h)
 
-    h, = ax.plot(
+    (h,) = ax.plot(
         [stat_median, stat_median],
-        [ymin - (yrange * .1), ymax + (yrange * .2)],
+        [ymin - (yrange * 0.1), ymax + (yrange * 0.2)],
         "--",
         color=[0] * 3,
-        label=f"Median {stat_name} = {stat_median}"
+        label=f"Median {stat_name} = {stat_median}",
     )
     handles.append(h)
 
     if len(hist_bins) > 1:
-        h, = ax.plot(
-            [hist_bins[-2] + (hist_bins[-1] - hist_bins[-2])]*2,
-            [ymin - (yrange * .1), ymax + (yrange * .2)],
+        (h,) = ax.plot(
+            [hist_bins[-2] + (hist_bins[-1] - hist_bins[-2])] * 2,
+            [ymin - (yrange * 0.1), ymax + (yrange * 0.2)],
             "-",
             color="red",
-            label="Outlier Break"
+            label="Outlier Break",
         )
         handles.append(h)
 
     ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax + (yrange * .1))
+    ax.set_ylim(ymin, ymax + (yrange * 0.1))
 
     prefix_title = output_prefix
     if "/" in output_prefix:
@@ -725,7 +898,9 @@ def _create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
     The resulting plot will represent the forward and reverse complemented ligations separately."""
 
     # Get our colormap:
-    heat_cmap = plot_utils.get_zero_white_cmap(base_cmap=plot_utils.get_heat_cmap("jet", False))
+    heat_cmap = plot_utils.get_zero_white_cmap(
+        base_cmap=plot_utils.get_heat_cmap("jet", False)
+    )
 
     # Make the figure huge so we can have our numbers fit:
     num_digits = _get_num_digits_for_heat_matrix(heat_matrix, 0)
@@ -776,8 +951,15 @@ def _create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
             else:
                 text_color = [1] * 3
 
-            ax.text(j, i, heat_matrix[i, j],
-                    ha="center", va="center", color=text_color, size="xx-small")
+            ax.text(
+                j,
+                i,
+                heat_matrix[i, j],
+                ha="center",
+                va="center",
+                color=text_color,
+                size="xx-small",
+            )
 
     plot_utils.fix_plot_visuals(fig)
 
@@ -786,13 +968,22 @@ def _create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
 
 
 # Plot the heatmap we created above:
-def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, title, count_divisor=None, significant_digits=3):
+def _create_ligation_heatmap_reduced(
+    output_prefix,
+    heat_matrix,
+    index_map,
+    title,
+    count_divisor=None,
+    significant_digits=3,
+):
     """Plot the given heatmap which represents the ligations between different MAS-seq adapters.
     The resulting plot will represent both the forward and reverse complemented ligations together
     in the same size-reduced heatmap and does not distinguish between read directions."""
 
     # Get our colormap:
-    heat_cmap = plot_utils.get_zero_white_cmap(base_cmap=plot_utils.get_heat_cmap("jet", False))
+    heat_cmap = plot_utils.get_zero_white_cmap(
+        base_cmap=plot_utils.get_heat_cmap("jet", False)
+    )
 
     # This heatmap should be the upper left and lower right quadrants of the normal heatmap.
     # We should produce a warning if there are any non-zero counts in the forward->RC indicating
@@ -811,7 +1002,9 @@ def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, titl
     reduced_heat_mat, reduced_index_map = reduce_heatmap(heat_matrix, index_map)
 
     if count_divisor:
-        reduced_heat_mat = plot_utils.signif(reduced_heat_mat / count_divisor, significant_digits)
+        reduced_heat_mat = plot_utils.signif(
+            reduced_heat_mat / count_divisor, significant_digits
+        )
 
     fig = plt.figure(figsize=[x * fig_scale for x in plot_utils.gFIG_SIZE_in])
     ax = fig.add_subplot()
@@ -841,7 +1034,9 @@ def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, titl
     plot_utils.fix_plot_visuals(fig)
 
     # Save the figure without numbers first.
-    plot_utils.save_figure(fig, name=title, prefix=output_prefix, suffix="reduced_no_numbers")
+    plot_utils.save_figure(
+        fig, name=title, prefix=output_prefix, suffix="reduced_no_numbers"
+    )
 
     # Get the color matrix so we can use it to display the counts
     # in an appropriately readable color:
@@ -856,8 +1051,16 @@ def _create_ligation_heatmap_reduced(output_prefix, heat_matrix, index_map, titl
                 text_color = [1] * 3
 
             # Old color:
-            ax.text(j, i, reduced_heat_mat[i, j],
-                    ha="center", va="center", color=text_color, size="medium", weight=1000)
+            ax.text(
+                j,
+                i,
+                reduced_heat_mat[i, j],
+                ha="center",
+                va="center",
+                color=text_color,
+                size="medium",
+                weight=1000,
+            )
 
     plot_utils.fix_plot_visuals(fig)
 
@@ -885,11 +1088,15 @@ def reduce_heatmap(heat_matrix, index_map):
     ur_sum = heat_matrix[0:half_point, half_point:].sum()
     ll_sum = heat_matrix[half_point:, 0:half_point].sum()
     if ur_sum != 0:
-        logger.warning("WARNING: "
-                       "Upper right quadrant of heat matrix has nonzero values that are ignored by this method!")
+        logger.warning(
+            "WARNING: "
+            "Upper right quadrant of heat matrix has nonzero values that are ignored by this method!"
+        )
     if ll_sum != 0:
-        logger.warning("WARNING: "
-                       "Lower left quadrant of heat matrix has nonzero values that are ignored by this method!")
+        logger.warning(
+            "WARNING: "
+            "Lower left quadrant of heat matrix has nonzero values that are ignored by this method!"
+        )
     # Convert given heat matrix into the reduced form for the forward direction only:
     reduced_heat_mat = np.copy(heat_matrix[0:half_point, 0:half_point])
     reduced_heat_mat += np.copy(heat_matrix[half_point:, half_point:])

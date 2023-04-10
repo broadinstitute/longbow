@@ -1,21 +1,19 @@
-import logging
-import sys
 import itertools
-import re
-import time
+import logging
+import multiprocessing as mp
 import os
+import re
+import sys
+import time
 
 import click
+import pysam
 import tqdm
 
-import pysam
-import multiprocessing as mp
-
 import longbow.utils.constants
-from ..utils import bam_utils
-from ..utils import cli_utils
-from ..utils.cli_utils import format_obnoxious_warning_message
 
+from ..utils import bam_utils, cli_utils
+from ..utils.cli_utils import format_obnoxious_warning_message
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +22,14 @@ logger = logging.getLogger(__name__)
 @cli_utils.output_bam("annotated bam output")
 @cli_utils.model
 @cli_utils.force_overwrite
-@click.option(
-    "-b",
-    "--barcode-tag",
-    type=str,
-    help="The barcode tag to adjust"
-)
+@click.option("-b", "--barcode-tag", type=str, help="The barcode tag to adjust")
 @click.option(
     "-n",
     "--new-barcode-tag",
     type=str,
     default=longbow.utils.constants.READ_RAW_UMI_TAG,
     show_default=True,
-    help="The barcode tag into which to put the adjusted value."
+    help="The barcode tag into which to put the adjusted value.",
 )
 @click.option(
     "-e",
@@ -47,7 +40,9 @@ logger = logging.getLogger(__name__)
 )
 @cli_utils.input_bam
 @click.pass_context
-def main(ctx, output_bam, model, force, barcode_tag, new_barcode_tag, expand, input_bam):
+def main(
+    ctx, output_bam, model, force, barcode_tag, new_barcode_tag, expand, input_bam
+):
     """Pad tag by specified number of adjacent bases from the read."""
 
     t_start = time.time()
@@ -81,9 +76,7 @@ def main(ctx, output_bam, model, force, barcode_tag, new_barcode_tag, expand, in
     # Start worker sub-processes:
     worker_process_pool = []
     for _ in range(threads):
-        p = mp.Process(
-            target=_pass_read_fn, args=(process_input_data_queue, results)
-        )
+        p = mp.Process(target=_pass_read_fn, args=(process_input_data_queue, results))
         p.start()
         worker_process_pool.append(p)
 
@@ -102,11 +95,15 @@ def main(ctx, output_bam, model, force, barcode_tag, new_barcode_tag, expand, in
 
         # Verify that the given model actually has the barcode to change:
         if not lb_model.has_annotation_tag(barcode_tag):
-            print(f"ERROR: Could not determine {lb_model.name} model segment from tag name: {barcode_tag}",
-                  file=sys.stderr)
+            print(
+                f"ERROR: Could not determine {lb_model.name} model segment from tag name: {barcode_tag}",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
-        out_header = bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header, model=lb_model)
+        out_header = bam_utils.create_bam_header_with_program_group(
+            logger.name, bam_file.header, model=lb_model
+        )
 
         # Start output worker:
         res = manager.dict({"num_reads_refined": 0, "num_reads": 0})
@@ -121,7 +118,7 @@ def main(ctx, output_bam, model, force, barcode_tag, new_barcode_tag, expand, in
                 lb_model,
                 barcode_tag,
                 new_barcode_tag,
-                expand
+                expand,
             ),
         )
         output_worker.start()
@@ -144,18 +141,35 @@ def main(ctx, output_bam, model, force, barcode_tag, new_barcode_tag, expand, in
         results.put(None)
         output_worker.join()
 
-    logger.info( f"Refined {res['num_reads_refined']} reads of {res['num_reads']} total.")
-    
+    logger.info(
+        f"Refined {res['num_reads_refined']} reads of {res['num_reads']} total."
+    )
+
     et = time.time()
-    logger.info(f"Done. Elapsed time: {et - t_start:2.2f}s. "
-                f"Overall processing rate: {res['num_reads']/(et - t_start):2.2f} reads/s.")
+    logger.info(
+        f"Done. Elapsed time: {et - t_start:2.2f}s. "
+        f"Overall processing rate: {res['num_reads']/(et - t_start):2.2f} reads/s."
+    )
 
-    if res['num_reads_refined'] == 0:
-        logger.warning(format_obnoxious_warning_message("No reads were refined / padded.  This is very likely a misconfiguration."))
+    if res["num_reads_refined"] == 0:
+        logger.warning(
+            format_obnoxious_warning_message(
+                "No reads were refined / padded.  This is very likely a misconfiguration."
+            )
+        )
 
 
-def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_model,
-                   barcode_tag, new_barcode_tag, expand):
+def _expand_tag_fn(
+    out_queue,
+    out_bam_header,
+    out_bam_file_name,
+    pbar,
+    res,
+    lb_model,
+    barcode_tag,
+    new_barcode_tag,
+    expand,
+):
     """Thread / process fn to expand a tag and write out all our data."""
 
     # Get the segment to pad out:
@@ -192,15 +206,20 @@ def _expand_tag_fn(out_queue, out_bam_header, out_bam_file_name, pbar, res, lb_m
 
                         tag_bc = read.get_tag(barcode_tag)
 
-                        for query_sequence in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
+                        for query_sequence in [
+                            read.query_sequence,
+                            bam_utils.reverse_complement(read.query_sequence),
+                        ]:
                             # Must add 1 to include the final base:
-                            pos = query_sequence.find(read.get_tag(barcode_tag), int(start), int(stop)+1)
+                            pos = query_sequence.find(
+                                read.get_tag(barcode_tag), int(start), int(stop) + 1
+                            )
 
                             if pos >= 0:
                                 start_pos = pos - expand
                                 if start_pos < 0:
                                     start_pos = 0
-                                end_pos = pos+len(tag_bc)+expand
+                                end_pos = pos + len(tag_bc) + expand
 
                                 new_bc = query_sequence[start_pos:end_pos]
 

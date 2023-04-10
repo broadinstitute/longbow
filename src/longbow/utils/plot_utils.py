@@ -1,6 +1,5 @@
 import matplotlib
 import matplotlib.pyplot as plt
-
 import numpy as np
 
 # Make big figures:
@@ -13,7 +12,7 @@ gPLOT_PARAMS = {
     "axes.labelsize": "x-large",
     "axes.titlesize": "x-large",
     "xtick.labelsize": "x-large",
-    "ytick.labelsize": "x-large"
+    "ytick.labelsize": "x-large",
 }
 matplotlib.rcParams.update(gPLOT_PARAMS)
 plt.rcParams.update(gPLOT_PARAMS)
@@ -29,12 +28,14 @@ gTEXT_FONT_SIZE = 16
 gFIG_NUM = 0
 
 
-def fix_plot_visuals(fig,
-                     titlesize=gTITLE_FONT_SIZE,
-                     labelsize=gAXIS_LABEL_FONT_SIZE,
-                     ticklabelsize=gTICK_LABEL_FONT_SIZE,
-                     textsize=gTEXT_FONT_SIZE,
-                     tight_rect=None):
+def fix_plot_visuals(
+    fig,
+    titlesize=gTITLE_FONT_SIZE,
+    labelsize=gAXIS_LABEL_FONT_SIZE,
+    ticklabelsize=gTICK_LABEL_FONT_SIZE,
+    textsize=gTEXT_FONT_SIZE,
+    tight_rect=None,
+):
     """Fix the plot elements to be appropriate sizes for a slide / presentation."""
 
     if not textsize:
@@ -42,9 +43,9 @@ def fix_plot_visuals(fig,
 
     for ax in fig.get_axes():
 
-        for ticklabel in (ax.get_xticklabels()):
+        for ticklabel in ax.get_xticklabels():
             ticklabel.set_fontsize(ticklabelsize)
-        for ticklabel in (ax.get_yticklabels()):
+        for ticklabel in ax.get_yticklabels():
             ticklabel.set_fontsize(ticklabelsize)
         for c in ax.get_children():
             if c.__class__ == matplotlib.text.Text:
@@ -79,10 +80,21 @@ def save_figure(fig=None, name=None, prefix=None, suffix=None, fig_dir=None):
 
     if not name:
         # Get our name from the figure we're given:
-        name = [ax.get_title() for ax in fig.axes if ax.get_title() and len(ax.get_title()) > 0][0]
+        name = [
+            ax.get_title()
+            for ax in fig.axes
+            if ax.get_title() and len(ax.get_title()) > 0
+        ][0]
 
     # Sanitize our name for writing to disk:
-    name = name.replace(" ", "_").replace("\n", "_").replace("\t", "_").replace("=", "-").replace("(", "").replace(")", "")
+    name = (
+        name.replace(" ", "_")
+        .replace("\n", "_")
+        .replace("\t", "_")
+        .replace("=", "-")
+        .replace("(", "")
+        .replace(")", "")
+    )
 
     # Add prefix and suffix to the name if we have them defined:
     if prefix:
@@ -100,7 +112,7 @@ def save_figure(fig=None, name=None, prefix=None, suffix=None, fig_dir=None):
 
 def signif(x, p=4):
     """Round the given value(s) in x to the number of significant figures given by p."""
-    x_positive = np.where(np.isfinite(x) & (x != 0), np.abs(x), 10**(p-1))
+    x_positive = np.where(np.isfinite(x) & (x != 0), np.abs(x), 10 ** (p - 1))
     mags = 10 ** (p - 1 - np.floor(np.log10(x_positive)))
     return np.round(x * mags) / mags
 
@@ -146,6 +158,8 @@ def get_zero_white_cmap(cmap_name=None, base_cmap=None):
     cmap = np.vstack((lower, upper))
 
     # convert to matplotlib colormap
-    cmap = matplotlib.colors.ListedColormap(cmap, name=f"{cmap_name}ZeroWhite", N=cmap.shape[0])
+    cmap = matplotlib.colors.ListedColormap(
+        cmap, name=f"{cmap_name}ZeroWhite", N=cmap.shape[0]
+    )
 
     return cmap

@@ -7,7 +7,10 @@ FFORMAT = "2.4f"
 DEFAULT_MODEL = "mas_15_sc_10x5p_single_none"
 DEFAULT_MAX_READ_LENGTH = 30000
 
-DEFAULT_DEMULTIPLEX_MODELS = ("mas_10_sc_10x5p_single_none", "mas_15_sc_10x5p_single_none")
+DEFAULT_DEMULTIPLEX_MODELS = (
+    "mas_10_sc_10x5p_single_none",
+    "mas_15_sc_10x5p_single_none",
+)
 
 BARCODE_CONF_FILE_NAME = "barcode_confidence_scores.txt"
 
@@ -60,15 +63,15 @@ READ_APPROX_QUAL_TAG = "YQ"
 READ_INDEX_TAG = "BC"
 READ_INDEX_ARRAY_TAG = "BA"
 
-READ_UMI_TAG = 'ZU'
+READ_UMI_TAG = "ZU"
 READ_UMI_POS_TAG = "XU"
-READ_BARCODE_TAG = 'CR'  # Cell barcode
+READ_BARCODE_TAG = "CR"  # Cell barcode
 
 READ_ADJUSTED_BARCODE_START = "pz"
 
 READ_BARCODE_POS_TAG = "XB"
 READ_BARCODE_QUAL_TAG = "CY"  # Cell barcode read quality
-READ_BARCODE_CORRECTED_TAG = 'CB'  # Cell barcode that is error-corrected and confirmed against a list of known-good barcode sequences
+READ_BARCODE_CORRECTED_TAG = "CB"  # Cell barcode that is error-corrected and confirmed against a list of known-good barcode sequences
 READ_BARCODE_CONF_FACTOR_TAG = "XF"
 READ_TAGS_ORDER_TAG = "XA"  # Order of tag names
 
@@ -91,9 +94,17 @@ BARCODE_CORRECTION_PERFORMED = "YP"  # True IFF the barcode was able to be corre
 #######################################
 READ_RAW_UMI_TAG = "XM"  # UMI sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
 READ_RAW_BARCODE_TAG = "XC"  # barcode sequence (for IsoSeq3 compatibility - https://isoseq.how/general-faq.html)
-READ_NUM_CONSENSUS_PASSES_TAG = "ic"  # Sum of number of passes from all ZMWs used to create consensus (e.g. 1)
-READ_ZMW_NAMES_TAG = "im"  # ZMW names associated with this isoform (e.g. m64013e_211031_055434/1/ccs)
+READ_NUM_CONSENSUS_PASSES_TAG = (
+    "ic"  # Sum of number of passes from all ZMWs used to create consensus (e.g. 1)
+)
+READ_ZMW_NAMES_TAG = (
+    "im"  # ZMW names associated with this isoform (e.g. m64013e_211031_055434/1/ccs)
+)
 READ_NUM_ZMWS_TAG = "is"  # Number of ZMWs associated with this isoform (e.g. 1)
-READ_CLIPPED_SEQS_LIST_TAG = "it"  # List of barcodes/UMIs clipped during tag (e.g. TCAGGTGCAGGTCGGATCCTGCGCAT)
+READ_CLIPPED_SEQS_LIST_TAG = (
+    "it"  # List of barcodes/UMIs clipped during tag (e.g. TCAGGTGCAGGTCGGATCCTGCGCAT)
+)
 READ_ZMW_TAG = "zm"
-READ_ALTERED_NAME_TAG = "XN"  # Altered read name given by Longbow to a segmented read (used for debugging)
+READ_ALTERED_NAME_TAG = (
+    "XN"  # Altered read name given by Longbow to a segmented read (used for debugging)
+)

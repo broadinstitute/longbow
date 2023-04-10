@@ -56,22 +56,22 @@ def model(function):
         "-m",
         "--model",
         help="The model to use for annotation.  If not specified, it will be autodetected from "
-             "the BAM header.  If the given value is a pre-configured model name, then that "
-             "model will be used.  Otherwise, the given value will be treated as a file name "
-             "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
-             "Longbow will assume the contents are the configuration of a LibraryModel as per "
-             "LibraryModel.to_json()."
+        "the BAM header.  If the given value is a pre-configured model name, then that "
+        "model will be used.  Otherwise, the given value will be treated as a file name "
+        "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
+        "Longbow will assume the contents are the configuration of a LibraryModel as per "
+        "LibraryModel.to_json().",
     )(function)
 
 
 def force_overwrite(function):
     return click.option(
-        '-f',
-        '--force',
+        "-f",
+        "--force",
         is_flag=True,
         default=False,
         show_default=True,
-        help="Force overwrite of the output files if they exist."
+        help="Force overwrite of the output files if they exist.",
     )(function)
 
 
@@ -100,14 +100,15 @@ class MutuallyExclusiveOption(click.Option):
 
     Taken from: https://stackoverflow.com/a/37491504
     """
+
     def __init__(self, *args, **kwargs):
-        self.mutually_exclusive = set(kwargs.pop('mutually_exclusive', []))
-        help = kwargs.get('help', '')
+        self.mutually_exclusive = set(kwargs.pop("mutually_exclusive", []))
+        help = kwargs.get("help", "")
         if self.mutually_exclusive:
-            ex_str = ', '.join(self.mutually_exclusive)
-            kwargs['help'] = help + (
-                ' NOTE: This argument is mutually exclusive with '
-                ' arguments: [' + ex_str + '].'
+            ex_str = ", ".join(self.mutually_exclusive)
+            kwargs["help"] = help + (
+                " NOTE: This argument is mutually exclusive with "
+                " arguments: [" + ex_str + "]."
             )
         super(MutuallyExclusiveOption, self).__init__(*args, **kwargs)
 
@@ -115,17 +116,10 @@ class MutuallyExclusiveOption(click.Option):
         if self.mutually_exclusive.intersection(opts) and self.name in opts:
             raise click.UsageError(
                 "Illegal usage: `{}` is mutually exclusive with "
-                "arguments `{}`.".format(
-                    self.name,
-                    ', '.join(self.mutually_exclusive)
-                )
+                "arguments `{}`.".format(self.name, ", ".join(self.mutually_exclusive))
             )
 
-        return super(MutuallyExclusiveOption, self).handle_parse_result(
-            ctx,
-            opts,
-            args
-        )
+        return super(MutuallyExclusiveOption, self).handle_parse_result(ctx, opts, args)
 
 
 def format_obnoxious_warning_message(message):
@@ -153,4 +147,4 @@ def get_field_count_and_percent_string(count, total, fformat="2.4f"):
 
 
 def zero_safe_div(n, d):
-    return 0 if not d else n/d
+    return 0 if not d else n / d

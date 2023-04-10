@@ -1,17 +1,19 @@
-import json
-import math
-import gzip
-import logging
-import re
-import pysam
-import sys
 import array
 import collections
-import os
+import gzip
+import json
+import logging
+import math
 import operator
-
-from functools import reduce
+import os
+import re
+import sys
 from collections import OrderedDict
+from functools import reduce
+from inspect import currentframe, getdoc
+
+import pysam
+import ssw
 from construct import (
     Array,
     Const,
@@ -25,18 +27,25 @@ from construct import (
     Struct,
     this,
 )
-from inspect import currentframe, getdoc
-
-import ssw
 
 from ..meta import VERSION
-
-from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG, SEGMENTS_CIGAR_TAG, SEGMENTS_QUAL_TAG, \
-    SEGMENTS_RC_TAG, SEGMENT_TAG_DELIMITER, READ_MODEL_NAME_TAG, READ_MODEL_SCORE_TAG, READ_APPROX_QUAL_TAG, \
-    READ_RAW_UMI_TAG, READ_RAW_BARCODE_TAG, CONF_FACTOR_SCALE, SEGMENT_POS_DELIMITER
-
 from ..utils.model import LibraryModel
-
+from .constants import (
+    CONF_FACTOR_SCALE,
+    HPR_SEGMENT_TYPE_NAME,
+    RANDOM_SEGMENT_NAME,
+    READ_APPROX_QUAL_TAG,
+    READ_MODEL_NAME_TAG,
+    READ_MODEL_SCORE_TAG,
+    READ_RAW_BARCODE_TAG,
+    READ_RAW_UMI_TAG,
+    SEGMENT_POS_DELIMITER,
+    SEGMENT_TAG_DELIMITER,
+    SEGMENTS_CIGAR_TAG,
+    SEGMENTS_QUAL_TAG,
+    SEGMENTS_RC_TAG,
+    SEGMENTS_TAG,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +54,7 @@ PB_READ_NAME_RE = re.compile("m[0-9]+e?_[0-9]{6}_[0-9]{6}/[0-9]+/.*")
 
 def get_pbi_format(short_form: bool = False):
     """Create a struct for parsing the PB index file
-    
+
     More on index format at
         https://pacbiofileformats.readthedocs.io/en/9.0/PacBioBamIndex.html
     """
@@ -61,7 +70,6 @@ def get_pbi_format(short_form: bool = False):
         "n_reads" / Int32ul,
         StopIf(short_form),  # potentially stop here
         "reserved" / Padding(18),
-
         # Basic information section (columnar format)
         "rgId" / Padding(this.n_reads * 4),
         "qStart" / Padding(this.n_reads * 4),
@@ -104,12 +112,18 @@ def get_read_count_from_bam_index(bam_file_handle):
     if not bam_file_handle.seekable():
         return total_reads
 
-    with pysam.AlignmentFile(bam_file_handle, "rb", check_sq=False, require_index=False) as bam_file:
+    with pysam.AlignmentFile(
+        bam_file_handle, "rb", check_sq=False, require_index=False
+    ) as bam_file:
         # Get total number of reads if we have an index:
         if bam_file.has_index():
             idx_stats = bam_file.get_index_statistics()
             unaligned_reads = bam_file.nocoordinate
-            aligned_reads = reduce(lambda a, b: a + b, [x.total for x in idx_stats]) if len(idx_stats) > 0 else 0
+            aligned_reads = (
+                reduce(lambda a, b: a + b, [x.total for x in idx_stats])
+                if len(idx_stats) > 0
+                else 0
+            )
             total_reads = unaligned_reads + aligned_reads
 
     bam_file_handle.seek(0)
@@ -148,7 +162,9 @@ def compute_shard_offsets(pbi_file, num_shards):
             # Save only the virtual file offset for the first ZMW hole number, so
             # that shard boundaries always keep reads from the same ZMW together.
             if idx_contents.holeNumber[j] not in file_offsets_hash:
-                file_offsets_hash[idx_contents.holeNumber[j]] = idx_contents.fileOffset[j]
+                file_offsets_hash[idx_contents.holeNumber[j]] = idx_contents.fileOffset[
+                    j
+                ]
 
             try:
                 zmw_count_hash[idx_contents.holeNumber[j]] += 1
@@ -164,7 +180,7 @@ def compute_shard_offsets(pbi_file, num_shards):
     by = int(math.ceil(len(file_offsets) / num_shards))
     for i in range(0, len(file_offsets), by):
         shard_offsets.append(file_offsets[i])
-        read_counts.append(len(file_offsets[i:i + by]))
+        read_counts.append(len(file_offsets[i : i + by]))
         read_nums.append(read_num)
         read_num += read_counts[-1]
 
@@ -174,7 +190,9 @@ def compute_shard_offsets(pbi_file, num_shards):
     return shard_offsets, zmw_count_hash, idx_contents.n_reads, read_counts, read_nums
 
 
-def create_bam_header_with_program_group(command_name, base_bam_header, description=None, model=None):
+def create_bam_header_with_program_group(
+    command_name, base_bam_header, description=None, model=None
+):
     """Create a dictionary with program group (PG) information populated by the given arguments, suitable for
     converting into a pysam.AlignmentHeader object.
 
@@ -185,7 +203,7 @@ def create_bam_header_with_program_group(command_name, base_bam_header, descript
 
     if not description:
         prev_frame = currentframe().f_back
-        description = getdoc(prev_frame.f_globals['main']).split("\n")[0]
+        description = getdoc(prev_frame.f_globals["main"]).split("\n")[0]
 
     # If we have a model here, we should add the description of the model to our program group:
     if model:
@@ -236,8 +254,12 @@ def load_model(model, input_bam=None):
     if model is None and input_bam is not None:
         pysam.set_verbosity(0)
         input_bam_path = input_bam if type(input_bam) is str else input_bam.name
-        with pysam.AlignmentFile(input_bam_path, "rb", check_sq=False, require_index=False) as bam_file:
-            lb_model = LibraryModel.from_json_obj(get_model_from_bam_header(bam_file.header))
+        with pysam.AlignmentFile(
+            input_bam_path, "rb", check_sq=False, require_index=False
+        ) as bam_file:
+            lb_model = LibraryModel.from_json_obj(
+                get_model_from_bam_header(bam_file.header)
+            )
     elif model is not None and LibraryModel.has_prebuilt_model(model):
         lb_model = LibraryModel.build_pre_configured_model(model)
     else:
@@ -258,10 +280,11 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     #                         seg_score_string = f" ({len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
     #                                            f"/{len(known_segment_seq)})"
 
-
     # We don't score random segments:
-    if segment.name == RANDOM_SEGMENT_NAME or \
-            (library_model.has_named_random_segments and segment.name in library_model.named_random_segments):
+    if segment.name == RANDOM_SEGMENT_NAME or (
+        library_model.has_named_random_segments
+        and segment.name in library_model.named_random_segments
+    ):
         return 0, 0
 
     # Create a default aligner if we weren't given one:
@@ -272,12 +295,17 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
     if type(library_model.adapter_dict[segment.name]) == str:
         model_seg_sequence = library_model.adapter_dict[segment.name]
     elif type(library_model.adapter_dict[segment.name]) == dict:
-        if list(library_model.adapter_dict[segment.name].keys())[0] == HPR_SEGMENT_TYPE_NAME:
-            b, l = list(library_model.adapter_dict[segment.name].values())[0]
-            model_seg_sequence = b * l
+        if (
+            list(library_model.adapter_dict[segment.name].keys())[0]
+            == HPR_SEGMENT_TYPE_NAME
+        ):
+            base, length = list(library_model.adapter_dict[segment.name].values())[0]
+            model_seg_sequence = base * length
         else:
-            raise RuntimeError(f"Cannot calculate score for dict segment type: "
-                               f"{type(library_model.adapter_dict[segment.name])}: {segment}")
+            raise RuntimeError(
+                f"Cannot calculate score for dict segment type: "
+                f"{type(library_model.adapter_dict[segment.name])}: {segment}"
+            )
     else:
         raise RuntimeError(
             f"Unknown segment type: {type(library_model.adapter_dict[segment.name])} for segment: {segment}"
@@ -285,7 +313,9 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
 
     # Get our alignment and our score:
     if segment.end - segment.start > 1:
-        alignment = ssw_aligner.align(read_sequence[segment.start:segment.end], model_seg_sequence)
+        alignment = ssw_aligner.align(
+            read_sequence[segment.start : segment.end], model_seg_sequence
+        )
         optimal_score = alignment.score
     else:
         optimal_score = 0
@@ -306,8 +336,8 @@ def collapse_annotations(path):
 
     for p in path:
         state, ops = re.split(":", p)
-        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
-            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
+        for opgroup in list(filter(None, re.split(r"(R?[MID]A?B?\d+)", ops))):
+            q = re.match(r"(R?[MID]A?B?)(\d+)", opgroup)
             op = q.group(1)
             oplen = int(q.group(2))
 
@@ -315,21 +345,27 @@ def collapse_annotations(path):
                 cur_state = state
 
             if cur_state != state:
-                segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
+                segment_ranges.append(
+                    SegmentInfo(cur_state, int(cur_pos), int(cur_pos + cur_len - 1))
+                )
                 cur_state = state
                 cur_pos += cur_len
                 cur_len = 0
 
             if cur_state == state:
-                if op in ['M', 'I', 'RI']:
+                if op in ["M", "I", "RI"]:
                     cur_len += oplen
 
-    segment_ranges.append(SegmentInfo(cur_state, int(cur_pos), int(cur_pos+cur_len-1)))
+    segment_ranges.append(
+        SegmentInfo(cur_state, int(cur_pos), int(cur_pos + cur_len - 1))
+    )
 
     return segment_ranges
 
 
-def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file, ssw_aligner=None):
+def write_annotated_read(
+    read, ppath, is_rc, logp, model, out_bam_file, ssw_aligner=None
+):
     """Write the given pysam.AlignedSegment read object to the given file with the given metadata."""
 
     # Obligatory log message:
@@ -340,13 +376,15 @@ def write_annotated_read(read, ppath, is_rc, logp, model, out_bam_file, ssw_alig
             read.query_name,
             logp,
             " (RC)" if is_rc else "",
-            ','.join(ppath),
+            ",".join(ppath),
         )
 
     # Set our tag and write out the read to the annotated file:
     segments = collapse_annotations(ppath)
 
-    read.set_tag(SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments]))
+    read.set_tag(
+        SEGMENTS_TAG, SEGMENT_TAG_DELIMITER.join([s.to_tag() for s in segments])
+    )
     read.set_tag(SEGMENTS_CIGAR_TAG, SEGMENT_TAG_DELIMITER.join(ppath))
 
     # Set the model info tags:
@@ -430,19 +468,23 @@ def reverse_complement(base_string):
     return "".join(map(lambda b: RC_BASE_MAP[b], base_string[::-1]))
 
 
-def get_confidence_factor(qual_string: str, scale_factor: float = CONF_FACTOR_SCALE) -> float:
+def get_confidence_factor(
+    qual_string: str, scale_factor: float = CONF_FACTOR_SCALE
+) -> float:
     """Get the confidence factor for the given sequence to be tallied for use with STARCODE.
     quals are assumed to be phred scale quality scores in string format and will be converted to numerical values."""
     return scale_factor * reduce(
-        operator.mul, map(lambda q: 1. - 10 ** (-(ord(q) - 33.) / 10), qual_string)
+        operator.mul, map(lambda q: 1.0 - 10 ** (-(ord(q) - 33.0) / 10), qual_string)
     )
 
 
-def get_confidence_factor_raw_quals(quals: array.array, scale_factor: float = CONF_FACTOR_SCALE) -> float:
+def get_confidence_factor_raw_quals(
+    quals: array.array, scale_factor: float = CONF_FACTOR_SCALE
+) -> float:
     """Get the confidence factor for the given sequence to be tallied for use with STARCODE.
     quals are assumed to be numerical already and will not be type converted."""
     return scale_factor * reduce(
-        operator.mul, map(lambda q: 1. - 10 ** (-q/10), quals)
+        operator.mul, map(lambda q: 1.0 - 10 ** (-q / 10), quals)
     )
 
 
@@ -455,26 +497,30 @@ def has_umi(read):
 
 
 def get_model_name_from_bam_header(header):
-    return get_model_name_from_bam_header(header)['name']
+    return get_model_name_from_bam_header(header)["name"]
 
 
 def get_model_from_bam_header(header):
     model_jsons = get_models_from_bam_header(header)
 
     if len(model_jsons) > 1:
-        logger.warning(f"Loading model {model_jsons[0]['name']}, but more than one detected ({', '.join([m['name'] for m in model_jsons])}).")
+        logger.warning(
+            f"Loading model {model_jsons[0]['name']}, but more than one detected ({', '.join([m['name'] for m in model_jsons])})."
+        )
 
     return model_jsons[0]
 
 
 def get_models_from_bam_header(header):
     model_jsons = []
-    for pg in header.as_dict()['PG']:
+    for pg in header.as_dict()["PG"]:
         try:
-            if pg['PN'] == 'longbow' and (pg['ID'].startswith('longbow-annotate') or
-                                          pg['ID'].startswith('longbow-pad')):
+            if pg["PN"] == "longbow" and (
+                pg["ID"].startswith("longbow-annotate")
+                or pg["ID"].startswith("longbow-pad")
+            ):
 
-                desc, models_str = pg['DS'].split('MODEL: ')
+                desc, models_str = pg["DS"].split("MODEL: ")
                 model_json = json.loads(models_str)
                 model_jsons.append(model_json)
         except KeyError:
@@ -485,9 +531,9 @@ def get_models_from_bam_header(header):
 
 def bam_header_has_model(header):
     try:
-        if 'PG' in header.as_dict():
-            for pg in header.as_dict()['PG']:
-                if pg['PN'] == 'longbow' and 'annotate' in pg['ID']:
+        if "PG" in header.as_dict():
+            for pg in header.as_dict()["PG"]:
+                if pg["PN"] == "longbow" and "annotate" in pg["ID"]:
                     return True
     except KeyError:
         pass
@@ -497,9 +543,9 @@ def bam_header_has_model(header):
 
 def bam_header_has_longbow_command_program_group(header, command):
     try:
-        if 'PG' in header.as_dict():
-            for pg in header.as_dict()['PG']:
-                if pg['PN'] == 'longbow' and f"-{command}-" in pg['ID']:
+        if "PG" in header.as_dict():
+            for pg in header.as_dict()["PG"]:
+                if pg["PN"] == "longbow" and f"-{command}-" in pg["ID"]:
                     return True
     except KeyError:
         pass
@@ -508,7 +554,7 @@ def bam_header_has_longbow_command_program_group(header, command):
 
 
 def generate_read_name(movie_name, zmw, split_read_index):
-    return f'{movie_name}/1{zmw:09d}{split_read_index:03d}/ccs'
+    return f"{movie_name}/1{zmw:09d}{split_read_index:03d}/ccs"
 
 
 def get_segments(read):
@@ -522,8 +568,8 @@ def get_segments(read):
 
     for p in segment_cigars:
         state, ops = re.split(":", p)
-        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
-            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
+        for opgroup in list(filter(None, re.split(r"(R?[MID]A?B?\d+)", ops))):
+            q = re.match(r"(R?[MID]A?B?)(\d+)", opgroup)
             op = q.group(1)
             oplen = int(q.group(2))
 
@@ -531,13 +577,15 @@ def get_segments(read):
                 cur_state = state
 
             if cur_state != state:
-                segment_ranges.append(SegmentInfo(cur_state, cur_pos, cur_pos + cur_len - 1))
+                segment_ranges.append(
+                    SegmentInfo(cur_state, cur_pos, cur_pos + cur_len - 1)
+                )
                 cur_state = state
                 cur_pos += cur_len
                 cur_len = 0
 
             if cur_state == state:
-                if op in ['M', 'I', 'RI']:
+                if op in ["M", "I", "RI"]:
                     cur_len += oplen
 
     segment_ranges.append(SegmentInfo(cur_state, cur_pos, cur_pos + cur_len - 1))

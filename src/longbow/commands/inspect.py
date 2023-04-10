@@ -1,29 +1,24 @@
+import gzip
 import logging
-import sys
-import os
-import time
-import re
 import math
+import os
+import re
+import sys
+import time
+from collections import OrderedDict
 from functools import reduce
 
 import click
-
-import gzip
-
+import matplotlib.pyplot as plt
 import numpy as np
 import pysam
-
-from polyleven import levenshtein
 import ssw
-
-from collections import OrderedDict
-
-import matplotlib.pyplot as plt
 from matplotlib import transforms
+from polyleven import levenshtein
 
 import longbow.utils.constants
-from ..utils import bam_utils
-from ..utils import cli_utils
+
+from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
@@ -61,16 +56,16 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     "-m",
     "--model",
     help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-         "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-         "of a LibraryModel as per LibraryModel.to_json()."
+    "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
+    "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
+    "of a LibraryModel as per LibraryModel.to_json().",
 )
 @click.option(
-    '--seg-score',
+    "--seg-score",
     is_flag=True,
     default=False,
     show_default=True,
-    help="Display alignment score for annotated segments.  (--quick mode only)"
+    help="Display alignment score for annotated segments.  (--quick mode only)",
 )
 @click.option(
     "--max-length",
@@ -78,7 +73,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
     show_default=True,
     required=False,
-    help="Maximum length of a read to process.  Reads beyond this length will not be annotated.  If the input file has already been annotated, this parameter is ignored."
+    help="Maximum length of a read to process.  Reads beyond this length will not be annotated.  If the input file has already been annotated, this parameter is ignored.",
 )
 @click.option(
     "--min-rq",
@@ -86,26 +81,38 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     default=-2,
     show_default=True,
     required=False,
-    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].  If the input file has already been annotated, this parameter is ignored."
+    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].  If the input file has already been annotated, this parameter is ignored.",
 )
 @click.option(
-    '-q',
-    '--quick',
+    "-q",
+    "--quick",
     is_flag=True,
     default=False,
     show_default=True,
-    help="Create quick (simplified) inspection figures."
+    help="Create quick (simplified) inspection figures.",
 )
 @click.option(
-    '-a',
-    '--annotated-bam',
+    "-a",
+    "--annotated-bam",
     type=click.File(),
     show_default=True,
     required=False,
-    help="Store annotations from a downstream BAM file so they can be displayed on reads from previous processing steps."
+    help="Store annotations from a downstream BAM file so they can be displayed on reads from previous processing steps.",
 )
 @cli_utils.input_bam
-def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min_rq, quick, annotated_bam, input_bam):
+def main(
+    read_names,
+    pbi,
+    file_format,
+    outdir,
+    model,
+    seg_score,
+    max_length,
+    min_rq,
+    quick,
+    annotated_bam,
+    input_bam,
+):
     """Inspect the classification results on specified reads."""
 
     t_start = time.time()
@@ -137,12 +144,16 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
     # Open our bam file:
     pysam.set_verbosity(0)
-    with pysam.AlignmentFile(input_bam, "rb", check_sq=False, require_index=False) as bam_file:
+    with pysam.AlignmentFile(
+        input_bam, "rb", check_sq=False, require_index=False
+    ) as bam_file:
 
         logger.info(f"Figure drawing mode: {'simplified' if quick else 'extended'}")
 
         if seg_score and not quick:
-            logger.warning("Seg score selected, but not using quick mode.  Ignoring --seg-score.")
+            logger.warning(
+                "Seg score selected, but not using quick mode.  Ignoring --seg-score."
+            )
 
         # If we have read names, we should use them to inspect the file:
         if len(read_name_set) > 0:
@@ -151,10 +162,23 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
             pbi = f"{input_bam}.pbi" if pbi is None else pbi
             if not os.path.exists(pbi):
                 # raise FileNotFoundError(f"Missing .pbi file for {input_bam}")
-                logger.info("No .pbi file available. Inspecting whole input bam file until we find specified reads.")
+                logger.info(
+                    "No .pbi file available. Inspecting whole input bam file until we find specified reads."
+                )
                 for read in bam_file:
                     if read.query_name in read_name_set:
-                        __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, anns, name_map)
+                        __create_read_figure(
+                            file_format,
+                            lb_model,
+                            outdir,
+                            read,
+                            seg_score,
+                            max_length,
+                            min_rq,
+                            quick,
+                            anns,
+                            name_map,
+                        )
             else:
                 file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
@@ -166,17 +190,52 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
                     bam_file.seek(file_offsets[z]["offset"])
                     read = bam_file.__next__()
-                    __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, anns, name_map)
+                    __create_read_figure(
+                        file_format,
+                        lb_model,
+                        outdir,
+                        read,
+                        seg_score,
+                        max_length,
+                        min_rq,
+                        quick,
+                        anns,
+                        name_map,
+                    )
         else:
             # Without read names we just inspect every read in the file:
-            logger.info("No read names given. Inspecting every read in the input bam file.")
+            logger.info(
+                "No read names given. Inspecting every read in the input bam file."
+            )
             for read in bam_file:
-                __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, anns, name_map)
+                __create_read_figure(
+                    file_format,
+                    lb_model,
+                    outdir,
+                    read,
+                    seg_score,
+                    max_length,
+                    min_rq,
+                    quick,
+                    anns,
+                    name_map,
+                )
 
     logger.info(f"Done. Elapsed time: {time.time() - t_start:2.2f}s.")
 
 
-def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, anns, name_map):
+def __create_read_figure(
+    file_format,
+    lb_model,
+    outdir,
+    read,
+    seg_score,
+    max_length,
+    min_rq,
+    quick,
+    anns,
+    name_map,
+):
     """Create a figure for the given read."""
 
     out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
@@ -187,9 +246,31 @@ def __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_len
         logger.info("Drawing read '%s' to '%s'", read.query_name, out)
 
         if quick:
-            draw_simplified_state_sequence(seq, path, logp, read, out, seg_score, lb_model, size=13, family="monospace")
+            draw_simplified_state_sequence(
+                seq,
+                path,
+                logp,
+                read,
+                out,
+                seg_score,
+                lb_model,
+                size=13,
+                family="monospace",
+            )
         else:
-            draw_extended_state_sequence(seq, path, logp, read, out, seg_score, lb_model, anns, name_map, size=13, family="monospace")
+            draw_extended_state_sequence(
+                seq,
+                path,
+                logp,
+                read,
+                out,
+                seg_score,
+                lb_model,
+                anns,
+                name_map,
+                size=13,
+                family="monospace",
+            )
 
 
 def load_read_names(read_name_args):
@@ -204,7 +285,10 @@ def load_read_names(read_name_args):
                     rn = line.strip()
                     if not bam_utils.PB_READ_NAME_RE.match(rn):
                         logger.error(
-                            "Read name on line %d of file %s doesn't appear to be a PacBio read: %s", i, r, rn
+                            "Read name on line %d of file %s doesn't appear to be a PacBio read: %s",
+                            i,
+                            r,
+                            rn,
                         )
                         sys.exit(1)
 
@@ -243,7 +327,10 @@ def load_read_offsets(pbi_file, read_names):
         else:
             range_end = re.split("_", name_pieces[2])[1]
 
-        file_offsets_hash[f"{hole_number}_{range_end}"] = {"read_name": read_name, "offset": None}
+        file_offsets_hash[f"{hole_number}_{range_end}"] = {
+            "read_name": read_name,
+            "offset": None,
+        }
 
     with gzip.open(pbi_file, "rb") as f:
         idx_contents = fmt.parse_stream(f)
@@ -268,21 +355,31 @@ def annotate_read(read, m, max_length, min_rq):
 
     if read.has_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG):
         # Set our ppath from the bam file:
-        fppath = re.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER, read.get_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG))
+        fppath = re.split(
+            longbow.utils.constants.SEGMENT_TAG_DELIMITER,
+            read.get_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG),
+        )
 
         # Set our logp from the bam file:
         flogp = read.get_tag(longbow.utils.constants.READ_MODEL_SCORE_TAG)
     else:
         # Check for max length and min quality:
         if len(read.query_sequence) > max_length:
-            logger.warning(f"Read is longer than max length.  "
-                           f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})")
+            logger.warning(
+                f"Read is longer than max length.  "
+                f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})"
+            )
             return [None] * 3
         elif read.get_tag("rq") < min_rq:
-            logger.warning(f"Read quality is below the minimum.  "
-                           f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})")
+            logger.warning(
+                f"Read quality is below the minimum.  "
+                f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})"
+            )
             return [None] * 3
-        for seq in [read.query_sequence, bam_utils.reverse_complement(read.query_sequence)]:
+        for seq in [
+            read.query_sequence,
+            bam_utils.reverse_complement(read.query_sequence),
+        ]:
             logp, ppath = m.annotate(seq)
 
             if logp > flogp:
@@ -298,18 +395,18 @@ def create_colormap_for_model(m):
     scaffold_state_color = "#334D5C"
     poly_a_color = "#45B29D"
     coding_region_color = "#4455FF"
-    three_p_adapter_color = "#EFC94C"
+    # three_p_adapter_color = "#EFC94C"
     random_color = "#aaaaaa"
 
     cbc_color = "#11FF66"
-    umi_color = "#1166FF"
+    # umi_color = "#1166FF"
 
     # Color for states we haven't enumerated:
     default_color = "#c2a8f0"
 
     color_map = {
         longbow.utils.constants.RANDOM_SEGMENT_NAME: random_color,
-        DEFAULT_COLOR_MAP_ENTRY: default_color
+        DEFAULT_COLOR_MAP_ENTRY: default_color,
     }
 
     # Generate the rest of the colors:
@@ -353,7 +450,9 @@ def create_colormap_for_model(m):
     return color_map
 
 
-def adjust_color_for_existing_colors(color, existing_color_strings, color_step, min_dist=50):
+def adjust_color_for_existing_colors(
+    color, existing_color_strings, color_step, min_dist=50
+):
     max_num_loops = 10
     loop_num = 0
 
@@ -367,7 +466,12 @@ def adjust_color_for_existing_colors(color, existing_color_strings, color_step, 
             ]
 
             # Simple Euclidian distance in color space:
-            color_dist = np.sqrt(reduce(lambda x, y: x+y, list(map(lambda x: (x[1]-x[0])**2, zip(color, other_color)))))
+            color_dist = np.sqrt(
+                reduce(
+                    lambda x, y: x + y,
+                    list(map(lambda x: (x[1] - x[0]) ** 2, zip(color, other_color))),
+                )
+            )
 
             if color_dist < min_dist:
                 color_dist_ok = False
@@ -385,19 +489,19 @@ def adjust_color_for_existing_colors(color, existing_color_strings, color_step, 
 
 
 def _adjust_aligned_state_sequence(seq, path, library_model, read_anns):
-    cur_state = ''
+    cur_state = ""
     cur_adapter = None
     cur_pos = 0
-    cur_seq = ''
+    cur_seq = ""
 
     new_path = []
 
-    last_path = ''
+    last_path = ""
 
     seq_pos = 0
     for p in path:
-        if cur_state == 'CBC' or cur_state == 'UMI':
-            tag = 'CB' if cur_state == 'CBC' else 'ZU'
+        if cur_state == "CBC" or cur_state == "UMI":
+            tag = "CB" if cur_state == "CBC" else "ZU"
             ssw_aligner = ssw.Aligner()
             s = None
             si = 0
@@ -412,22 +516,22 @@ def _adjust_aligned_state_sequence(seq, path, library_model, read_anns):
                         si = i
 
             new_cigar = []
-            for opgroup in list(filter(None, re.split(r'(\d+[MIDS])', s.cigar))):
-                q = re.match(r'(\d+)([MIDS])', opgroup)
+            for opgroup in list(filter(None, re.split(r"(\d+[MIDS])", s.cigar))):
+                q = re.match(r"(\d+)([MIDS])", opgroup)
                 op = q.group(2)
                 oplen = int(q.group(1))
-                new_cigar.append(f'{op}{oplen}')
+                new_cigar.append(f"{op}{oplen}")
 
             last_path = f"{cur_state}:{''.join(new_cigar)}:{read_anns[si][tag]}"
 
-        if last_path != '':
+        if last_path != "":
             new_path.append(last_path)
 
         state, ops = re.split(":", p)
         last_path = p
 
-        for opgroup in list(filter(None, re.split(r'(R?[MID]A?B?\d+)', ops))):
-            q = re.match(r'(R?[MID]A?B?)(\d+)', opgroup)
+        for opgroup in list(filter(None, re.split(r"(R?[MID]A?B?\d+)", ops))):
+            q = re.match(r"(R?[MID]A?B?)(\d+)", opgroup)
             op = q.group(1)
             oplen = int(q.group(2))
 
@@ -435,29 +539,32 @@ def _adjust_aligned_state_sequence(seq, path, library_model, read_anns):
                 cur_state = state
                 cur_pos = 0
                 cur_adapter = None
-                cur_seq = ''
+                cur_seq = ""
 
-                if cur_state in library_model.adapter_dict and cur_state not in library_model.annotation_segments and \
-                        type(library_model.adapter_dict[cur_state]) == str:
+                if (
+                    cur_state in library_model.adapter_dict
+                    and cur_state not in library_model.annotation_segments
+                    and type(library_model.adapter_dict[cur_state]) == str
+                ):
                     cur_adapter = library_model.adapter_dict[cur_state]
 
             for _ in range(oplen):
-                base = seq[seq_pos] if seq_pos < len(seq) else ' '
+                base = seq[seq_pos] if seq_pos < len(seq) else " "
 
-                if op == 'M':
+                if op == "M":
                     if cur_adapter is not None:
                         cur_pos += 1
 
                     seq_pos += 1
-                    cur_seq = f'{cur_seq}{base}'
-                elif op == 'D' or op == 'RD':
+                    cur_seq = f"{cur_seq}{base}"
+                elif op == "D" or op == "RD":
                     if cur_adapter is not None:
                         cur_pos += 1
-                elif op == 'I' or op == 'RI':
+                elif op == "I" or op == "RI":
                     seq_pos += 1
-                    cur_seq = f'{cur_seq}{base}'
+                    cur_seq = f"{cur_seq}{base}"
 
-    if last_path != '':
+    if last_path != "":
         new_path.append(last_path)
 
     return new_path
@@ -469,7 +576,7 @@ def _make_aligned_state_sequence(seq, path, library_model):
     expected_track = []
     classification_track = []
 
-    cur_state = ''
+    cur_state = ""
     cur_adapter = None
     cur_pos = 0
 
@@ -478,8 +585,8 @@ def _make_aligned_state_sequence(seq, path, library_model):
         f = re.split(":", p)
         state, ops = f[0], f[1]
 
-        for opgroup in list(filter(None, re.split(r'(R?[MIDS]A?B?\d+)', ops))):
-            q = re.match(r'(R?[MIDS]A?B?)(\d+)', opgroup)
+        for opgroup in list(filter(None, re.split(r"(R?[MIDS]A?B?\d+)", ops))):
+            q = re.match(r"(R?[MIDS]A?B?)(\d+)", opgroup)
             op = q.group(1)
             oplen = int(q.group(2))
 
@@ -488,16 +595,19 @@ def _make_aligned_state_sequence(seq, path, library_model):
                 cur_pos = 0
                 cur_adapter = None
 
-                if cur_state in library_model.adapter_dict and cur_state not in library_model.annotation_segments \
-                        and type(library_model.adapter_dict[cur_state]) == str:
+                if (
+                    cur_state in library_model.adapter_dict
+                    and cur_state not in library_model.annotation_segments
+                    and type(library_model.adapter_dict[cur_state]) == str
+                ):
                     cur_adapter = library_model.adapter_dict[cur_state]
                 elif len(f) > 2:
                     cur_adapter = f[2]
 
             for _ in range(oplen):
-                base = seq[seq_pos] if seq_pos < len(seq) else ' '
+                base = seq[seq_pos] if seq_pos < len(seq) else " "
 
-                if op == 'M':
+                if op == "M":
                     classification_track.append(state)
                     observed_track.append(base)
 
@@ -505,37 +615,37 @@ def _make_aligned_state_sequence(seq, path, library_model):
                         expected_track.append(cur_adapter[cur_pos])
 
                         if cur_adapter[cur_pos] == base:
-                            mismatch_track.append('|')
+                            mismatch_track.append("|")
                         else:
-                            mismatch_track.append('.')
+                            mismatch_track.append(".")
 
                         cur_pos += 1
                     else:
-                        expected_track.append(' ')
-                        mismatch_track.append(' ')
+                        expected_track.append(" ")
+                        mismatch_track.append(" ")
 
                     seq_pos += 1
-                elif op == 'D' or op == 'RD':
+                elif op == "D" or op == "RD":
                     classification_track.append(state)
-                    observed_track.append('-' if op == 'D' else ' ')
+                    observed_track.append("-" if op == "D" else " ")
 
                     if cur_adapter is not None:
                         expected_track.append(cur_adapter[cur_pos])
-                        mismatch_track.append(' ')
+                        mismatch_track.append(" ")
                         cur_pos += 1
                     else:
-                        expected_track.append(' ')
-                        mismatch_track.append(' ')
-                elif op == 'I' or op == 'RI':
+                        expected_track.append(" ")
+                        mismatch_track.append(" ")
+                elif op == "I" or op == "RI":
                     classification_track.append(state)
                     observed_track.append(base)
 
                     if cur_adapter is not None:
-                        expected_track.append('-' if op == 'I' else ' ')
-                        mismatch_track.append(' ')
+                        expected_track.append("-" if op == "I" else " ")
+                        mismatch_track.append(" ")
                     else:
-                        expected_track.append(' ')
-                        mismatch_track.append(' ')
+                        expected_track.append(" ")
+                        mismatch_track.append(" ")
 
                     seq_pos += 1
 
@@ -584,14 +694,26 @@ def format_state_sequence(seq, path, library_model, line_length=150):
     return labelled_bases, state_colors, state_labels
 
 
-def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, anns, name_map, **kwargs):
+def draw_extended_state_sequence(
+    seq, path, logp, read, out, show_seg_score, library_model, anns, name_map, **kwargs
+):
 
     line_length = 150
 
     if name_map is not None:
-        path = _adjust_aligned_state_sequence(seq, path, library_model, list(map(lambda x: anns[x], name_map[read.query_name])))
+        path = _adjust_aligned_state_sequence(
+            seq,
+            path,
+            library_model,
+            list(map(lambda x: anns[x], name_map[read.query_name])),
+        )
 
-    observed_track, mismatch_track, expected_track, classification_track = _make_aligned_state_sequence(seq, path, library_model)
+    (
+        observed_track,
+        mismatch_track,
+        expected_track,
+        classification_track,
+    ) = _make_aligned_state_sequence(seq, path, library_model)
 
     f = plt.figure(figsize=(24, 24))
 
@@ -617,8 +739,10 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
 
     color_map = create_colormap_for_model(library_model)
 
-    last_label = ''
-    for i, (o, m, e, c) in enumerate(zip(observed_track, mismatch_track, expected_track, classification_track)):
+    last_label = ""
+    for i, (o, m, e, c) in enumerate(
+        zip(observed_track, mismatch_track, expected_track, classification_track)
+    ):
         color = color_map[c]
 
         if column == 0:
@@ -626,7 +750,7 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
                 column - 1,
                 rows - row,
                 total_bases_seen,
-                color='#000000',
+                color="#000000",
                 transform=t,
                 va="bottom",
                 ha="right",
@@ -638,7 +762,7 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
                 column + 2,
                 rows - row,
                 len(read.query_sequence),
-                color='#000000',
+                color="#000000",
                 transform=t,
                 va="bottom",
                 ha="left",
@@ -665,7 +789,7 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
         )
         mismatch_indicator.draw(canvas.get_renderer())
 
-        if e != ' ':
+        if e != " ":
             expected_base = ax.text(
                 column,
                 rows - row - 8,
@@ -718,7 +842,7 @@ def _expand_cigar_sequence(cigar_path):
             op, count = m.groups()
 
             # Update our ops string:
-            ops_string = ops_string[m.span()[1]:]
+            ops_string = ops_string[m.span()[1] :]
 
             # We need to ignore deletions:
             if op != "D":
@@ -729,13 +853,17 @@ def _expand_cigar_sequence(cigar_path):
     return ppath
 
 
-def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, library_model, **kwargs):
+def draw_simplified_state_sequence(
+    seq, path, logp, read, out, show_seg_score, library_model, **kwargs
+):
 
     line_length = 150
 
     # TODO: This is a bandaid.  This method should not exist.  Instead we should fix `format_state_sequence`.
     ppath = _expand_cigar_sequence(path)
-    base_strings, colors, labels = format_state_sequence(seq, ppath, library_model, line_length=line_length)
+    base_strings, colors, labels = format_state_sequence(
+        seq, ppath, library_model, line_length=line_length
+    )
 
     # Collapse the path here so we can later annotate our reads with the correct scores:
     segments = bam_utils.collapse_annotations(path) if show_seg_score else None
@@ -799,10 +927,16 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
                 seg_score_string = f" [{length}]"
 
             # Always display the length of known random segments of fixed length:
-            elif library_model.has_named_random_segments and lbl in library_model.named_random_segments:
+            elif (
+                library_model.has_named_random_segments
+                and lbl in library_model.named_random_segments
+            ):
 
                 # Handle basic named random segment:
-                if library_model.adapter_dict[lbl] == longbow.utils.constants.RANDOM_SEGMENT_NAME:
+                if (
+                    library_model.adapter_dict[lbl]
+                    == longbow.utils.constants.RANDOM_SEGMENT_NAME
+                ):
                     length = len(collapsed_annotations[total_segments_seen])
                     seg_score_string = f" [{length}]"
 
@@ -811,41 +945,59 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
 
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 
-                    if special_seg_type == longbow.utils.constants.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
+                    if (
+                        special_seg_type
+                        == longbow.utils.constants.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME
+                    ):
                         # Mark the length that this known random segment should be:
                         length = list(library_model.adapter_dict[lbl].values())[0]
                         seg_score_string = f" [{length}]"
                     else:
-                        logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
+                        logger.warning(
+                            f"Ignoring score/length for unknown special segment type: {special_seg_type}"
+                        )
 
             # If we want to show the segment scores, we calculate them here:
-            elif show_seg_score and (not library_model.has_named_random_segments or
-                                     lbl not in library_model.named_random_segments):
+            elif show_seg_score and (
+                not library_model.has_named_random_segments
+                or lbl not in library_model.named_random_segments
+            ):
 
                 if type(library_model.adapter_dict[lbl]) is dict:
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 
-                    if special_seg_type == longbow.utils.constants.HPR_SEGMENT_TYPE_NAME:
+                    if (
+                        special_seg_type
+                        == longbow.utils.constants.HPR_SEGMENT_TYPE_NAME
+                    ):
                         base, count = library_model.adapter_dict[lbl][special_seg_type]
                         known_segment_seq = base * count
-                        segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
+                        segment_bases = _get_segment_bases(
+                            seq, total_bases_seen, segments
+                        )
 
                         # Annotate the score
-                        seg_score_string = f" (" \
-                                           f"{len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
-                                           f"/{len(known_segment_seq)})"
+                        seg_score_string = (
+                            f" ("
+                            f"{len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}"
+                            f"/{len(known_segment_seq)})"
+                        )
 
                         # Also annotate the actual length:
                         seg_score_string = f"{seg_score_string} [{len(collapsed_annotations[total_segments_seen])}]"
 
                     else:
-                        logger.warning(f"Ignoring score/length for unknown special segment type: {special_seg_type}")
+                        logger.warning(
+                            f"Ignoring score/length for unknown special segment type: {special_seg_type}"
+                        )
                 else:
                     known_segment_seq = library_model.adapter_dict[lbl]
                     segment_bases = _get_segment_bases(seq, total_bases_seen, segments)
 
-                    seg_score_string = f" ({len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}" \
-                                       f"/{len(known_segment_seq)})"
+                    seg_score_string = (
+                        f" ({len(known_segment_seq) - levenshtein(segment_bases, known_segment_seq)}"
+                        f"/{len(known_segment_seq)})"
+                    )
 
             ax.text(
                 0 - (len(base_string) / 2),
@@ -893,27 +1045,55 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
 
 
 def _set_figure_title(f, library_model, logp, collapsed_annotations, read):
-    qual_string = f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    " if read.has_tag("rq") else ""
+    qual_string = (
+        f"[read qual: {read.get_tag('rq'):0.03f}/1.000]    "
+        if read.has_tag("rq")
+        else ""
+    )
     np_string = f"[# Passes: {read.get_tag('np')}]    " if read.has_tag("np") else ""
-    is_rc_string = "[Direction: RC]" if read.has_tag("RC") and read.get_tag("RC") == 1 else "[Direction: Forward]"
+    is_rc_string = (
+        "[Direction: RC]"
+        if read.has_tag("RC") and read.get_tag("RC") == 1
+        else "[Direction: Forward]"
+    )
 
     # Calculate whether the read has the correct array structure:
-    read_mas_adapters = [s.name for s in collapsed_annotations if s.name in library_model.array_model["structure"]]
-    segment_order_valid, key_adapters_found, first_key_adapter_indx = \
-        library_model.validate_segment_order(collapsed_annotations)
+    read_mas_adapters = [
+        s.name
+        for s in collapsed_annotations
+        if s.name in library_model.array_model["structure"]
+    ]
+    (
+        segment_order_valid,
+        key_adapters_found,
+        first_key_adapter_indx,
+    ) = library_model.validate_segment_order(collapsed_annotations)
 
-    printed_array_model_name = library_model.array_model['name'].replace('_', '\\_')
-    valid_library_order_string = "[$\\bf{" + printed_array_model_name + "}$ adapters: " + \
-                                 f"{' '.join(library_model.key_adapters)}]"
-    is_valid_order_string = "[Segment order: $\\bf{Valid}$]" if segment_order_valid \
+    printed_array_model_name = library_model.array_model["name"].replace("_", "\\_")
+    valid_library_order_string = (
+        "[$\\bf{"
+        + printed_array_model_name
+        + "}$ adapters: "
+        + f"{' '.join(library_model.key_adapters)}]"
+    )
+    is_valid_order_string = (
+        "[Segment order: $\\bf{Valid}$]"
+        if segment_order_valid
         else "[Segment order: $\\bf{INVALID}$]"
+    )
     read_mas_adapter_string = f"[Key adapters: {' '.join(read_mas_adapters)}]"
     f.suptitle(
-        r"$\bf{" + read.query_name.replace("_", "\\_") + "}$" + f"\n{qual_string}{np_string}"
+        r"$\bf{"
+        + read.query_name.replace("_", "\\_")
+        + "}$"
+        + f"\n{qual_string}{np_string}"
         f"[{len(read.query_sequence)} bp]    {is_rc_string}    "
-        r"[$\bf{" + library_model.name.replace("_", "\\_") + "}$" + f" model score: {logp:.2f}]\n"
+        r"[$\bf{"
+        + library_model.name.replace("_", "\\_")
+        + "}$"
+        + f" model score: {logp:.2f}]\n"
         f"{is_valid_order_string}    {read_mas_adapter_string}    {valid_library_order_string}",
-        fontsize=16
+        fontsize=16,
     )
 
 
@@ -922,7 +1102,7 @@ def _get_segment_bases(seq, position, segments):
     segment_bases = ""
     for s in segments:
         if s.start <= position <= s.end:
-            segment_bases = seq[s.start:s.end + 1]
+            segment_bases = seq[s.start : s.end + 1]
             break
 
     return segment_bases.upper()
@@ -933,7 +1113,9 @@ def _load_annotations(annotated_bam):
     name_map = {}
 
     pysam.set_verbosity(0)
-    with pysam.AlignmentFile(annotated_bam, "rb", check_sq=False, require_index=False) as annotated_bam_file:
+    with pysam.AlignmentFile(
+        annotated_bam, "rb", check_sq=False, require_index=False
+    ) as annotated_bam_file:
         for r in annotated_bam_file:
             anns[r.query_name] = {}
             for k, v in r.get_tags():
