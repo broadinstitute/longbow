@@ -1,0 +1,16 @@
+cython
+click
+click-log
+polyleven
+pomegranate @ git+https://github.com/jonn-smith/pomegranate.git@d80ec9304bba4c42ee3943c887754fd78885cd55
+pandas
+numpy
+matplotlib
+ordered-set
+pysam==0.19.1
+progress
+construct
+pathos
+ssw==0.4.1
+tqdm
+symspellpy

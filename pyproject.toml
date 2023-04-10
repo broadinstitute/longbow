@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools >= 61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maslongbow"
+description = "Annotation and segmentation of MAS-seq data"
+readme = "README.rst"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dynamic = ["dependencies", "optional-dependencies", "version"]
+
+[project.scripts]
+longbow = "longbow.__main__:main_entry"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = "requirements.txt" }
+optional-dependencies = { dev = { file = "dev-requirements.txt" }, test = { file = "test-requirements.txt" } }
+version = { attr = "longbow.meta.VERSION" }
+
+[tool.ruff]
+src = ["src"]
+ignore = ["E501"]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.coverage.run]
+source = "longbow"
+branch = true
+
+[tool.coverage.report]
+skip_covered = true
+exclude_lines = [
+    "no cov",
+    "no qa",
+    "noqa",
+    "pragma: no cover",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError"
+]
+
+[tool.coverage.html]
+directory = "coverage_html_report"
+
+[tool.mypy.overrides]
+module = [
+    "numpy",
+    "pysam",
+    "pytest"
+]
+ignore_missing_imports = true
