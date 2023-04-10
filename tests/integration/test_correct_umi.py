@@ -13,13 +13,16 @@ TOOL_NAME = "correct_umi"
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / TOOL_NAME
 
 
-@pytest.fixture(scope="function", params=[
-    (
-        TEST_DATA_FOLDER / "correct_umi_test_data.sam",
-        TEST_DATA_FOLDER / "correct_umi_expected_corrected_data.sam",
-        TEST_DATA_FOLDER / "correct_umi_expected_uncorrected_data.sam",
-    )
-])
+@pytest.fixture(
+    scope="function",
+    params=[
+        (
+            TEST_DATA_FOLDER / "correct_umi_test_data.sam",
+            TEST_DATA_FOLDER / "correct_umi_expected_corrected_data.sam",
+            TEST_DATA_FOLDER / "correct_umi_expected_uncorrected_data.sam",
+        )
+    ],
+)
 def input_data_files(tmpdir, request):
     input_sam, expected_umi_corrected_sam, expected_umi_uncorrected_sam = request.param
 
@@ -36,15 +39,22 @@ def input_data_files(tmpdir, request):
 def test_correct_umi(tmpdir, input_data_files):
     input_bam, expected_corrected_bam, expected_uncorrected_sam = input_data_files
 
-    actual_umi_corrected_file = tmpdir.join(f"{TOOL_NAME}_actual_umi_corrected_out.mas15.bam")
-    actual_umi_uncorrected_file = tmpdir.join(f"{TOOL_NAME}_actual_umi_uncorrected_out.mas15.bam")
+    actual_umi_corrected_file = tmpdir.join(
+        f"{TOOL_NAME}_actual_umi_corrected_out.mas15.bam"
+    )
+    actual_umi_uncorrected_file = tmpdir.join(
+        f"{TOOL_NAME}_actual_umi_uncorrected_out.mas15.bam"
+    )
     args = [
         "correct_umi",
         "-f",
         "--pre-extracted",
-        "-l", 10,
-        "-o", str(actual_umi_corrected_file),
-        "-x", str(actual_umi_uncorrected_file),
+        "-l",
+        10,
+        "-o",
+        str(actual_umi_corrected_file),
+        "-x",
+        str(actual_umi_uncorrected_file),
         str(input_bam),
     ]
 
@@ -55,23 +65,38 @@ def test_correct_umi(tmpdir, input_data_files):
     assert result.exit_code == 0
 
     # Equal files result as True:
-    assert_reads_files_equal(actual_umi_corrected_file, expected_corrected_bam, order_matters=True)
-    assert_reads_files_equal(actual_umi_uncorrected_file, expected_uncorrected_sam, order_matters=True)
+    assert_reads_files_equal(
+        actual_umi_corrected_file, expected_corrected_bam, order_matters=True
+    )
+    assert_reads_files_equal(
+        actual_umi_uncorrected_file, expected_uncorrected_sam, order_matters=True
+    )
 
 
 def test_correct_umi_from_pipe(tmpdir, input_data_files):
-    input_bam, expected_umi_corrected_bam, expected_umi_uncorrected_sam = input_data_files
+    (
+        input_bam,
+        expected_umi_corrected_bam,
+        expected_umi_uncorrected_sam,
+    ) = input_data_files
 
-    actual_umi_corrected_file = tmpdir.join(f"{TOOL_NAME}_actual_umi_corrected_out.mas15.pipe.bam")
-    actual_umi_uncorrected_file = tmpdir.join(f"{TOOL_NAME}_actual_umi_uncorrected_out.mas15.pipe.bam")
+    actual_umi_corrected_file = tmpdir.join(
+        f"{TOOL_NAME}_actual_umi_corrected_out.mas15.pipe.bam"
+    )
+    actual_umi_uncorrected_file = tmpdir.join(
+        f"{TOOL_NAME}_actual_umi_uncorrected_out.mas15.pipe.bam"
+    )
 
     args = [
         "correct_umi",
         "-f",
         "--pre-extracted",
-        "-l", 10,
-        "-o", str(actual_umi_corrected_file),
-        "-x", str(actual_umi_uncorrected_file),
+        "-l",
+        10,
+        "-o",
+        str(actual_umi_corrected_file),
+        "-x",
+        str(actual_umi_uncorrected_file),
     ]
 
     runner = CliRunner()
@@ -81,5 +106,9 @@ def test_correct_umi_from_pipe(tmpdir, input_data_files):
     assert result.exit_code == 0
 
     # Equal files result as True:
-    assert_reads_files_equal(actual_umi_corrected_file, expected_umi_corrected_bam, order_matters=True)
-    assert_reads_files_equal(actual_umi_uncorrected_file, expected_umi_uncorrected_sam, order_matters=True)
+    assert_reads_files_equal(
+        actual_umi_corrected_file, expected_umi_corrected_bam, order_matters=True
+    )
+    assert_reads_files_equal(
+        actual_umi_uncorrected_file, expected_umi_uncorrected_sam, order_matters=True
+    )

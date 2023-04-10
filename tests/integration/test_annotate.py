@@ -28,7 +28,18 @@ TEST_PARAMS = [
 @pytest.mark.parametrize("input_bam, expected_bam, model_name", TEST_PARAMS)
 def test_annotate(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"{TOOL_NAME}_actual_out.{model_name}.bam")
-    args = ["annotate", "-t", 1, "-v", "INFO", "-m", model_name, str(input_bam), "-o", str(actual_bam)]
+    args = [
+        "annotate",
+        "-t",
+        1,
+        "-v",
+        "INFO",
+        "-m",
+        model_name,
+        str(input_bam),
+        "-o",
+        str(actual_bam),
+    ]
 
     print(" ".join([str(a) for a in args]))
 
@@ -42,7 +53,19 @@ def test_annotate(tmpdir, input_bam, expected_bam, model_name):
 @pytest.mark.parametrize("input_bam, expected_bam, model_name", TEST_PARAMS)
 def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.pipe.bam")
-    args = ["annotate", "-t", 1, "-v", "INFO", "-m", model_name, "-f", "-o", str(actual_bam), "-"]
+    args = [
+        "annotate",
+        "-t",
+        1,
+        "-v",
+        "INFO",
+        "-m",
+        model_name,
+        "-f",
+        "-o",
+        str(actual_bam),
+        "-",
+    ]
 
     runner = CliRunner()
     with open(input_bam, "rb") as fh:

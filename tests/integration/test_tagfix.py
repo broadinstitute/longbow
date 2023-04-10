@@ -21,7 +21,6 @@ TEST_PARAMS = [
 
 @pytest.mark.parametrize("input_sam, expected_sam", TEST_PARAMS)
 def test_tagfix(tmpdir, input_sam, expected_sam):
-
     # Convert test files to bam:
     input_bam = tmpdir.join("input.bam")
     convert_sam_to_bam(input_sam, input_bam)
@@ -42,7 +41,6 @@ def test_tagfix(tmpdir, input_sam, expected_sam):
 
 @pytest.mark.parametrize("input_sam, expected_sam", TEST_PARAMS)
 def test_tagfix_from_pipe(tmpdir, input_sam, expected_sam):
-
     # Convert test files to bam:
     input_bam = tmpdir.join("input.bam")
     convert_sam_to_bam(input_sam, input_bam)

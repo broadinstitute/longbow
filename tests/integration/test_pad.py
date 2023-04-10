@@ -24,7 +24,21 @@ TEST_PARAMS = [
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
 def test_pad_from_file(tmpdir, input_bam, expected_bam):
     actual_bam = tmpdir.join("pad_actual_out.bam")
-    args = ["pad", "-t", "1", "--barcode-tag", "ZU", "-n", "XM", "-e", "2", "-f", "-o", actual_bam, str(input_bam)]
+    args = [
+        "pad",
+        "-t",
+        "1",
+        "--barcode-tag",
+        "ZU",
+        "-n",
+        "XM",
+        "-e",
+        "2",
+        "-f",
+        "-o",
+        actual_bam,
+        str(input_bam),
+    ]
 
     runner = CliRunner()
     result = runner.invoke(longbow, args)
@@ -36,7 +50,20 @@ def test_pad_from_file(tmpdir, input_bam, expected_bam):
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
 def test_pad_from_pipe(tmpdir, input_bam, expected_bam):
     actual_bam = tmpdir.join("pad_actual_out.pipe.bam")
-    args = ["pad", "-t", "1", "--barcode-tag", "ZU", "-n", "XM", "-e", "2", "-f", "-o", actual_bam]
+    args = [
+        "pad",
+        "-t",
+        "1",
+        "--barcode-tag",
+        "ZU",
+        "-n",
+        "XM",
+        "-e",
+        "2",
+        "-f",
+        "-o",
+        actual_bam,
+    ]
 
     runner = CliRunner()
     with open(input_bam, "rb") as fh:
