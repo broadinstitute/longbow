@@ -19,8 +19,6 @@ import ssw
 
 from collections import OrderedDict
 
-from construct import *
-
 import matplotlib.pyplot as plt
 from matplotlib import transforms
 
@@ -236,25 +234,7 @@ def load_read_offsets(pbi_file, read_names):
     # Decode PacBio .pbi file.  This is not a full decode of the index, only the parts we need for read selection.
     # More on index format at https://pacbiofileformats.readthedocs.io/en/9.0/PacBioBamIndex.html .
 
-    fmt = Struct(
-        # Header
-        "magic" / Const(b"PBI\x01"),
-        "version_patch" / Int8ul,
-        "version_minor" / Int8ul,
-        "version_major" / Int8ul,
-        "version_empty" / Int8ul,
-        "pbi_flags" / Int16ul,
-        "n_reads" / Int32ul,
-        "reserved" / Padding(18),
-        # Basic information section (columnar format)
-        "rgId" / Padding(this.n_reads * 4),
-        "qStart" / Padding(this.n_reads * 4),
-        "qEnd" / Array(this.n_reads, Int32sl),
-        "holeNumber" / Array(this.n_reads, Int32sl),
-        "readQual" / Padding(this.n_reads * 4),
-        "ctxtFlag" / Padding(this.n_reads * 1),
-        "fileOffset" / Array(this.n_reads, Int64sl),
-    )
+    fmt = bam_utils.get_pbi_format()
 
     # Make a list of bgzf virtual file offsets for sharding and store ZMW counts.
     file_offsets_hash = OrderedDict()
