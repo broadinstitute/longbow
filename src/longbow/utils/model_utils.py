@@ -21,9 +21,8 @@ starts_with_number_re = re.compile(r"^\d")
 def load_models():
     models = {"array": {}, "cdna": {}}
 
-    # TODO: for python>=3.9, use importlib.resources.files("longbow.models")
-    with importlib.resources.path("longbow.models", "__init__.py") as model_dir:
-        for json_file in model_dir.parent.glob("*json"):
+    with importlib.resources.files("longbow.models") as model_dir:
+        for json_file in model_dir.glob("*json"):
             with json_file.open() as fh:
                 m = json.load(fh)
                 if "array" in m:
