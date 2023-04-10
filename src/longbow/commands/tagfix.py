@@ -61,7 +61,6 @@ def main(ctx, output_bam, force, input_bam):
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
-
         # Start worker sub-processes:
         res = manager.dict({"num_tags_corrected": 0, "num_reads": 0})
         worker_process_pool = []
@@ -177,7 +176,6 @@ def _correct_read_tags(in_queue, out_queue, bam_header, res):
         read = pysam.AlignedSegment.from_dict(raw_data, bam_header)
 
         if read.is_reverse:
-
             # Reverse the segments and update the positions:
             segments_tag = read.get_tag(longbow.utils.constants.SEGMENTS_TAG)
             segments = segments_tag.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER)

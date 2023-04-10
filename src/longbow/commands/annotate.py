@@ -163,7 +163,6 @@ def main(
         check_sq=False,
         require_index=False,
     ) as bam_file:
-
         # If we're chunking, advance to the specified virtual file offset.
         if start_offset > 0:
             bam_file.seek(start_offset)
@@ -251,7 +250,6 @@ def _write_thread_fn(
         disable=disable_pbar,
         total=read_count,
     ) as pbar:
-
         while True:
             # Wait for some output data:
             raw_data = out_queue.get()

@@ -122,7 +122,6 @@ def main(
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
-
         # Validate our command line arguments:
         if lb_model.has_coding_region:
             logger.info(
@@ -184,7 +183,6 @@ def main(
         with pysam.AlignmentFile(
             output_bam, "wb", header=out_header
         ) as extracted_bam_file:
-
             num_reads = 0
             num_reads_with_extracted_segments = 0
             num_segments_extracted = 0
@@ -199,7 +197,6 @@ def main(
                 disable=not sys.stdin.isatty(),
                 total=read_count,
             ):
-
                 # Get our read segments:
                 try:
                     seq, segment_ranges, segment_cigars = get_segments(read)
@@ -214,7 +211,6 @@ def main(
                 if (
                     not read.has_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG)
                 ) or (not read.get_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG)):
-
                     # The read is not segmented.
                     # We should segment it first and then go through our segments one by one:
                     logger.debug(
@@ -364,7 +360,6 @@ def _extract_region_from_model_without_coding_region(
 
     # Go through each marker pair and do the extraction:
     for s_info, e_info in zip(start_marker_list, end_marker_list):
-
         si, start_marker = s_info
         ei, end_marker = e_info
 

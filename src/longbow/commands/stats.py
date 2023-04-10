@@ -98,7 +98,6 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
-
         # Prepare our delimiters for segmentation below:
         delimiters = segment.create_simple_delimiters(lb_model)
         logger.debug(f"Splitting delimiters: {delimiters}")
@@ -714,7 +713,6 @@ def _write_heat_matrix(f, heat_matrix):
 def _calculate_top_ligation_profiles(
     num_reads, ligation_profile_count_dict, num_ligation_profiles_to_show
 ):
-
     ligation_profiles, profile_counts = zip(*ligation_profile_count_dict.items())
     ligation_profiles = np.array(ligation_profiles)
     profile_counts = np.array(profile_counts)
@@ -895,7 +893,8 @@ def _create_array_element_length_histogram(
 
 def _create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
     """Plot the given heatmap which represents the ligations between different MAS-seq adapters.
-    The resulting plot will represent the forward and reverse complemented ligations separately."""
+    The resulting plot will represent the forward and reverse complemented ligations separately.
+    """
 
     # Get our colormap:
     heat_cmap = plot_utils.get_zero_white_cmap(
@@ -945,7 +944,6 @@ def _create_ligation_heatmap(output_prefix, heat_matrix, index_map, title):
     # Add counts in the heatmap:
     for i in range(len(heat_matrix)):
         for j in range(len(heat_matrix[0])):
-
             if np.mean(color_matrix[i, j][:3]) > 0.5:
                 text_color = [0] * 3
             else:
@@ -978,7 +976,8 @@ def _create_ligation_heatmap_reduced(
 ):
     """Plot the given heatmap which represents the ligations between different MAS-seq adapters.
     The resulting plot will represent both the forward and reverse complemented ligations together
-    in the same size-reduced heatmap and does not distinguish between read directions."""
+    in the same size-reduced heatmap and does not distinguish between read directions.
+    """
 
     # Get our colormap:
     heat_cmap = plot_utils.get_zero_white_cmap(

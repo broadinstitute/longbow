@@ -96,7 +96,6 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
-
         logger.info(
             f"Filtering according to {lb_model.name} model ordered key adapters: "
             f"{', '.join(lb_model.key_adapters)}"
@@ -113,7 +112,6 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
         ) as passing_bam_file, pysam.AlignmentFile(
             reject_bam, "wb", header=out_header
         ) as failing_bam_file:
-
             num_passed = 0
             num_failed = 0
 

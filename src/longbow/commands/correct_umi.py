@@ -374,7 +374,6 @@ def main(
             with pysam.AlignmentFile(
                 reject_bam, "wb", template=input_bam_file
             ) as rejected_out_umi_bam:
-
                 # Output BAM with corrected UMIs
                 for read in tqdm(
                     input_bam_file,

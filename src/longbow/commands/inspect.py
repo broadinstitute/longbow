@@ -147,7 +147,6 @@ def main(
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
-
         logger.info(f"Figure drawing mode: {'simplified' if quick else 'extended'}")
 
         if seg_score and not quick:
@@ -183,7 +182,6 @@ def main(
                 file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
                 for i, z in enumerate(file_offsets):
-
                     if not file_offsets[z]["offset"]:
                         logger.error("Read not in index file: %s", read_names[i])
                         sys.exit(1)
@@ -697,7 +695,6 @@ def format_state_sequence(seq, path, library_model, line_length=150):
 def draw_extended_state_sequence(
     seq, path, logp, read, out, show_seg_score, library_model, anns, name_map, **kwargs
 ):
-
     line_length = 150
 
     if name_map is not None:
@@ -856,7 +853,6 @@ def _expand_cigar_sequence(cigar_path):
 def draw_simplified_state_sequence(
     seq, path, logp, read, out, show_seg_score, library_model, **kwargs
 ):
-
     line_length = 150
 
     # TODO: This is a bandaid.  This method should not exist.  Instead we should fix `format_state_sequence`.
@@ -931,7 +927,6 @@ def draw_simplified_state_sequence(
                 library_model.has_named_random_segments
                 and lbl in library_model.named_random_segments
             ):
-
                 # Handle basic named random segment:
                 if (
                     library_model.adapter_dict[lbl]
@@ -942,7 +937,6 @@ def draw_simplified_state_sequence(
 
                 # Handle special random segments:
                 elif type(library_model.adapter_dict[lbl]) is dict:
-
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 
                     if (
@@ -962,7 +956,6 @@ def draw_simplified_state_sequence(
                 not library_model.has_named_random_segments
                 or lbl not in library_model.named_random_segments
             ):
-
                 if type(library_model.adapter_dict[lbl]) is dict:
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 

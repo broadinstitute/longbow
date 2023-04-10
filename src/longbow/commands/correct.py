@@ -174,7 +174,6 @@ def main(
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
-
         # Get our barcode length:
         barcode_length = _get_barcode_tag_length_from_model(lb_model, barcode_tag)
 
@@ -367,7 +366,6 @@ def main(
     )
 
     for read_type in ["ccs", "clr"]:
-
         logger.info("=" * 80)
 
         count_str, pct_str = get_field_count_and_percent_string(
@@ -523,7 +521,6 @@ def _write_thread_fn(
         total=num_reads,
         leave=False,
     ) as pbar:
-
         while True:
             # Wait for some output data:
             raw_data = data_queue.get()
@@ -640,7 +637,6 @@ def _correct_barcode_fn(
         has_barcode = False
 
         if read.has_tag(barcode_tag):
-
             has_barcode = True
             old_bc = read.get_tag(barcode_tag)
             dist_threshold = (
@@ -755,7 +751,6 @@ def _perform_barcode_multi_match(
 
     # Now we can see if we have one good success:
     if len(success_dict) > 0:
-
         # We need to collapse entries with the same barcode here.
         # That is, it's possible that for different padded positions we're getting the same barcode back.
         # If this is the case, we should not call the correction ambiguous.
@@ -798,7 +793,6 @@ def _perform_barcode_multi_match(
 
 
 def _get_barcode_tag_length_from_model(lb_model, barcode_tag):
-
     barcode_seg_name = lb_model.get_segment_name_for_annotation_tag(barcode_tag)
     if not barcode_seg_name:
         print(

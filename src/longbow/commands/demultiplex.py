@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 def main(ctx, pbi, out_base_name, demux_on_tag, input_bam):
     """Separate reads into files based on which model they fit best.
 
-    Resulting reads will be annotated with the model they best fit as well as the score and segments for that model."""
+    Resulting reads will be annotated with the model they best fit as well as the score and segments for that model.
+    """
 
     t_start = time.time()
 
@@ -75,7 +76,6 @@ def main(ctx, pbi, out_base_name, demux_on_tag, input_bam):
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
-
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(
             logger.name, bam_file.header
@@ -138,7 +138,6 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, res, read_cou
             file=sys.stderr,
             total=read_count,
         ) as pbar:
-
             while True:
                 # Wait for some output data:
                 raw_data = out_queue.get()

@@ -83,7 +83,6 @@ def get_pbi_format(short_form: bool = False):
 
 # Named tuple to store alignment information:
 class SegmentInfo(collections.namedtuple("SegmentInfo", ["name", "start", "end"])):
-
     _tag_regex = re.compile(r"(.*?):(\d+)-(-?\d+)")
 
     def __len__(self):
@@ -197,7 +196,8 @@ def create_bam_header_with_program_group(
     converting into a pysam.AlignmentHeader object.
 
     This function is intended to be called from the 'main' function of a longbow subcommand because it uses reflection
-    to pull in the first line of the docstring from the main function as the description (DS field)."""
+    to pull in the first line of the docstring from the main function as the description (DS field).
+    """
 
     bam_header_dict = base_bam_header.to_dict()
 
@@ -249,7 +249,6 @@ def check_for_preexisting_files(file_list, exist_ok=False):
 
 
 def load_model(model, input_bam=None):
-
     # Get our model:
     if model is None and input_bam is not None:
         pysam.set_verbosity(0)
@@ -472,7 +471,8 @@ def get_confidence_factor(
     qual_string: str, scale_factor: float = CONF_FACTOR_SCALE
 ) -> float:
     """Get the confidence factor for the given sequence to be tallied for use with STARCODE.
-    quals are assumed to be phred scale quality scores in string format and will be converted to numerical values."""
+    quals are assumed to be phred scale quality scores in string format and will be converted to numerical values.
+    """
     return scale_factor * reduce(
         operator.mul, map(lambda q: 1.0 - 10 ** (-(ord(q) - 33.0) / 10), qual_string)
     )
@@ -519,7 +519,6 @@ def get_models_from_bam_header(header):
                 pg["ID"].startswith("longbow-annotate")
                 or pg["ID"].startswith("longbow-pad")
             ):
-
                 desc, models_str = pg["DS"].split("MODEL: ")
                 model_json = json.loads(models_str)
                 model_jsons.append(model_json)

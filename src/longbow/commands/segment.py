@@ -103,7 +103,6 @@ def main(
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
-
         if ignore_cbc_and_umi:
             logger.info("Ignoring CBC / UMI - all split elements will be written.")
         else:
@@ -234,7 +233,6 @@ def _sub_process_write_fn(
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
     ) as out_bam_file:
-
         while True:
             # Wait for some output data:
             raw_data = out_queue.get()

@@ -40,7 +40,7 @@ ignore = ["E501"]
 "__init__.py" = ["F401"]
 
 [tool.coverage.run]
-source = "longbow"
+source = ["longbow"]
 branch = true
 
 [tool.coverage.report]

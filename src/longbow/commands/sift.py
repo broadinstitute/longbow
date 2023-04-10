@@ -103,7 +103,6 @@ def main(
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
-
         # Get our header from the input bam file:
         out_header = pysam.AlignmentHeader.from_dict(
             bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
@@ -123,7 +122,6 @@ def main(
         ) as failing_bam_file, open(
             stats, "w"
         ) as stats_file:
-
             num_passed = 0
             num_failed = 0
             num_ignored = 0
@@ -145,7 +143,6 @@ def main(
                     total=read_count,
                 )
             ):
-
                 if read.query_name in reads_to_ignore:
                     logger.debug(f"Ignoring read: {read.query_name}")
                     num_ignored += 1

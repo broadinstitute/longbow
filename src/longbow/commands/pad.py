@@ -92,7 +92,6 @@ def main(
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
-
         # Verify that the given model actually has the barcode to change:
         if not lb_model.has_annotation_tag(barcode_tag):
             print(

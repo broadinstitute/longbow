@@ -2,12 +2,11 @@ name: longbow.env
 channels:
   - bioconda
   - conda-forge
-  - defaults
 dependencies:
-  - python==3.7.6
-  - samtools
-  - minimap2
-  - pbmm2
+  - python=3.9
   - pip
+  - pbmm2
+  - minimap2
+  - samtools
   - pip:
-    - maslongbow==0.6.13
+    - -e .[dev]

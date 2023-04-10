@@ -101,7 +101,6 @@ def load_training_seqs(m, num_training_samples, threads, training_bam):
     ) as executor, tqdm.tqdm(
         desc="Progress", unit=" reads", colour="green", file=sys.stdout
     ) as pbar:
-
         future_to_segmented_read = {
             executor.submit(select_read, r, m): r for r in raw_reads
         }

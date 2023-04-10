@@ -42,7 +42,6 @@ def fix_plot_visuals(
         textsize = ticklabelsize
 
     for ax in fig.get_axes():
-
         for ticklabel in ax.get_xticklabels():
             ticklabel.set_fontsize(ticklabelsize)
         for ticklabel in ax.get_yticklabels():

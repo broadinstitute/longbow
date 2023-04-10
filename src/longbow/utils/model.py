@@ -25,7 +25,8 @@ MODEL_NAME_REGEX = re.compile(f"\\{MODEL_DESC_DELIMITER}")
 
 class LibraryModel:
     """Model describing a given library preparation.
-    The model can annotate the known sections of a read from the library it describes."""
+    The model can annotate the known sections of a read from the library it describes.
+    """
 
     def __init__(
         self,
@@ -35,7 +36,6 @@ class LibraryModel:
         model_description=None,
         do_build=True,
     ):
-
         if not model_name:
             self.name = array_model["name"] + MODEL_DESC_DELIMITER + cdna_model["name"]
         else:
@@ -130,7 +130,7 @@ class LibraryModel:
         cur_op = ""
         cur_op_len = 0
 
-        for (idx, state) in path:
+        for idx, state in path:
             apath.append(re.sub(r"\d+$", "", state.name))
 
             if not state.name.endswith(
@@ -177,7 +177,6 @@ class LibraryModel:
         for n in ordered_segment_names:
             # Ignore all segment names that do not characterize our library:
             if n in self.array_model["structure"]:
-
                 # If this is our first segment, we should allow for the possibility that our array begins
                 # somewhere after the first element.  We must find the starting point:
                 if not found_first_key:
@@ -251,7 +250,6 @@ class LibraryModel:
             pass
 
     def build(self):
-
         # Validate our model here so we can go through and just worry about creating it:
         self.validate_model()
 
@@ -562,7 +560,8 @@ class LibraryModel:
     @staticmethod
     def from_json_file(json_file):
         """Create a LibraryModel instance from the given json file.
-        This method will open the file at the given location and use the data in that file to create a LibraryModel."""
+        This method will open the file at the given location and use the data in that file to create a LibraryModel.
+        """
 
         try:
             with open(json_file) as f:
