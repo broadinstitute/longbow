@@ -6,7 +6,6 @@ import time
 import os
 
 import click
-import click_log
 import tqdm
 
 import pysam
@@ -14,48 +13,17 @@ import multiprocessing as mp
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils.cli_utils import format_obnoxious_warning_message
 
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("pad")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-t",
-    "--threads",
-    type=int,
-    default=mp.cpu_count() - 1,
-    show_default=True,
-    help="number of threads to use (0 for all)",
-)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="annotated bam output  [default: stdout]",
-)
-@click.option(
-    "-m",
-    "--model",
-    help="The model to use for annotation.  If not specified, it will be autodetected from "
-         "the BAM header.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name "
-         "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
-         "Longbow will assume the contents are the configuration of a LibraryModel as per "
-         "LibraryModel.to_json()."
-)
-@click.option(
-    '-f',
-    '--force',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist."
-)
+
+@click.command()
+@cli_utils.output_bam("annotated bam output")
+@cli_utils.model
+@cli_utils.force_overwrite
 @click.option(
     "-b",
     "--barcode-tag",
@@ -77,19 +45,17 @@ click_log.basic_config(logger)
     default=2,
     help="Expand tag by specified number of bases",
 )
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(threads, output_bam, model, force, barcode_tag, new_barcode_tag, expand, input_bam):
+@cli_utils.input_bam
+@click.pass_context
+def main(ctx, output_bam, model, force, barcode_tag, new_barcode_tag, expand, input_bam):
     """Pad tag by specified number of adjacent bases from the read."""
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
-    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} worker subprocess(es)")
+    threads = ctx.obj["THREADS"]
 
     logger.info(f"Expanding tag {barcode_tag} by {expand} bases")
     logger.info(f"Writing expanded tag to: {new_barcode_tag}")

@@ -1,4 +1,78 @@
+import logging
+import sys
+
 import click
+import click_log
+
+log = logging.getLogger(__name__)
+
+
+def create_logger():
+    root_log = logging.getLogger()
+    click_log.basic_config(root_log)
+    root_log.handlers[0].setFormatter(
+        logging.Formatter(
+            "[%(levelname)5s %(asctime)s %(name)7s] %(message)s",
+            "%Y-%m-%d %H:%M:%S",
+        )
+    )
+    log.debug("Configured base logger")
+
+
+def input_bam(function):
+    return click.argument(
+        "input-bam",
+        default="-" if not sys.stdin.isatty() else None,
+        type=click.File("rb"),
+    )(function)
+
+
+def input_pbi(function):
+    return click.option(
+        "-p",
+        "--pbi",
+        required=False,
+        type=click.Path(exists=False),
+        help="BAM .pbi index file",
+    )(function)
+
+
+def output_bam(help_message):
+    def decorator(function):
+        return click.option(
+            "-o",
+            "--output-bam",
+            default="-",
+            show_default=True,
+            type=click.Path(exists=False),
+            help=help_message,
+        )(function)
+
+    return decorator
+
+
+def model(function):
+    return click.option(
+        "-m",
+        "--model",
+        help="The model to use for annotation.  If not specified, it will be autodetected from "
+             "the BAM header.  If the given value is a pre-configured model name, then that "
+             "model will be used.  Otherwise, the given value will be treated as a file name "
+             "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
+             "Longbow will assume the contents are the configuration of a LibraryModel as per "
+             "LibraryModel.to_json()."
+    )(function)
+
+
+def force_overwrite(function):
+    return click.option(
+        '-f',
+        '--force',
+        is_flag=True,
+        default=False,
+        show_default=True,
+        help="Force overwrite of the output files if they exist."
+    )(function)
 
 
 class MutuallyExclusiveOption(click.Option):

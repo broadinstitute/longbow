@@ -7,7 +7,6 @@ import time
 import datetime
 
 import click
-import click_log
 import tqdm
 
 import pysam
@@ -17,6 +16,7 @@ import matplotlib.pyplot as plt
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils import plot_utils
 from ..utils.constants import FFORMAT
 
@@ -24,18 +24,13 @@ from ..utils.cli_utils import get_field_count_and_percent_string
 
 from . import segment
 
-from ..utils.bam_utils import get_segments
-
 plot_title_path_regex = re.compile(r".*/([^/].*?)/*$")
 
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("stats")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
+@click.command()
 @click.option(
     "-o",
     "--output-prefix",
@@ -43,13 +38,7 @@ click_log.basic_config(logger)
     type=str,
     help="prefix to give to output files",
 )
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(),
-    help="BAM .pbi index file",
-)
+@cli_utils.input_pbi
 @click.option(
     "-m",
     "--model",
@@ -68,13 +57,11 @@ click_log.basic_config(logger)
     "This splitting will cause delimiter sequences to be repeated in each read they bound.  "
     "This is now the default setting, and this flag has been DEPRECATED.",
 )
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
+@cli_utils.input_bam
 def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
     """Calculate and produce stats on the given input bam file."""
 
     t_start = time.time()
-
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     # Try to read in a pac bio index file so we can have a good progress bar:
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
@@ -145,7 +132,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         for read in bam_file:
             # Get our read segments:
             try:
-                _, segments, _ = get_segments(read)
+                _, segments, _ = bam_utils.get_segments(read)
             except KeyError:
                 logger.error(f"Input bam file does not contain longbow segmented reads!  "
                              f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !")

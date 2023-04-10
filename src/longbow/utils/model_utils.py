@@ -4,8 +4,6 @@ import importlib.resources
 import json
 import logging
 
-import click_log
-
 from pomegranate import *
 
 from .constants import (
@@ -16,9 +14,7 @@ from .constants import (
     BAKE_MERGE_STRATEGY,
 )
 
-logging.basicConfig(stream=sys.stderr)
 logger = logging.getLogger(__name__)
-click_log.basic_config(logger)
 
 starts_with_number_re = re.compile(r"^\d")
 

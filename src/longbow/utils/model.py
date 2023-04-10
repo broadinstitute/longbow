@@ -3,8 +3,6 @@ import re
 import logging
 import json
 
-import click_log
-
 import longbow.utils.model_utils
 from .model_utils import ModelBuilder
 from ..meta import VERSION
@@ -13,9 +11,8 @@ import longbow.utils.constants
 from .constants import FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME, HPR_SEGMENT_TYPE_NAME, \
     RANDOM_SEGMENT_NAME, START_STATE_INDICATOR, END_STATE_INDICATOR, MODEL_DESC_DELIMITER
 
-logging.basicConfig(stream=sys.stderr)
+
 logger = logging.getLogger(__name__)
-click_log.basic_config(logger)
 
 # NOTE: The backslash here is because the delimiter itself is a plus sign.
 MODEL_NAME_REGEX = re.compile(f"\\{MODEL_DESC_DELIMITER}")

@@ -1,4 +1,5 @@
 import logging
+import multiprocessing as mp
 
 import click
 import click_log
@@ -20,12 +21,27 @@ logger.handlers[0].formatter = logging.Formatter(
 
 
 @click.group(name="longbow")
-def main_entry():
+@click_log.simple_verbosity_option(logger)
+@click.option(
+    "-t",
+    "--threads",
+    type=int,
+    default=mp.cpu_count() - 1,
+    show_default=True,
+    help="number of threads to use (0 for all)",
+)
+@click.pass_context
+def main_entry(ctx, threads):
     logger.info("Invoked via: longbow %s", " ".join(sys.argv))
+
+    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
+    logger.info(f"Running with {threads} worker subprocess(es)")
+
+    ctx.ensure_object(dict)
+    ctx.obj["THREADS"] = threads
 
 
 @main_entry.command()
-@click_log.simple_verbosity_option(logger)
 def version():
     """Print the version of longbow."""
     click.echo(VERSION)

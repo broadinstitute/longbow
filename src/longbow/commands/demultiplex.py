@@ -5,37 +5,20 @@ import time
 import os
 
 import click
-import click_log
 import tqdm
 
 import pysam
 import multiprocessing as mp
 
 from ..utils import bam_utils
+from ..utils import cli_utils
 
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("demultiplex")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(),
-    help="BAM .pbi index file",
-)
-@click.option(
-    "-t",
-    "--threads",
-    type=int,
-    default=mp.cpu_count() - 1,
-    show_default=True,
-    help="number of threads to use (0 for all)",
-)
+@click.command()
+@cli_utils.input_pbi
 @click.option(
     "-o",
     "--out-base-name",
@@ -54,18 +37,16 @@ click_log.basic_config(logger)
     required=False,
     help="BAM tag on which to demultiplex (e.g. YN, BC)"
 )
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
-def main(pbi, threads, out_base_name, demux_on_tag, input_bam):
+@cli_utils.input_bam
+@click.pass_context
+def main(ctx, pbi, out_base_name, demux_on_tag, input_bam):
     """Separate reads into files based on which model they fit best.
 
     Resulting reads will be annotated with the model they best fit as well as the score and segments for that model."""
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
-    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} worker subprocess(es)")
+    threads = ctx.obj["THREADS"]
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None

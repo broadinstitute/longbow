@@ -4,10 +4,8 @@ import math
 import sys
 
 import click
-import click_log
 import tqdm
 
-import multiprocessing as mp
 import concurrent.futures
 
 import pysam
@@ -16,13 +14,10 @@ import longbow.utils.constants
 
 from ..utils import bam_utils
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("train")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name="train")
-@click_log.simple_verbosity_option(logger)
+@click.command()
 @click.option(
     "-n",
     "--num-training-samples",
@@ -38,14 +33,6 @@ click_log.basic_config(logger)
     default=5,
     show_default=True,
     help="number of training iterations to use",
-)
-@click.option(
-    "-t",
-    "--threads",
-    type=int,
-    default=mp.cpu_count() - 1,
-    show_default=True,
-    help="number of threads to use (0 for all)",
 )
 @click.option(
     "-o",
@@ -65,17 +52,15 @@ click_log.basic_config(logger)
          "of a LibraryModel as per LibraryModel.to_json()."
 )
 @click.argument("training-bam", type=click.Path(exists=True))
+@click.pass_context
 def main(
-    num_training_samples, max_training_iterations, threads, output_yaml, model, training_bam
+    ctx, num_training_samples, max_training_iterations, output_yaml, model, training_bam
 ):
     """Train transition and emission probabilities on real data."""
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
-    threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
-    logger.info(f"Running with {threads} worker subprocess(es)")
+    threads = ctx.obj["THREADS"]
 
     # Get our model:
     m = bam_utils.load_model(model, training_bam)

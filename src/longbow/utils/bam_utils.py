@@ -2,7 +2,6 @@ import json
 import math
 import gzip
 import logging
-import click_log
 import re
 import pysam
 import sys
@@ -38,9 +37,8 @@ from .constants import RANDOM_SEGMENT_NAME, HPR_SEGMENT_TYPE_NAME, SEGMENTS_TAG,
 
 from ..utils.model import LibraryModel
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("bam_utils")
-click_log.basic_config(logger)
+
+logger = logging.getLogger(__name__)
 
 PB_READ_NAME_RE = re.compile("m[0-9]+e?_[0-9]{6}_[0-9]{6}/[0-9]+/.*")
 

@@ -4,13 +4,13 @@ import os
 import sys
 
 import click
-import click_log
 
 import tqdm
 import pysam
 
 import longbow.utils.constants
 from ..utils import bam_utils
+from ..utils import cli_utils
 
 from ..utils.bam_utils import SegmentInfo, get_segments
 from ..utils.cli_utils import get_field_count_and_percent_string
@@ -20,35 +20,13 @@ from .segment import create_simple_delimiters
 from .segment import segment_read_with_simple_splitting
 from .segment import create_simple_split_array_element
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("extract")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(exists=True),
-    help="BAM .pbi index file",
-)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="extracted bam output.  [default: stdout]",
-)
-@click.option(
-    '-f',
-    '--force',
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist."
-)
+@click.command()
+@cli_utils.input_pbi
+@cli_utils.output_bam("extracted bam output.")
+@cli_utils.force_overwrite
 @click.option(
     "--create-barcode-conf-file",
     required=False,
@@ -92,17 +70,8 @@ click_log.basic_config(logger)
          "These bases will not be included in the extracted sequences.  "
          "Required if the given model does not name a `coding_region`.",
 )
-@click.option(
-    "-m",
-    "--model",
-    help="The model to use for annotation.  If not specified, it will be autodetected from "
-         "the BAM header.  If the given value is a pre-configured model name, then that "
-         "model will be used.  Otherwise, the given value will be treated as a file name "
-         "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
-         "Longbow will assume the contents are the configuration of a LibraryModel as per "
-         "LibraryModel.to_json()."
-)
-@click.argument("input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb"))
+@cli_utils.model
+@cli_utils.input_bam
 def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
          leading_adapter, trailing_adapter, start_offset, model, input_bam):
     """Extract coding segments from the reads in the given bam.
@@ -119,8 +88,6 @@ def main(pbi, output_bam, force, base_padding, create_barcode_conf_file,
     """
 
     t_start = time.time()
-
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     # Check to see if the output file exists:
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
