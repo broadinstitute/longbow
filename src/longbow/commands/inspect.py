@@ -768,7 +768,7 @@ def draw_simplified_state_sequence(seq, path, logp, read, out, show_seg_score, l
 
     for base_string, color, lbl in zip(base_strings, colors, labels):
         if column == 0:
-            ytic = ax.text(0, rows - row, f"{total_bases_seen}  ", transform=t, ha="right")
+            ax.text(0, rows - row, f"{total_bases_seen}  ", transform=t, ha="right")
 
         # Write classified sequence
         text = ax.text(

@@ -1,10 +1,9 @@
-import sys
 import re
 import importlib.resources
 import json
 import logging
 
-from pomegranate import *
+from pomegranate import HiddenMarkovModel, State, DiscreteDistribution
 
 from .constants import (
     RANDOM_SEGMENT_NAME,
@@ -22,8 +21,9 @@ starts_with_number_re = re.compile(r"^\d")
 def load_models():
     models = {"array": {}, "cdna": {}}
 
-    with importlib.resources.path("longbow", "models") as model_dir:
-        for json_file in model_dir.glob("*json"):
+    # TODO: for python>=3.9, use importlib.resources.files("longbow.models")
+    with importlib.resources.path("longbow.models", "__init__.py") as model_dir:
+        for json_file in model_dir.parent.glob("*json"):
             with json_file.open() as fh:
                 m = json.load(fh)
                 if "array" in m:

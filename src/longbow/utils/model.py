@@ -272,25 +272,25 @@ class LibraryModel:
 
         # Connect all array ends to random end and cDNA start:
         for array_state in self.array_model['structure']:
-            l = len(self.array_model['adapters'][array_state])
+            length = len(self.array_model['adapters'][array_state])
 
             for op in ['M', 'I', 'D']:
-                self.hmm.add_transition(all_states[f'{array_state}:{op}{l}'], all_states['random:RDB'], 0.01)
-                self.hmm.add_transition(all_states[f'{array_state}:{op}{l}'], all_states['random-end'], 0.01)
+                self.hmm.add_transition(all_states[f'{array_state}:{op}{length}'], all_states['random:RDB'], 0.01)
+                self.hmm.add_transition(all_states[f'{array_state}:{op}{length}'], all_states['random-end'], 0.01)
 
                 # NOTE: the last array adapter does not get to have a connection to the cDNA start:
                 if array_state != self.array_model["structure"][-1]:
-                    self.hmm.add_transition(all_states[f'{array_state}:{op}{l}'],
+                    self.hmm.add_transition(all_states[f'{array_state}:{op}{length}'],
                                             all_states[f'{self.cdna_model["structure"][0]}-start'], 1.0)
 
         # Connect all cDNA ends to array starts
         for array_state in self.array_model['structure']:
             cdna_state = self.cdna_model['structure'][-1]
-            l = len(self.cdna_model['adapters'][cdna_state])
+            length = len(self.cdna_model['adapters'][cdna_state])
 
             for op in ['M', 'I', 'D']:
-                self.hmm.add_transition(all_states[f'{cdna_state}:{op}{l}'], all_states['random:RDB'], 0.01)
-                self.hmm.add_transition(all_states[f'{cdna_state}:{op}{l}'],
+                self.hmm.add_transition(all_states[f'{cdna_state}:{op}{length}'], all_states['random:RDB'], 0.01)
+                self.hmm.add_transition(all_states[f'{cdna_state}:{op}{length}'],
                                         all_states[f'{array_state}-start'], 1.0/(len(self.array_model['structure'])))
 
         # Connect the cDNA adapter ends to random end
@@ -310,24 +310,24 @@ class LibraryModel:
                                                 all_states[f'{next_adapter_name}-start'], 1.0)
                 else:
                     for op in ['M', 'I', 'D']:
-                        l = len(self.cdna_model['adapters'][adapter_name])
-                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'], all_states['random:RDB'], 0.01)
-                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'], all_states['random-end'], 0.01)
+                        length = len(self.cdna_model['adapters'][adapter_name])
+                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{length}'], all_states['random:RDB'], 0.01)
+                        self.hmm.add_transition(all_states[f'{adapter_name}:{op}{length}'], all_states['random-end'], 0.01)
 
                         if next_adapter_name is not None:
-                            self.hmm.add_transition(all_states[f'{adapter_name}:{op}{l}'],
+                            self.hmm.add_transition(all_states[f'{adapter_name}:{op}{length}'],
                                                     all_states[f'{next_adapter_name}-start'], 1.0)
 
             elif type(adapter_def) is dict:
                 segment_type = list(adapter_def.keys())[0]
 
                 if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
-                    l = list(adapter_def.values())[0]
-                    self.hmm.add_transition(all_states[f'{adapter_name}:M{l}'], all_states['random:RDB'], 0.01)
-                    self.hmm.add_transition(all_states[f'{adapter_name}:M{l}'], all_states['random-end'], 0.01)
+                    length = list(adapter_def.values())[0]
+                    self.hmm.add_transition(all_states[f'{adapter_name}:M{length}'], all_states['random:RDB'], 0.01)
+                    self.hmm.add_transition(all_states[f'{adapter_name}:M{length}'], all_states['random-end'], 0.01)
 
                     if next_adapter_name is not None:
-                        self.hmm.add_transition(all_states[f'{adapter_name}:M{l}'],
+                        self.hmm.add_transition(all_states[f'{adapter_name}:M{length}'],
                                                 all_states[f'{next_adapter_name}-start'], 1.0)
                 elif segment_type == HPR_SEGMENT_TYPE_NAME:
                     base, hpr_length = list(adapter_def.values())[0]
@@ -424,8 +424,8 @@ class LibraryModel:
                 segment_type = list(adapter_def.keys())[0]
 
                 if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
-                    l = list(adapter_def.values())[0]
-                    model.add_transition(states[f'{adapter_name_i}:M{l}'], states[f'{adapter_name_j}-start'], 1.0)
+                    length = list(adapter_def.values())[0]
+                    model.add_transition(states[f'{adapter_name_i}:M{length}'], states[f'{adapter_name_j}-start'], 1.0)
 
         model.bake(merge="None")
 

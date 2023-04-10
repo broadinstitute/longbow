@@ -627,8 +627,8 @@ def _create_array_length_histogram(output_prefix,
 
     # Add the labels for the bars:
     yoff = (ymax - ymin) * .025
-    for c, l in zip(count_hist, hist_bins):
-        h = ax.text(l, c + yoff, f"{c}\n{c / num_data_points * 100:.02f}%", horizontalalignment='center')
+    for count, length in zip(count_hist, hist_bins):
+        h = ax.text(length, count + yoff, f"{count}\n{count / num_data_points * 100:.02f}%", horizontalalignment='center')
 
     prefix_title = output_prefix
     if "/" in output_prefix:
