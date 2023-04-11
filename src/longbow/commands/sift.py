@@ -99,6 +99,10 @@ def main(
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
+
         # Get our header from the input bam file:
         out_header = pysam.AlignmentHeader.from_dict(
             bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)

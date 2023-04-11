@@ -61,7 +61,9 @@ def main(
     threads = ctx.obj["THREADS"]
 
     # Get our model:
-    with pysam.AlignmentFile(training_bam, "rb", check_sq=False, require_index=False) as bam_file:
+    with pysam.AlignmentFile(
+        training_bam, "rb", check_sq=False, require_index=False
+    ) as bam_file:
         m = bam_utils.load_model(model, bam_file)
         logger.info(f"Using {m.name}: {m.description}")
 

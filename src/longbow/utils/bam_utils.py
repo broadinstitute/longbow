@@ -251,7 +251,9 @@ def check_for_preexisting_files(file_list, exist_ok=False):
 def load_model(model, bam_file=None):
     # Get our model:
     if model is None and bam_file is not None:
-        lb_model = LibraryModel.from_json_obj(get_model_from_bam_header(bam_file.header))
+        lb_model = LibraryModel.from_json_obj(
+            get_model_from_bam_header(bam_file.header)
+        )
     elif model is not None and LibraryModel.has_prebuilt_model(model):
         lb_model = LibraryModel.build_pre_configured_model(model)
     else:
