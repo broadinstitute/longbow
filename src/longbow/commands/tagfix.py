@@ -13,14 +13,13 @@ import tqdm
 import longbow.utils.constants
 
 from ..utils import bam_utils, cli_utils
-from ..utils.cli_utils import format_obnoxious_warning_message
 
 PROG_NAME = "tagfix"
 
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("tagfix")
 @cli_utils.output_bam("annotated bam output")
 @cli_utils.force_overwrite
 @cli_utils.input_bam
@@ -63,11 +62,17 @@ def main(ctx, output_bam, force, input_bam):
     ) as pbar:
         # Start worker sub-processes:
         res = manager.dict({"num_tags_corrected": 0, "num_reads": 0})
+
         worker_process_pool = []
         for _ in range(threads):
             p = mp.Process(
                 target=_correct_read_tags,
-                args=(process_input_data_queue, results, bam_file.header, res),
+                args=(
+                    process_input_data_queue,
+                    results,
+                    bam_file.header.to_dict(),
+                    res,
+                ),
             )
             p.start()
             worker_process_pool.append(p)
@@ -125,7 +130,7 @@ def main(ctx, output_bam, force, input_bam):
 
     if res["num_tags_corrected"] == 0:
         logger.warning(
-            format_obnoxious_warning_message(
+            cli_utils.format_obnoxious_warning_message(
                 "No read tags were corrected.  This is very unlikely.  "
                 "You should check your data."
             )
@@ -160,6 +165,8 @@ def _output_writer_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
 def _correct_read_tags(in_queue, out_queue, bam_header, res):
     """Function to run in each subprocess.
     Do the tag correction here."""
+
+    bam_header = pysam.AlignmentHeader.from_dict(bam_header)
 
     while True:
         # Wait until we get some data.

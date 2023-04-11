@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
 
 
-@click.command()
+@click.command("inspect")
 @click.option(
     "-r",
     "--read-names",
@@ -52,14 +52,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     type=click.Path(exists=False),
     help="Output directory",
 )
-@click.option(
-    "-m",
-    "--model",
-    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-    "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-    "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-    "of a LibraryModel as per LibraryModel.to_json().",
-)
+@cli_utils.model
 @click.option(
     "--seg-score",
     is_flag=True,

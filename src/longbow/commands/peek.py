@@ -15,14 +15,13 @@ import tqdm
 import longbow.utils.constants
 
 from ..utils import bam_utils, cli_utils
-from ..utils.cli_utils import zero_safe_div
 from ..utils.model import LibraryModel
 from ..utils.model_utils import ModelBuilder
 
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("peek")
 @cli_utils.input_pbi
 @click.option(
     "-o",
@@ -254,7 +253,7 @@ def main(
 
     logger.info(
         f"Overall most likely model: {best_model} (seen in {best_model_count} reads, "
-        f"{100.0*zero_safe_div(best_model_count, np.sum(list(res.values()))):.1f}%)"
+        f"{100.0 * cli_utils.zero_safe_div(best_model_count, np.sum(list(res.values()))):.1f}%)"
     )
 
     with open(output_model if output_model != "-" else "/dev/stdout", "w") as wm:

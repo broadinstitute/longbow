@@ -1,9 +1,7 @@
 import logging
 import pickle
-import sys
 
 import click
-import click_log
 import matplotlib.pyplot as plt
 import networkx as nx
 
@@ -11,13 +9,10 @@ from ..utils import cli_utils
 from ..utils.model import MODEL_NAME_REGEX, LibraryModel
 from ..utils.model_utils import ModelBuilder
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("models")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name="models")
-@click_log.simple_verbosity_option(logger)
+@click.command("models")
 @click.option(
     "-l",
     "--list-models",

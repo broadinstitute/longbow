@@ -20,18 +20,10 @@ from ..utils.bam_utils import collapse_annotations
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("annotate")
 @cli_utils.input_pbi
 @cli_utils.output_bam("annotated bam output")
-@click.option(
-    "-m",
-    "--model",
-    type=str,
-    help="The model(s) to use for annotation.  If the given value is a pre-configured model name, then that "
-    "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-    "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-    "of a LibraryModel as per LibraryModel.to_json().",
-)
+@cli_utils.model
 @click.option(
     "-c",
     "--chunk",

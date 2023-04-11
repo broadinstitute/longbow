@@ -13,12 +13,11 @@ import tqdm
 import longbow.utils.constants
 
 from ..utils import bam_utils, cli_utils
-from ..utils.cli_utils import format_obnoxious_warning_message
 
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("pad")
 @cli_utils.output_bam("annotated bam output")
 @cli_utils.model
 @cli_utils.force_overwrite
@@ -152,7 +151,7 @@ def main(
 
     if res["num_reads_refined"] == 0:
         logger.warning(
-            format_obnoxious_warning_message(
+            cli_utils.format_obnoxious_warning_message(
                 "No reads were refined / padded.  This is very likely a misconfiguration."
             )
         )

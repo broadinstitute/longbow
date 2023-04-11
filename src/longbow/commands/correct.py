@@ -26,7 +26,7 @@ class BarcodeResolutionFailure(enum.Enum):
     NO_MATCH_IN_LEV_DIST = enum.auto()
 
 
-@click.command()
+@click.command("correct")
 @cli_utils.input_pbi
 @cli_utils.output_bam("annotated bam output")
 @cli_utils.model

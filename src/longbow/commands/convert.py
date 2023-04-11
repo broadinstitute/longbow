@@ -11,7 +11,7 @@ from ..utils import bam_utils, cli_utils
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("convert")
 @cli_utils.output_bam("bam output")
 @click.option(
     "-q",
@@ -42,14 +42,7 @@ logger = logging.getLogger(__name__)
     required=False,
     help="Maximum length of reads to process",
 )
-@click.option(
-    "-f",
-    "--force",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist.",
-)
+@cli_utils.force_overwrite
 @click.argument("input-spec", required=True, type=click.Path(exists=True))
 def main(
     output_bam,

@@ -14,7 +14,6 @@ import tqdm
 import longbow.utils.constants
 
 from ..utils import bam_utils, cli_utils, plot_utils
-from ..utils.cli_utils import get_field_count_and_percent_string
 from ..utils.constants import FFORMAT
 from . import segment
 
@@ -24,7 +23,7 @@ plot_title_path_regex = re.compile(r".*/([^/].*?)/*$")
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("stats")
 @click.option(
     "-o",
     "--output-prefix",
@@ -33,14 +32,7 @@ logger = logging.getLogger(__name__)
     help="prefix to give to output files",
 )
 @cli_utils.input_pbi
-@click.option(
-    "-m",
-    "--model",
-    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-    "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-    "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-    "of a LibraryModel as per LibraryModel.to_json().",
-)
+@cli_utils.model
 @click.option(
     "-s",
     "--do-simple-splitting",
@@ -601,19 +593,21 @@ def _write_summary_stats_file(
         logger.debug("Off Diagonal Count: %d", off_sub_diagonal_count)
         logger.debug("Sub Sub Diagonal Count: %d", sub_sub_diagonal_count)
 
-        _, pct_str = get_field_count_and_percent_string(sub_diagonal_count, total_count)
+        _, pct_str = cli_utils.get_field_count_and_percent_string(
+            sub_diagonal_count, total_count
+        )
         f.write(
             f"Subdiagonal Count Total (correct segments): {sub_diagonal_count} {pct_str}\n"
         )
 
-        _, pct_str = get_field_count_and_percent_string(
+        _, pct_str = cli_utils.get_field_count_and_percent_string(
             off_sub_diagonal_count, total_count
         )
         f.write(
             f"Off-Subdiagonal Count Total (segmentation / ligation errors): {off_sub_diagonal_count} {pct_str}\n"
         )
 
-        _, pct_str = get_field_count_and_percent_string(
+        _, pct_str = cli_utils.get_field_count_and_percent_string(
             sub_sub_diagonal_count, total_count
         )
         f.write(

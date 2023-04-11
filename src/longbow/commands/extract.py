@@ -10,8 +10,6 @@ import tqdm
 import longbow.utils.constants
 
 from ..utils import bam_utils, cli_utils
-from ..utils.bam_utils import SegmentInfo, get_segments
-from ..utils.cli_utils import get_field_count_and_percent_string, zero_safe_div
 from .segment import (
     create_simple_delimiters,
     create_simple_split_array_element,
@@ -21,7 +19,7 @@ from .segment import (
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("extract")
 @cli_utils.input_pbi
 @cli_utils.output_bam("extracted bam output.")
 @cli_utils.force_overwrite
@@ -199,7 +197,7 @@ def main(
             ):
                 # Get our read segments:
                 try:
-                    seq, segment_ranges, segment_cigars = get_segments(read)
+                    seq, segment_ranges, segment_cigars = bam_utils.get_segments(read)
                 except KeyError:
                     logger.error(
                         f"Input bam file does not contain longbow segmented reads!  "
@@ -289,10 +287,10 @@ def main(
         barcode_conf_file.close()
 
     # Calc some stats:
-    count_str, pct_str = get_field_count_and_percent_string(
+    count_str, pct_str = cli_utils.get_field_count_and_percent_string(
         num_reads_with_extracted_segments, num_reads
     )
-    segs_per_read = zero_safe_div(num_segments_extracted, num_reads)
+    segs_per_read = cli_utils.zero_safe_div(num_segments_extracted, num_reads)
 
     # Yell at the user:
     logger.info(f"Done. Elapsed time: {time.time() - t_start:2.2f}s.")
@@ -306,7 +304,7 @@ def main(
 def _get_segments_only(read):
     """Get the segments corresponding to a particular read by reading the segments tag information."""
     return [
-        SegmentInfo.from_tag(s)
+        bam_utils.SegmentInfo.from_tag(s)
         for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
             longbow.utils.constants.SEGMENT_TAG_DELIMITER
         )

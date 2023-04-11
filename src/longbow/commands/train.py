@@ -8,14 +8,12 @@ import click
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils
+from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("train")
 @click.option(
     "-n",
     "--num-training-samples",
@@ -39,16 +37,7 @@ logger = logging.getLogger(__name__)
     type=click.Path(exists=False),
     help="trained model",
 )
-@click.option(
-    "-m",
-    "--model",
-    default=longbow.utils.constants.DEFAULT_MODEL,
-    show_default=True,
-    help="The model to use for annotation.  If the given value is a pre-configured model name, then that "
-    "model will be used.  Otherwise, the given value will be treated as a file name and Longbow will attempt to "
-    "read in the file and create a LibraryModel from it.  Longbow will assume the contents are the configuration "
-    "of a LibraryModel as per LibraryModel.to_json().",
-)
+@cli_utils.model
 @click.argument("training-bam", type=click.Path(exists=True))
 @click.pass_context
 def main(

@@ -18,16 +18,10 @@ from ..utils.constants import FFORMAT
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("sift")
 @cli_utils.input_pbi
 @cli_utils.output_bam("filtered bam output (passing reads only)")
-@click.option(
-    "-x",
-    "--reject-bam",
-    default="/dev/null",
-    type=click.Path(exists=False),
-    help="Filtered bam output (failing reads only)  [default: /dev/null]",
-)
+@cli_utils.reject_bam
 @cli_utils.model
 @cli_utils.force_overwrite
 @click.option(

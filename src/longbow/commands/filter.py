@@ -4,66 +4,26 @@ import sys
 import time
 
 import click
-import click_log
 import pysam
 import tqdm
 
 import longbow.utils.constants
 
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils.bam_utils import SegmentInfo
-from ..utils.cli_utils import get_field_count_and_percent_string, zero_safe_div
 from ..utils.constants import FFORMAT
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger("filter")
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
-@click.option(
-    "-p",
-    "--pbi",
-    required=False,
-    type=click.Path(exists=True),
-    help="BAM .pbi index file",
-)
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="filtered bam output (passing reads only)  [default: stdout]",
-)
-@click.option(
-    "-x",
-    "--reject-bam",
-    default="/dev/null",
-    type=click.Path(exists=False),
-    help="Filtered bam output (failing reads only)  [default: /dev/null]",
-)
-@click.option(
-    "-m",
-    "--model",
-    help="The model to use for annotation.  If not specified, it will be autodetected from "
-    "the BAM header.  If the given value is a pre-configured model name, then that "
-    "model will be used.  Otherwise, the given value will be treated as a file name "
-    "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
-    "Longbow will assume the contents are the configuration of a LibraryModel as per "
-    "LibraryModel.to_json().",
-)
-@click.option(
-    "-f",
-    "--force",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist.",
-)
-@click.argument(
-    "input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb")
-)
+@click.command("filter")
+@cli_utils.input_pbi
+@cli_utils.output_bam("filtered bam output (passing reads only)")
+@cli_utils.reject_bam
+@cli_utils.model
+@cli_utils.force_overwrite
+@cli_utils.input_bam
 def main(pbi, output_bam, reject_bam, model, force, input_bam):
     """Filter reads by conformation to expected segment order."""
 
@@ -211,12 +171,12 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
     logger.info(f"Done. Elapsed time: %{FFORMAT}s.", time.time() - t_start)
     logger.info(f"Total Reads Processed: {num_passed + num_failed}")
 
-    count_str, pct_str = get_field_count_and_percent_string(
+    count_str, pct_str = cli_utils.get_field_count_and_percent_string(
         num_passed, total_reads, FFORMAT
     )
     logger.info(f"# Reads Passing Model Filter: {count_str} {pct_str}")
 
-    count_str, pct_str = get_field_count_and_percent_string(
+    count_str, pct_str = cli_utils.get_field_count_and_percent_string(
         num_failed, total_reads, FFORMAT
     )
     logger.info(f"# Reads Failing Model Filter: {count_str} {pct_str}")
@@ -229,11 +189,11 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
     )
     logger.info(
         f"Avg # correctly ordered key adapters per passing read: %{FFORMAT} [%d]",
-        zero_safe_div(tot_num_valid_adapters, num_passed),
+        cli_utils.zero_safe_div(tot_num_valid_adapters, num_passed),
         len(lb_model.key_adapters),
     )
     logger.info(
         f"Avg # correctly ordered key adapters per failing read: %{FFORMAT} [%d]",
-        zero_safe_div(tot_num_failed_adapters, num_passed),
+        cli_utils.zero_safe_div(tot_num_failed_adapters, num_passed),
         len(lb_model.key_adapters),
     )

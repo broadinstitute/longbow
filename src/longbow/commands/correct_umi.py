@@ -7,7 +7,6 @@ import time
 from collections import Counter, defaultdict
 
 import click
-import click_log
 import pysam
 from polyleven import levenshtein
 from tqdm import tqdm
@@ -15,15 +14,12 @@ from tqdm import tqdm
 import longbow.utils.constants
 
 from ..utils import bam_utils
+from ..utils import cli_utils
 from ..utils.bam_utils import SegmentInfo
-from ..utils.cli_utils import get_field_count_and_percent_string
 from ..utils.constants import FFORMAT
 
-PROG_NAME = "correct_umi"
 
-logging.basicConfig(stream=sys.stderr)
-logger = logging.getLogger(PROG_NAME)
-click_log.basic_config(logger)
+logger = logging.getLogger(__name__)
 
 MAS_GENE_PREFIX = "MAS"
 GENCODE_GENE_PREFIX = "ENSG"
@@ -67,8 +63,7 @@ class ReadSnapshot:
 ############################################################
 
 
-@click.command(name=logger.name)
-@click_log.simple_verbosity_option(logger)
+@click.command("correct_umi")
 @click.option(
     "--cache-read-loci",
     is_flag=True,
@@ -207,27 +202,9 @@ class ReadSnapshot:
     show_default=True,
     help="Length of the UMI for this sample.",
 )
-@click.option(
-    "-o",
-    "--output-bam",
-    default="-",
-    type=click.Path(exists=False),
-    help="Corrected UMI bam output [default: stdout].",
-)
-@click.option(
-    "-x",
-    "--reject-bam",
-    type=click.Path(exists=False),
-    help="Filtered bam output (failing reads only).",
-)
-@click.option(
-    "-f",
-    "--force",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Force overwrite of the output files if they exist.",
-)
+@cli_utils.output_bam("Corrected UMI bam output")
+@cli_utils.reject_bam
+@cli_utils.force_overwrite
 @click.option(
     "--pre-extracted",
     is_flag=True,
@@ -235,9 +212,7 @@ class ReadSnapshot:
     show_default=True,
     help="Whether the input file has been processed with `longbow extract`",
 )
-@click.argument(
-    "input-bam", default="-" if not sys.stdin.isatty() else None, type=click.File("rb")
-)
+@cli_utils.input_bam
 def main(
     umi_length,
     max_ccs_edit_dist,
@@ -417,12 +392,12 @@ def main(
     )
     logger.info(f"Total Number of reads: {total_reads}")
 
-    count_str, pct_str = get_field_count_and_percent_string(
+    count_str, pct_str = cli_utils.get_field_count_and_percent_string(
         num_corrected, total_reads, FFORMAT
     )
     logger.info(f"Number of reads with corrected UMIs: {count_str} {pct_str}")
 
-    count_str, pct_str = get_field_count_and_percent_string(
+    count_str, pct_str = cli_utils.get_field_count_and_percent_string(
         num_rejected, total_reads, FFORMAT
     )
     logger.info(f"Number of reads with uncorrectable UMIs: {count_str} {pct_str}")

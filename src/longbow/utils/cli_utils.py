@@ -51,6 +51,17 @@ def output_bam(help_message):
     return decorator
 
 
+def reject_bam(function):
+    return click.option(
+        "-x",
+        "--reject-bam",
+        default="/dev/null",
+        show_default=True,
+        type=click.Path(exists=False),
+        help="Filtered bam output (failing reads only).",
+    )
+
+
 def model(function):
     return click.option(
         "-m",
@@ -126,9 +137,9 @@ def format_obnoxious_warning_message(message):
     """Adds some obnoxious formatting to the given message."""
     header = r"""
 #############################################
-__        ___    ____  _   _ ___ _   _  ____ 
+__        ___    ____  _   _ ___ _   _  ____
 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|
- \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _ 
+ \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _
   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |
    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|
 

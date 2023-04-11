@@ -15,12 +15,11 @@ import longbow.utils.constants
 
 from ..utils import bam_utils, cli_utils
 from ..utils.bam_utils import SegmentInfo, get_segments
-from ..utils.cli_utils import zero_safe_div
 
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.command("segment")
 @cli_utils.output_bam("segment-annotated bam output")
 @click.option(
     "-b",
@@ -169,7 +168,9 @@ def main(
     num_reads = res["num_reads_segmented"]
     num_segmented = res["num_segments"]
 
-    logger.info(f"MAS-seq gain factor: {zero_safe_div(num_segmented, num_reads):.02f}x")
+    logger.info(
+        f"MAS-seq gain factor: {cli_utils.zero_safe_div(num_segmented, num_reads):.02f}x"
+    )
     logger.info(f"Done. Elapsed time: {time.time() - t_start:2.2f}s.")
 
 
