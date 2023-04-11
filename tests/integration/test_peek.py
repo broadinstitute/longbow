@@ -35,15 +35,13 @@ def test_peek_from_file(tmpdir, input_bam, model_exp):
 )
 def test_peek_from_pipe(tmpdir, input_bam, model_exp):
     actual_file = tmpdir.join(f"peek_actual_out.{model_exp}.pipe.txt")
-
-    args = ["peek", "-f", "-o", str(actual_file)]
+    args = ["-t", 4, "peek", "-f", "-o", str(actual_file)]
 
     runner = CliRunner()
     with open(input_bam, "rb") as fh:
         result = runner.invoke(longbow, args, input=fh)
 
     assert result.exit_code == 0
-
     with open(actual_file, "r") as f:
         lines = f.readlines()
         assert lines[0].rstrip() == model_exp

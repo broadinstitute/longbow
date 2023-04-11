@@ -34,7 +34,7 @@ def test_convert_from_file(tmpdir, input_bam):
                         )
                     )
 
-            actual_bam = tmpdir.join(f"convert_actual_out.bam")
+            actual_bam = tmpdir.join("convert_actual_out.bam")
             args = ["convert", "-f", "-o", actual_bam, str(input_bam)]
 
             runner = CliRunner()

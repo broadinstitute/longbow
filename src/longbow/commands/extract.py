@@ -117,7 +117,7 @@ def main(
         input_bam, "rb", check_sq=False, require_index=False
     ) as bam_file:
         # Get our model:
-        lb_model = bam_utils.load_model(model, input_bam)
+        lb_model = bam_utils.load_model(model, bam_file)
         logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
         # Validate our command line arguments:

@@ -32,9 +32,9 @@ def test_tagfix(tmpdir, input_sam, expected_sam):
     args = [
         "-t",
         "1",
-        "tagfix",
         "-v",
         "INFO",
+        "tagfix",
         "-o",
         str(actual_bam_out),
         str(input_bam),
@@ -59,7 +59,7 @@ def test_tagfix_from_pipe(tmpdir, input_sam, expected_sam):
 
     actual_bam_out = tmpdir.join(f"{TOOL_NAME}_actual_out.bam")
 
-    args = ["-t", "1", "tagfix", "-v", "INFO", "-o", str(actual_bam_out)]
+    args = ["-t", "1", "-v", "INFO", "tagfix", "-o", str(actual_bam_out)]
 
     runner = CliRunner()
     with open(input_bam, "rb") as fh:

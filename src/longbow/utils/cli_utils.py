@@ -59,7 +59,7 @@ def reject_bam(function):
         show_default=True,
         type=click.Path(exists=False),
         help="Filtered bam output (failing reads only).",
-    )
+    )(function)
 
 
 def model(function):

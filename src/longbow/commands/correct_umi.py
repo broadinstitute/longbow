@@ -15,7 +15,6 @@ import longbow.utils.constants
 
 from ..utils import bam_utils
 from ..utils import cli_utils
-from ..utils.bam_utils import SegmentInfo
 from ..utils.constants import FFORMAT
 
 
@@ -420,7 +419,9 @@ def get_read_seq(read, pre_extracted):
     if pre_extracted:
         return read.query_sequence.upper()
     else:
-        seg = SegmentInfo.from_tag(read.get_tag(longbow.utils.constants.SEGMENTS_TAG))
+        seg = bam_utils.SegmentInfo.from_tag(
+            read.get_tag(longbow.utils.constants.SEGMENTS_TAG)
+        )
         return read.query_sequence.upper()[seg.start : seg.end + 1]
 
 

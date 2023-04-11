@@ -217,7 +217,7 @@ def assert_text_files_equal(
                     has_lines_remaining = len(expected_lines) != i
                     if has_lines_remaining:
                         print(
-                            f"ERROR: number of lines is different in actual and expected files.",
+                            "ERROR: number of lines is different in actual and expected files.",
                             file=sys.stderr,
                         )
                     assert not has_lines_remaining

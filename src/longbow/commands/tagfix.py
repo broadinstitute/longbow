@@ -51,17 +51,11 @@ def main(ctx, output_bam, force, input_bam):
     pysam.set_verbosity(0)  # silence message about the .bai file not being found
     with pysam.AlignmentFile(
         input_bam, "rb", check_sq=False, require_index=False
-    ) as bam_file, tqdm.tqdm(
-        desc="Progress",
-        unit=" read",
-        colour="green",
-        file=sys.stderr,
-        total=num_reads,
-        leave=False,
-        disable=not sys.stdin.isatty(),
-    ) as pbar:
+    ) as bam_file:
         # Start worker sub-processes:
         res = manager.dict({"num_tags_corrected": 0, "num_reads": 0})
+
+        bam_file_header = bam_file.header.to_dict()
 
         worker_process_pool = []
         for _ in range(threads):
@@ -70,7 +64,7 @@ def main(ctx, output_bam, force, input_bam):
                 args=(
                     process_input_data_queue,
                     results,
-                    bam_file.header.to_dict(),
+                    bam_file_header,
                     res,
                 ),
             )
@@ -95,7 +89,8 @@ def main(ctx, output_bam, force, input_bam):
                 results,
                 out_header,
                 output_bam,
-                pbar,
+                num_reads,
+                not sys.stdin.isatty(),
             ),
         )
         output_worker.start()
@@ -137,13 +132,21 @@ def main(ctx, output_bam, force, input_bam):
         )
 
 
-def _output_writer_fn(out_queue, out_bam_header, out_bam_file_name, pbar):
+def _output_writer_fn(out_queue, out_bam_header, out_bam_file_name, num_reads, disable):
     """Thread / process fn to write out all our data."""
     out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
 
     with pysam.AlignmentFile(
         out_bam_file_name, "wb", header=out_bam_header
-    ) as out_bam_file:
+    ) as out_bam_file, tqdm.tqdm(
+        desc="Progress",
+        unit=" read",
+        colour="green",
+        file=sys.stderr,
+        total=num_reads,
+        leave=False,
+        disable=disable,
+    ) as pbar:
         while True:
             # Wait for some output data:
             raw_data = out_queue.get()
