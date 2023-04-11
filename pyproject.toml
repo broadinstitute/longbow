@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "maslongbow"
 description = "Annotation and segmentation of MAS-seq data"
 readme = "README.rst"
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.11"
 license = { file = "LICENSE" }
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -16,7 +16,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 dynamic = ["dependencies", "optional-dependencies", "version"]

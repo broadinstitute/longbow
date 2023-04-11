@@ -7,13 +7,42 @@ on:
     - main
 
 jobs:
+  # run black and ruff code style
+  code-style:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.9
+        id: setup
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+          architecture: 'x64'
+      - name: Cache dependencies
+        id: cache-deps
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.pythonLocation }}
+          key: code-style-v1-${{ runner.os }}-${{ steps.setup.outputs.python-version }}-${{ hashFiles('**/pyproject.toml', 'requirements.txt', 'dev-requirements.txt', '.github/workflows/ci_push.yml') }}
+      - name: Install and upgrade pip
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          pip install --upgrade pip
+          pip install -r dev-requirements.txt
+      - name: Verify code style and lint
+        run: |
+          ruff check src
+          black src
+
   # Run test suite
   test_suite:
     runs-on: ubuntu-20.04
 
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10"]
 
     steps:
     - name: Work around permissions issue
@@ -25,39 +54,47 @@ jobs:
         python-version: ${{ matrix.python-version }}
         architecture: 'x64'
 
+    - name: Cache dependencies
+      id: cache-deps
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.pythonLocation }}
+        key: tests-v1-${{ runner.os }}-${{ steps.setup.outputs.python-version }}-${{ hashFiles('**/pyproject.toml', 'requirements.txt', 'dev-requirements.txt', '.github/workflows/ci_push.yml') }}
+
+    - name: Install and upgrade pip
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      run: |
+        pip install --upgrade pip
+        pip install -r test-requirements.txt -r dev-requirements.txt
+        pip install -e .
+
     - name: pytest
       run: |-
         wget -O /usr/local/bin/starcode https://github.com/gui11aume/starcode/releases/download/1.4/starcode-1.4
         chmod 755 /usr/local/bin/starcode
         echo "/usr/local/bin" >> $GITHUB_PATH
         starcode --help
-        python3 -mvenv venv
-        . venv/bin/activate
-        pip install --upgrade pip
-        pip3 install -r test-requirements.txt
-        pip3 install -r dev-requirements.txt
-        pip install -e .
         pytest
 
-  # Build Docker image
-  build_docker:
-    runs-on: ubuntu-latest
+  # # Build Docker image
+  # build_docker:
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Work around permissions issue
-      run: git config --global --add safe.directory /__w/longbow/longbow
-    - uses: 'actions/checkout@v3'
+  #   steps:
+  #   - name: Work around permissions issue
+  #     run: git config --global --add safe.directory /__w/longbow/longbow
+  #   - uses: 'actions/checkout@v3'
 
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v0'
-      with:
-        credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
+  #   - id: 'auth'
+  #     name: 'Authenticate to Google Cloud'
+  #     uses: 'google-github-actions/auth@v0'
+  #     with:
+  #       credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
 
-    - name: Image
-      run: |-
-        TAG=$(git rev-parse --abbrev-ref HEAD)
-        cd docker
-        docker build --build-arg branch=$TAG -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
-        gcloud auth configure-docker -q
-        docker push -q us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG
+  #   - name: Image
+  #     run: |-
+  #       TAG=$(git rev-parse --abbrev-ref HEAD)
+  #       cd docker
+  #       docker build --build-arg branch=$TAG -t us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG .
+  #       gcloud auth configure-docker -q
+  #       docker push -q us.gcr.io/broad-dsp-lrma/lr-longbow:$TAG

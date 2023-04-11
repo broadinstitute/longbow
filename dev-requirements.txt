@@ -3,6 +3,7 @@ wheel
 bumpversion
 twine
 black
+pre-commit
 ruff
 sphinx
 sphinx-rtd-theme
