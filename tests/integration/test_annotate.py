@@ -29,11 +29,11 @@ TEST_PARAMS = [
 def test_annotate(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"{TOOL_NAME}_actual_out.{model_name}.bam")
     args = [
-        "annotate",
         "-t",
         1,
         "-v",
         "INFO",
+        "annotate",
         "-m",
         model_name,
         str(input_bam),
@@ -54,11 +54,11 @@ def test_annotate(tmpdir, input_bam, expected_bam, model_name):
 def test_annotate_from_pipe(tmpdir, input_bam, expected_bam, model_name):
     actual_bam = tmpdir.join(f"annotate_actual_out.{model_name}.pipe.bam")
     args = [
-        "annotate",
         "-t",
         1,
         "-v",
         "INFO",
+        "annotate",
         "-m",
         model_name,
         "-f",

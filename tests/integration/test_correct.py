@@ -44,9 +44,9 @@ def test_correct(tmpdir, input_data_files):
         f"{TOOL_NAME}_actual_bc_uncorrected_out.mas15.bam"
     )
     args = [
-        "correct",
         "-t",
         1,
+        "correct",
         "-m",
         "mas_15+sc_10x5p",
         "-a",
@@ -82,9 +82,9 @@ def test_correct_from_pipe(tmpdir, input_data_files):
     )
 
     args = [
-        "correct",
         "-t",
         1,
+        "correct",
         "-m",
         "mas_15+sc_10x5p",
         "-a",

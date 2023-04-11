@@ -16,15 +16,15 @@ TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 )
 def test_peek_from_file(tmpdir, input_bam, model_exp):
     actual_file = tmpdir.join(f"peek_actual_out.{model_exp}.txt")
-    args = ["peek", "-t", 4, str(input_bam), "-f", "-o", actual_file]
+    args = ["-t", 4, "peek", str(input_bam), "-f", "-o", actual_file]
 
     runner = CliRunner()
     result = runner.invoke(longbow, args)
 
     assert result.exit_code == 0
     with open(actual_file, "r") as f:
-        l = f.readlines()
-        assert l[0].rstrip() == model_exp
+        lines = f.readlines()
+        assert lines[0].rstrip() == model_exp
 
 
 @pytest.mark.parametrize(
@@ -45,5 +45,5 @@ def test_peek_from_pipe(tmpdir, input_bam, model_exp):
     assert result.exit_code == 0
 
     with open(actual_file, "r") as f:
-        l = f.readlines()
-        assert l[0].rstrip() == model_exp
+        lines = f.readlines()
+        assert lines[0].rstrip() == model_exp

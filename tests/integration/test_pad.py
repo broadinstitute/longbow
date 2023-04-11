@@ -25,9 +25,9 @@ TEST_PARAMS = [
 def test_pad_from_file(tmpdir, input_bam, expected_bam):
     actual_bam = tmpdir.join("pad_actual_out.bam")
     args = [
-        "pad",
         "-t",
         "1",
+        "pad",
         "--barcode-tag",
         "ZU",
         "-n",
@@ -51,9 +51,9 @@ def test_pad_from_file(tmpdir, input_bam, expected_bam):
 def test_pad_from_pipe(tmpdir, input_bam, expected_bam):
     actual_bam = tmpdir.join("pad_actual_out.pipe.bam")
     args = [
-        "pad",
         "-t",
         "1",
+        "pad",
         "--barcode-tag",
         "ZU",
         "-n",

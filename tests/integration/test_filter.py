@@ -23,7 +23,7 @@ TEST_PARAMS = [
 
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
 def test_filter_from_file(tmpdir, input_bam, expected_bam):
-    actual_bam = tmpdir.join(f"filter_actual_out.bam")
+    actual_bam = tmpdir.join("filter_actual_out.bam")
     args = ["filter", "-f", "-o", str(actual_bam), str(input_bam)]
 
     runner = CliRunner()
@@ -35,7 +35,7 @@ def test_filter_from_file(tmpdir, input_bam, expected_bam):
 
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
 def test_filter_from_pipe(tmpdir, input_bam, expected_bam):
-    actual_bam = tmpdir.join(f"filter_actual_out.pipe.bam")
+    actual_bam = tmpdir.join("filter_actual_out.pipe.bam")
 
     args = ["filter", "-f", "-o", str(actual_bam)]
 

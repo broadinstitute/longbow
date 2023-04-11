@@ -23,8 +23,8 @@ TEST_PARAMS = [
 
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
 def test_segment_from_file(tmpdir, input_bam, expected_bam):
-    actual_bam = tmpdir.join(f"segment_actual_out.bam")
-    args = ["segment", "-t", "1", "-f", "-o", actual_bam, str(input_bam)]
+    actual_bam = tmpdir.join("segment_actual_out.bam")
+    args = ["-t", "1", "segment", "-f", "-o", actual_bam, str(input_bam)]
 
     runner = CliRunner()
     result = runner.invoke(longbow, args)
@@ -35,8 +35,8 @@ def test_segment_from_file(tmpdir, input_bam, expected_bam):
 
 @pytest.mark.parametrize("input_bam, expected_bam", TEST_PARAMS)
 def test_segment_from_pipe(tmpdir, input_bam, expected_bam):
-    actual_bam = tmpdir.join(f"segment_actual_out.pipe.bam")
-    args = ["segment", "-t", "1", "-f", "-o", str(actual_bam)]
+    actual_bam = tmpdir.join("segment_actual_out.pipe.bam")
+    args = ["-t", "1", "segment", "-f", "-o", str(actual_bam)]
 
     runner = CliRunner()
     with open(input_bam, "rb") as fh:
