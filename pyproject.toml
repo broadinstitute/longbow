@@ -33,6 +33,7 @@ version = { attr = "longbow.meta.VERSION" }
 
 [tool.ruff]
 src = ["src"]
+select = ["E", "F", "I", "A"]
 ignore = ["E501"]
 
 [tool.ruff.per-file-ignores]

@@ -9,8 +9,7 @@ import tqdm
 
 import longbow.utils.constants
 
-from ..utils import bam_utils
-from ..utils import cli_utils
+from ..utils import bam_utils, cli_utils
 from ..utils.bam_utils import SegmentInfo
 from ..utils.constants import FFORMAT
 

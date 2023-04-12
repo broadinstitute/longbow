@@ -114,10 +114,10 @@ class MutuallyExclusiveOption(click.Option):
 
     def __init__(self, *args, **kwargs):
         self.mutually_exclusive = set(kwargs.pop("mutually_exclusive", []))
-        help = kwargs.get("help", "")
+        help_msg = kwargs.get("help", "")
         if self.mutually_exclusive:
             ex_str = ", ".join(self.mutually_exclusive)
-            kwargs["help"] = help + (
+            kwargs["help"] = help_msg + (
                 " NOTE: This argument is mutually exclusive with "
                 " arguments: [" + ex_str + "]."
             )
