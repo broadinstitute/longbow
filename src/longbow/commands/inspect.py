@@ -9,11 +9,12 @@ from collections import OrderedDict
 from functools import reduce
 
 import click
-import matplotlib.pyplot as plt
 import numpy as np
 import pysam
 import ssw
 from matplotlib import transforms
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 from polyleven import levenshtein
 
 import longbow.utils.constants
@@ -705,11 +706,9 @@ def draw_extended_state_sequence(
         classification_track,
     ) = _make_aligned_state_sequence(seq, path, library_model)
 
-    f = plt.figure(figsize=(24, 24))
-
-    ax = plt.gca()
+    f = Figure(figsize=(24, 24))
+    ax = f.add_axes([0.1, 0.1, 0.8, 0.8])
     t = ax.transData
-    canvas = ax.figure.canvas
 
     collapsed_annotations = bam_utils.collapse_annotations(path)
     _set_figure_title(f, library_model, logp, collapsed_annotations, read)
@@ -720,8 +719,8 @@ def draw_extended_state_sequence(
     columns = line_length
     rows = 4 * 80
 
-    plt.xlim([0, columns])
-    plt.ylim([0, rows])
+    ax.set_xlim([0, columns])
+    ax.set_ylim([0, rows])
 
     row = 0
     column = 0
@@ -736,7 +735,7 @@ def draw_extended_state_sequence(
         color = color_map[c]
 
         if column == 0:
-            pos1 = ax.text(
+            ax.text(
                 column - 1,
                 rows - row,
                 total_bases_seen,
@@ -745,10 +744,9 @@ def draw_extended_state_sequence(
                 va="bottom",
                 ha="right",
             )
-            pos1.draw(canvas.get_renderer())
 
         if i == len(observed_track) - 1:
-            pos2 = ax.text(
+            ax.text(
                 column + 2,
                 rows - row,
                 len(read.query_sequence),
@@ -757,9 +755,8 @@ def draw_extended_state_sequence(
                 va="bottom",
                 ha="left",
             )
-            pos2.draw(canvas.get_renderer())
 
-        observed_base = ax.text(
+        ax.text(
             column,
             rows - row,
             o,
@@ -768,19 +765,17 @@ def draw_extended_state_sequence(
             bbox=dict(facecolor=f"{color}22", edgecolor=f"{color}22", pad=0),
             **kwargs,
         )
-        observed_base.draw(canvas.get_renderer())
 
-        mismatch_indicator = ax.text(
+        ax.text(
             column,
             rows - row - 4,
             m,
             transform=t,
             **kwargs,
         )
-        mismatch_indicator.draw(canvas.get_renderer())
 
         if e != " ":
-            expected_base = ax.text(
+            ax.text(
                 column,
                 rows - row - 8,
                 e,
@@ -789,12 +784,11 @@ def draw_extended_state_sequence(
                 bbox=dict(facecolor=f"{color}22", edgecolor=f"{color}22", pad=0),
                 **kwargs,
             )
-            expected_base.draw(canvas.get_renderer())
 
         if c != last_label:
             last_label = c
 
-            label = ax.text(
+            ax.text(
                 column,
                 rows - row + 4,
                 c,
@@ -804,7 +798,6 @@ def draw_extended_state_sequence(
                 fontsize=8,
                 bbox=dict(facecolor="white", edgecolor="black"),
             )
-            label.draw(canvas.get_renderer())
 
         total_bases_seen += 1
         column += 1
@@ -812,9 +805,7 @@ def draw_extended_state_sequence(
             column = 0
             row += 15
 
-    plt.savefig(out, bbox_inches="tight")
-
-    plt.close()
+    FigureCanvasAgg(f).print_figure(out, bbox_inches="tight")
 
 
 def _expand_cigar_sequence(cigar_path):
@@ -857,11 +848,10 @@ def draw_simplified_state_sequence(
     # Collapse the path here so we can later annotate our reads with the correct scores:
     segments = bam_utils.collapse_annotations(path) if show_seg_score else None
 
-    f = plt.figure(figsize=(24, 24))
+    f = Figure(figsize=(24, 24))
 
-    ax = plt.gca()
+    ax = f.add_axes([0.1, 0.1, 0.8, 0.8])
     t = ax.transData
-    canvas = ax.figure.canvas
 
     collapsed_annotations = bam_utils.collapse_annotations(path)
     _set_figure_title(f, library_model, logp, collapsed_annotations, read)
@@ -872,8 +862,8 @@ def draw_simplified_state_sequence(
     columns = line_length
     rows = 4 * 80
 
-    plt.xlim([0, columns])
-    plt.ylim([0, rows])
+    ax.set_xlim([0, columns])
+    ax.set_ylim([0, rows])
 
     row = 0
     column = 0
@@ -897,7 +887,6 @@ def draw_simplified_state_sequence(
             bbox=dict(facecolor=f"{color}22", edgecolor=f"{color}22", pad=0),
             **kwargs,
         )
-        text.draw(canvas.get_renderer())
         ex = text.get_window_extent()
 
         # I truly have no idea why I need the scaling factor, but if I don't have this, PDF images
@@ -1017,7 +1006,6 @@ def draw_simplified_state_sequence(
             column = 0
 
             text = ax.text(column, row, "")
-            text.draw(canvas.get_renderer())
             t = transforms.offset_copy(
                 text.get_transform(), x=0, y=-30 * row, units="dots"
             )
@@ -1025,9 +1013,7 @@ def draw_simplified_state_sequence(
         # Store our label so we don't write it twice:
         last_label = lbl
 
-    plt.savefig(out, bbox_inches="tight")
-
-    plt.close()
+    FigureCanvasAgg(f).print_figure(out, bbox_inches="tight")
 
 
 def _set_figure_title(f, library_model, logp, collapsed_annotations, read):
