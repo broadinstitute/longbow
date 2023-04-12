@@ -11,16 +11,13 @@ import longbow
 import longbow.commands
 
 from .meta import VERSION
+from .utils.cli_utils import create_logger
 
-logger = logging.getLogger("version")
-click_log.basic_config(logger)
-logger.handlers[0].formatter = logging.Formatter(
-    "[%(levelname)s %(asctime)s %(name)8s] %(message)s", "%Y-%m-%d %H:%M:%S"
-)
+logger = logging.getLogger("longbow")
 
 
 @click.group(name="longbow")
-@click_log.simple_verbosity_option(logger)
+@click_log.simple_verbosity_option(logger, default="WARNING")
 @click.option(
     "-t",
     "--threads",
@@ -31,7 +28,8 @@ logger.handlers[0].formatter = logging.Formatter(
 )
 @click.pass_context
 def main_entry(ctx, threads):
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv))
+    create_logger()
+    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
     threads = mp.cpu_count() if threads <= 0 or threads > mp.cpu_count() else threads
     logger.info(f"Running with {threads} worker subprocess(es)")
