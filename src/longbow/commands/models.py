@@ -11,8 +11,10 @@ from ..utils.model_utils import ModelBuilder
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "models"
 
-@click.command("models")
+
+@click.command(PROG_NAME)
 @click.option(
     "-l",
     "--list-models",

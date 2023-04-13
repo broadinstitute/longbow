@@ -14,12 +14,12 @@ import longbow.utils.constants
 
 from ..utils import bam_utils, cli_utils
 
-PROG_NAME = "tagfix"
-
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "tagfix"
 
-@click.command("tagfix")
+
+@click.command(PROG_NAME)
 @cli_utils.output_bam("annotated bam output")
 @cli_utils.force_overwrite
 @cli_utils.input_bam
@@ -79,7 +79,7 @@ def main(ctx, output_bam, force, input_bam):
             sys.exit(1)
 
         out_header = bam_utils.create_bam_header_with_program_group(
-            logger.name, bam_file.header
+            PROG_NAME, bam_file.header
         )
 
         # Start output worker:

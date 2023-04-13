@@ -19,8 +19,10 @@ from ..utils.bam_utils import collapse_annotations
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "annotate"
 
-@click.command("annotate")
+
+@click.command(PROG_NAME)
 @cli_utils.input_pbi
 @cli_utils.output_bam("annotated bam output")
 @cli_utils.model
@@ -161,7 +163,7 @@ def main(
 
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(
-            logger.name, bam_file.header, model=lb_model
+            PROG_NAME, bam_file.header, model=lb_model
         )
 
         # Start output worker:

@@ -19,6 +19,8 @@ from ..utils.cli_utils import get_field_count_and_percent_string
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "correct"
+
 
 class BarcodeResolutionFailure(enum.Enum):
     NO_RAW_BARCODE = enum.auto()
@@ -26,7 +28,7 @@ class BarcodeResolutionFailure(enum.Enum):
     NO_MATCH_IN_LEV_DIST = enum.auto()
 
 
-@click.command("correct")
+@click.command(PROG_NAME)
 @cli_utils.input_pbi
 @cli_utils.output_bam("annotated bam output")
 @cli_utils.model
@@ -225,7 +227,7 @@ def main(
 
         # Get header for output file:
         out_header = bam_utils.create_bam_header_with_program_group(
-            logger.name, bam_file.header, model=lb_model
+            PROG_NAME, bam_file.header, model=lb_model
         )
 
         # Start output worker:

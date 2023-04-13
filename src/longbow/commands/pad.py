@@ -16,8 +16,10 @@ from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "pad"
 
-@click.command("pad")
+
+@click.command(PROG_NAME)
 @cli_utils.output_bam("annotated bam output")
 @cli_utils.model
 @cli_utils.force_overwrite
@@ -100,7 +102,7 @@ def main(
             sys.exit(1)
 
         out_header = bam_utils.create_bam_header_with_program_group(
-            logger.name, bam_file.header, model=lb_model
+            PROG_NAME, bam_file.header, model=lb_model
         )
 
         # Start output worker:

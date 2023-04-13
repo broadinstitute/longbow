@@ -18,8 +18,10 @@ from ..utils.bam_utils import SegmentInfo, get_segments
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "segment"
 
-@click.command("segment")
+
+@click.command(PROG_NAME)
 @cli_utils.output_bam("segment-annotated bam output")
 @click.option(
     "-b",
@@ -124,7 +126,7 @@ def main(
                 ignore_cbc_and_umi = True
 
         out_header = bam_utils.create_bam_header_with_program_group(
-            logger.name, bam_file.header, model=lb_model
+            PROG_NAME, bam_file.header, model=lb_model
         )
 
         # Start output worker:

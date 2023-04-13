@@ -10,8 +10,10 @@ from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "convert"
 
-@click.command("convert")
+
+@click.command(PROG_NAME)
 @cli_utils.output_bam("bam output")
 @click.option(
     "-q",
@@ -67,7 +69,7 @@ def main(
     # Create header for the output bam file:
     h = pysam.AlignmentHeader.from_dict(
         bam_utils.create_bam_header_with_program_group(
-            logger.name,
+            PROG_NAME,
             pysam.AlignmentHeader().from_dict(
                 {
                     "HD": {"VN": f"{VERSION}"},

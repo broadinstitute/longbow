@@ -20,8 +20,10 @@ from ..utils.model_utils import ModelBuilder
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "peek"
 
-@click.command("peek")
+
+@click.command(PROG_NAME)
 @cli_utils.input_pbi
 @click.option(
     "-o",

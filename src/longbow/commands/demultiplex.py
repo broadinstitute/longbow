@@ -13,8 +13,10 @@ from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "demultiplex"
 
-@click.command("demultiplex")
+
+@click.command(PROG_NAME)
 @cli_utils.input_pbi
 @click.option(
     "-o",
@@ -78,7 +80,7 @@ def main(ctx, pbi, out_base_name, demux_on_tag, input_bam):
     ) as bam_file:
         # Get our header from the input bam file:
         out_header = bam_utils.create_bam_header_with_program_group(
-            logger.name, bam_file.header
+            PROG_NAME, bam_file.header
         )
 
         # Start output worker:

@@ -18,8 +18,10 @@ from .segment import (
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "extract"
 
-@click.command("extract")
+
+@click.command(PROG_NAME)
 @cli_utils.input_pbi
 @cli_utils.output_bam("extracted bam output.")
 @cli_utils.force_overwrite
@@ -174,7 +176,7 @@ def main(
 
         # Get our header from the input bam file:
         out_header = pysam.AlignmentHeader.from_dict(
-            bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
+            bam_utils.create_bam_header_with_program_group(PROG_NAME, bam_file.header)
         )
 
         # Setup output files:

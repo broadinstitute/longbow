@@ -12,8 +12,10 @@ from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "train"
 
-@click.command("train")
+
+@click.command(PROG_NAME)
 @click.option(
     "-n",
     "--num-training-samples",

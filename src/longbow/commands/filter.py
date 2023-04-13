@@ -15,8 +15,10 @@ from ..utils.constants import FFORMAT
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "filter"
 
-@click.command("filter")
+
+@click.command(PROG_NAME)
 @cli_utils.input_pbi
 @cli_utils.output_bam("filtered bam output (passing reads only)")
 @cli_utils.reject_bam
@@ -67,7 +69,7 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
 
         # Get our header from the input bam file:
         out_header = pysam.AlignmentHeader.from_dict(
-            bam_utils.create_bam_header_with_program_group(logger.name, bam_file.header)
+            bam_utils.create_bam_header_with_program_group(PROG_NAME, bam_file.header)
         )
 
         # Setup output files:

@@ -5,7 +5,7 @@ import os
 import re
 import sys
 import time
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from functools import reduce
 
 import click
@@ -23,11 +23,12 @@ from ..utils import bam_utils, cli_utils
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "inspect"
 
 DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
 
 
-@click.command("inspect")
+@click.command(PROG_NAME)
 @click.option(
     "-r",
     "--read-names",
@@ -346,6 +347,7 @@ def annotate_read(read, m, max_length, min_rq):
     flogp = -math.inf
 
     if read.has_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG):
+        logger.info("loading annotation")
         # Set our ppath from the bam file:
         fppath = re.split(
             longbow.utils.constants.SEGMENT_TAG_DELIMITER,
@@ -355,6 +357,7 @@ def annotate_read(read, m, max_length, min_rq):
         # Set our logp from the bam file:
         flogp = read.get_tag(longbow.utils.constants.READ_MODEL_SCORE_TAG)
     else:
+        logger.info("annotating read")
         # Check for max length and min quality:
         if len(read.query_sequence) > max_length:
             logger.warning(
@@ -1081,20 +1084,16 @@ def _get_segment_bases(seq, position, segments):
 
 
 def _load_annotations(annotated_bam):
-    anns = {}
-    name_map = {}
+    anns = defaultdict(dict)
+    name_map = defaultdict(set)
 
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(
         annotated_bam, "rb", check_sq=False, require_index=False
     ) as annotated_bam_file:
         for r in annotated_bam_file:
-            anns[r.query_name] = {}
             for k, v in r.get_tags():
                 anns[r.query_name][k] = v
-
-            if r.get_tag("im") not in name_map:
-                name_map[r.get_tag("im")] = set()
 
             name_map[r.get_tag("im")].add(r.query_name)
 

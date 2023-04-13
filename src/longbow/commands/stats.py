@@ -22,8 +22,10 @@ plot_title_path_regex = re.compile(r".*/([^/].*?)/*$")
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "stats"
 
-@click.command("stats")
+
+@click.command(PROG_NAME)
 @click.option(
     "-o",
     "--output-prefix",

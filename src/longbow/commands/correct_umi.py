@@ -18,6 +18,8 @@ from ..utils.constants import FFORMAT
 
 logger = logging.getLogger(__name__)
 
+PROG_NAME = "correct_umi"
+
 MAS_GENE_PREFIX = "MAS"
 GENCODE_GENE_PREFIX = "ENSG"
 
@@ -60,7 +62,7 @@ class ReadSnapshot:
 ############################################################
 
 
-@click.command("correct_umi")
+@click.command(PROG_NAME)
 @click.option(
     "--cache-read-loci",
     is_flag=True,
@@ -337,50 +339,52 @@ def main(
     num_rejected = 0
     total_reads = 0
 
-    with pysam.AlignmentFile(
-        input_bam, "rb", check_sq=False, require_index=False
-    ) as input_bam_file:
-        with pysam.AlignmentFile(
+    with (
+        pysam.AlignmentFile(
+            input_bam, "rb", check_sq=False, require_index=False
+        ) as input_bam_file,
+        pysam.AlignmentFile(
             output_bam, "wb", template=input_bam_file
-        ) as correct_umi_bam:
-            with pysam.AlignmentFile(
-                reject_bam, "wb", template=input_bam_file
-            ) as rejected_out_umi_bam:
-                # Output BAM with corrected UMIs
-                for read in tqdm(
-                    input_bam_file,
-                    desc="Writing out UMI-corrected reads",
-                    unit=" read",
-                    colour="green",
-                    position=2,
-                    file=sys.stderr,
-                    total=num_reads,
-                    leave=False,
-                    disable=not sys.stdin.isatty(),
-                ):
-                    if read.qname in read2umi:
-                        read.set_tag(final_umi_tag, read2umi[read.qname])
-                        read.set_tag(umi_corrected_tag, 1)
-                    else:
-                        read.set_tag(final_umi_tag, read.get_tag(umi_tag))
-                        read.set_tag(umi_corrected_tag, 0)
+        ) as correct_umi_bam,
+        pysam.AlignmentFile(
+            reject_bam, "wb", template=input_bam_file
+        ) as rejected_out_umi_bam,
+    ):
+        # Output BAM with corrected UMIs
+        for read in tqdm(
+            input_bam_file,
+            desc="Writing out UMI-corrected reads",
+            unit=" read",
+            colour="green",
+            position=2,
+            file=sys.stderr,
+            total=num_reads,
+            leave=False,
+            disable=not sys.stdin.isatty(),
+        ):
+            if read.qname in read2umi:
+                read.set_tag(final_umi_tag, read2umi[read.qname])
+                read.set_tag(umi_corrected_tag, 1)
+            else:
+                read.set_tag(final_umi_tag, read.get_tag(umi_tag))
+                read.set_tag(umi_corrected_tag, 0)
 
-                    if read_passes_filters(
-                        read,
-                        umi_length,
-                        min_back_seg_score,
-                        max_final_ccs_umi_length_delta,
-                        max_final_clr_umi_length_delta,
-                        final_umi_tag,
-                        back_alignment_score_tag,
-                    ):
-                        correct_umi_bam.write(read)
-                        num_corrected += 1
-                    else:
-                        rejected_out_umi_bam.write(read)
-                        num_rejected += 1
+            if read_passes_filters(
+                read,
+                umi_length,
+                min_back_seg_score,
+                max_final_ccs_umi_length_delta,
+                max_final_clr_umi_length_delta,
+                final_umi_tag,
+                back_alignment_score_tag,
+            ):
+                correct_umi_bam.write(read)
+                num_corrected += 1
+            else:
+                rejected_out_umi_bam.write(read)
+                num_rejected += 1
 
-                    total_reads += 1
+            total_reads += 1
 
     t_end = time.time()
     logger.info(
