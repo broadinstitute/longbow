@@ -347,7 +347,7 @@ def annotate_read(read, m, max_length, min_rq):
     flogp = -math.inf
 
     if read.has_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG):
-        logger.info("loading annotation")
+        logger.debug("Loading annotation from BAM")
         # Set our ppath from the bam file:
         fppath = re.split(
             longbow.utils.constants.SEGMENT_TAG_DELIMITER,
@@ -357,7 +357,7 @@ def annotate_read(read, m, max_length, min_rq):
         # Set our logp from the bam file:
         flogp = read.get_tag(longbow.utils.constants.READ_MODEL_SCORE_TAG)
     else:
-        logger.info("annotating read")
+        logger.debug("Annotating read from scratch")
         # Check for max length and min quality:
         if len(read.query_sequence) > max_length:
             logger.warning(
