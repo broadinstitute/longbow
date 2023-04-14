@@ -286,9 +286,9 @@ def get_segment_score(read_sequence, segment, library_model, ssw_aligner=None):
         ssw_aligner = ssw.Aligner()
 
     # get our model segment so we can reference it later:
-    if type(library_model.adapter_dict[segment.name]) == str:
+    if isinstance(library_model.adapter_dict[segment.name], str):
         model_seg_sequence = library_model.adapter_dict[segment.name]
-    elif type(library_model.adapter_dict[segment.name]) == dict:
+    elif isinstance(library_model.adapter_dict[segment.name], dict):
         if (
             list(library_model.adapter_dict[segment.name].keys())[0]
             == HPR_SEGMENT_TYPE_NAME

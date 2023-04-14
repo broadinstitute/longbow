@@ -539,7 +539,7 @@ def _adjust_aligned_state_sequence(seq, path, library_model, read_anns):
                 if (
                     cur_state in library_model.adapter_dict
                     and cur_state not in library_model.annotation_segments
-                    and type(library_model.adapter_dict[cur_state]) == str
+                    and isinstance(library_model.adapter_dict[cur_state], str)
                 ):
                     cur_adapter = library_model.adapter_dict[cur_state]
 
@@ -593,7 +593,7 @@ def _make_aligned_state_sequence(seq, path, library_model):
                 if (
                     cur_state in library_model.adapter_dict
                     and cur_state not in library_model.annotation_segments
-                    and type(library_model.adapter_dict[cur_state]) == str
+                    and isinstance(library_model.adapter_dict[cur_state], str)
                 ):
                     cur_adapter = library_model.adapter_dict[cur_state]
                 elif len(f) > 2:
@@ -921,7 +921,7 @@ def draw_simplified_state_sequence(
                     seg_score_string = f" [{length}]"
 
                 # Handle special random segments:
-                elif type(library_model.adapter_dict[lbl]) is dict:
+                elif isinstance(library_model.adapter_dict[lbl], dict):
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 
                     if (
@@ -941,7 +941,7 @@ def draw_simplified_state_sequence(
                 not library_model.has_named_random_segments
                 or lbl not in library_model.named_random_segments
             ):
-                if type(library_model.adapter_dict[lbl]) is dict:
+                if isinstance(library_model.adapter_dict[lbl], dict):
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 
                     if (

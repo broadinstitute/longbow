@@ -353,7 +353,7 @@ class LibraryModel:
                 else self.cdna_model["structure"][i + 1]
             )
 
-            if type(adapter_def) is str:
+            if isinstance(adapter_def, str):
                 if adapter_def == RANDOM_SEGMENT_NAME:
                     self.hmm.add_transition(
                         all_states[f"{adapter_name}-end"],
@@ -393,7 +393,7 @@ class LibraryModel:
                                 1.0,
                             )
 
-            elif type(adapter_def) is dict:
+            elif isinstance(adapter_def, dict):
                 segment_type = list(adapter_def.keys())[0]
 
                 if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
@@ -476,7 +476,7 @@ class LibraryModel:
         for adapter_name, adapter_def in self.cdna_model["adapters"].items():
             adapter_hmm = None
 
-            if type(adapter_def) is str:
+            if isinstance(adapter_def, str):
                 if adapter_name in self.named_random_segments:
                     adapter_hmm = ModelBuilder.make_named_random_model(adapter_name)
                 else:
@@ -484,7 +484,7 @@ class LibraryModel:
                         self.cdna_model["adapters"][adapter_name], adapter_name
                     )
 
-            elif type(adapter_def) is dict:
+            elif isinstance(adapter_def, dict):
                 segment_type = list(adapter_def.keys())[0]
 
                 if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
@@ -520,7 +520,7 @@ class LibraryModel:
 
             adapter_def = self.cdna_model["adapters"][adapter_name_i]
 
-            if type(adapter_def) is dict:
+            if isinstance(adapter_def, dict):
                 segment_type = list(adapter_def.keys())[0]
 
                 if segment_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
@@ -612,9 +612,9 @@ class LibraryModel:
             return None
 
         segment_length = None
-        if type(self.adapter_dict[segment_name]) == str:
+        if isinstance(self.adapter_dict[segment_name], str):
             segment_length = len(self.adapter_dict[segment_name])
-        elif type(self.adapter_dict[segment_name]) == dict:
+        elif isinstance(self.adapter_dict[segment_name], dict):
             seg_type = next(iter(self.adapter_dict[segment_name].keys()))
             if seg_type == longbow.utils.constants.HPR_SEGMENT_TYPE_NAME:
                 segment_length = next(iter(self.adapter_dict[segment_name].values()))[1]
@@ -760,7 +760,7 @@ class LibraryModel:
         model, segments_name, collection_name, model_type
     ):
         not_present = []
-        if type(model[segments_name]) is str:
+        if isinstance(model[segments_name], str):
             if model[segments_name] not in model[collection_name]:
                 not_present.append(model[segments_name])
         else:
@@ -856,21 +856,17 @@ class LibraryModel:
     def has_prebuilt_model(model_name):
         model_name_pieces = MODEL_NAME_REGEX.split(model_name)
 
-        if len(model_name_pieces) == 2:
-            array_model_name, cdna_model_name = model_name_pieces
+        if len(model_name_pieces) != 2:
+            return False
 
-            if (
-                array_model_name
-                not in ModelBuilder.pre_configured_models["array"].keys()
-            ):
-                return False
+        array_model_name, cdna_model_name = model_name_pieces
+        if array_model_name not in ModelBuilder.pre_configured_models["array"]:
+            return False
 
-            if cdna_model_name not in ModelBuilder.pre_configured_models["cdna"].keys():
-                return False
+        if cdna_model_name not in ModelBuilder.pre_configured_models["cdna"]:
+            return False
 
-            return True
-
-        return False
+        return True
 
     @staticmethod
     def build_pre_configured_model(model_name):
@@ -886,7 +882,7 @@ class LibraryModel:
 
     @staticmethod
     def _get_state_base_name(state):
-        if type(state) is str:
+        if isinstance(state, str):
             state_name = state
         else:
             state_name = state.name
