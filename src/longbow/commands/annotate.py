@@ -297,6 +297,7 @@ def _worker_segmentation_fn(
     """Function to run in each subthread / subprocess.
     Segments each read and place the segments in the output queue."""
 
+    lb_model.build()  # rebuild HMM inside subprocess
     num_reads_processed, num_reads_segmented = 0, 0
 
     while True:
