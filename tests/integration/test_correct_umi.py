@@ -1,13 +1,11 @@
-import pytest
 import pathlib
 
+import pytest
 from click.testing import CliRunner
 
 from longbow.__main__ import main_entry as longbow
 
-from ..utils import assert_reads_files_equal
-from ..utils import convert_sam_to_bam
-
+from ..utils import assert_reads_files_equal, convert_sam_to_bam
 
 TOOL_NAME = "correct_umi"
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / TOOL_NAME

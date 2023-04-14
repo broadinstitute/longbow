@@ -1,6 +1,6 @@
-import pytest
 import pathlib
 
+import pytest
 from click.testing import CliRunner
 
 from longbow.__main__ import main_entry as longbow

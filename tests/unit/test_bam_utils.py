@@ -1,15 +1,12 @@
-import pytest
+import itertools
+import json
+import pathlib
+import tempfile
 
 import pysam
-import tempfile
-import pathlib
-import json
-import itertools
+import pytest
 
-from longbow.utils import bam_utils
-from longbow.utils import model
-from longbow.utils import model_utils
-
+from longbow.utils import bam_utils, model, model_utils
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / "models"
 

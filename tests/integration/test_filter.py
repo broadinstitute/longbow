@@ -1,12 +1,11 @@
-import pytest
 import pathlib
 
+import pytest
 from click.testing import CliRunner
 
 from longbow.__main__ import main_entry as longbow
 
 from ..utils import assert_reads_files_equal
-
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 TEST_PARAMS = [

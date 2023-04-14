@@ -1,14 +1,12 @@
+import gzip
+import pathlib
+import tempfile
+
+import pysam
 import pytest
 from click.testing import CliRunner
 
-import pathlib
-import tempfile
-import gzip
-
-import pysam
-
 from longbow.__main__ import main_entry as longbow
-
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 

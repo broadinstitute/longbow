@@ -1,8 +1,8 @@
-import sys
-import pysam
 import filecmp
-
+import sys
 from pathlib import Path
+
+import pysam
 
 
 def convert_sam_to_bam(sam_path, out_bam_path):
