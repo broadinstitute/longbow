@@ -721,7 +721,7 @@ def draw_extended_state_sequence(seq, path, logp, read, out, show_seg_score, lib
 def _expand_cigar_sequence(cigar_path):
     """Expand a cigar sequence to a `ppath` list ala the model."""
     ppath = []
-    op_re = re.compile("([A-Za-z]+)(\d+)")
+    op_re = re.compile(r"([A-Za-z]+)(\d+)")
     for p in cigar_path:
         # Get our segment:
         seg = re.split(":", p)[0]

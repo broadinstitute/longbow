@@ -304,6 +304,9 @@ def _worker_attempt_segmentations_fn(in_queue, out_queue, worker_num, min_length
     """Function to run in each subthread / subprocess.
     Segments each read and place the segments in the output queue."""
 
+    for model in models.values():
+        model.build()  # rebuild HMM inside subprocess
+
     num_reads_segmented = 0
 
     while True:

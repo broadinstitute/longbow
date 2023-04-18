@@ -235,6 +235,8 @@ def _sub_process_write_fn(
 ):
     """Thread / process fn to write out all our data."""
 
+    model.build()  # rebuild HMM inside subprocess
+
     delimiters = create_simple_delimiters(model)
     logger.debug("Delimiter sequences for simple delimiters: {delimiters}")
     out_bam_header = pysam.AlignmentHeader.from_dict(out_bam_header)
