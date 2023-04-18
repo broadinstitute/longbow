@@ -102,10 +102,6 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
     if total_reads:
         logger.info(f"About to segment {total_reads} reads.")
 
-    # Get our model:
-    lb_model = bam_utils.load_model(model, input_bam)
-    logger.info(f"Using {lb_model.name}: {lb_model.description}")
-
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.
     manager = mp.Manager()
@@ -133,6 +129,9 @@ def main(threads, output_bam, create_barcode_conf_file, model, ignore_cbc_and_um
         leave=False,
         disable=not sys.stdin.isatty(),
     ) as pbar:
+        # Get our model:
+        lb_model = bam_utils.load_model(model, bam_file)
+        logger.info(f"Using {lb_model.name}: {lb_model.description}")
 
         if ignore_cbc_and_umi:
             logger.info("Ignoring CBC / UMI - all split elements will be written.")
