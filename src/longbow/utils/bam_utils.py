@@ -29,11 +29,11 @@ from construct import (
 )
 
 from ..meta import VERSION
-from ..utils.model import LibraryModel
 from .constants import (
     CONF_FACTOR_SCALE,
     HPR_SEGMENT_TYPE_NAME,
     RANDOM_SEGMENT_NAME,
+    RC_BASE_MAP,
     READ_APPROX_QUAL_TAG,
     READ_MODEL_NAME_TAG,
     READ_MODEL_SCORE_TAG,
@@ -46,6 +46,7 @@ from .constants import (
     SEGMENTS_RC_TAG,
     SEGMENTS_TAG,
 )
+from .model import LibraryModel
 
 logger = logging.getLogger(__name__)
 
@@ -414,42 +415,6 @@ def write_annotated_read(
         read.set_tag(READ_APPROX_QUAL_TAG, "0.0")
 
     out_bam_file.write(read)
-
-
-# IUPAC RC's from: http://arep.med.harvard.edu/labgc/adnan/projects/Utilities/revcomp.html
-# and https://www.dnabaser.com/articles/IUPAC%20ambiguity%20codes.html
-RC_BASE_MAP = {
-    "N": "N",
-    "A": "T",
-    "T": "A",
-    "G": "C",
-    "C": "G",
-    "Y": "R",
-    "R": "Y",
-    "S": "S",
-    "W": "W",
-    "K": "M",
-    "M": "K",
-    "B": "V",
-    "V": "B",
-    "D": "H",
-    "H": "D",
-    "n": "n",
-    "a": "t",
-    "t": "a",
-    "g": "c",
-    "c": "g",
-    "y": "r",
-    "r": "y",
-    "s": "s",
-    "w": "w",
-    "k": "m",
-    "m": "k",
-    "b": "v",
-    "v": "b",
-    "d": "h",
-    "h": "d",
-}
 
 
 def reverse_complement(base_string):

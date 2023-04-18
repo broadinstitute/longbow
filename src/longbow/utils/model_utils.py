@@ -1,7 +1,6 @@
 import importlib.resources
 import json
 import logging
-import re
 
 from pomegranate import DiscreteDistribution, HiddenMarkovModel, State
 
@@ -14,8 +13,6 @@ from .constants import (
 )
 
 logger = logging.getLogger(__name__)
-
-starts_with_number_re = re.compile(r"^\d")
 
 
 def load_models():

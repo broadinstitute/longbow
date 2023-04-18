@@ -4,15 +4,44 @@
 
 FFORMAT = "2.4f"
 
-DEFAULT_MODEL = "mas_15_sc_10x5p_single_none"
 DEFAULT_MAX_READ_LENGTH = 30000
 
-DEFAULT_DEMULTIPLEX_MODELS = (
-    "mas_10_sc_10x5p_single_none",
-    "mas_15_sc_10x5p_single_none",
-)
-
 BARCODE_CONF_FILE_NAME = "barcode_confidence_scores.txt"
+
+# IUPAC RC's from: http://arep.med.harvard.edu/labgc/adnan/projects/Utilities/revcomp.html
+# and https://www.dnabaser.com/articles/IUPAC%20ambiguity%20codes.html
+RC_BASE_MAP = {
+    "N": "N",
+    "A": "T",
+    "T": "A",
+    "G": "C",
+    "C": "G",
+    "Y": "R",
+    "R": "Y",
+    "S": "S",
+    "W": "W",
+    "K": "M",
+    "M": "K",
+    "B": "V",
+    "V": "B",
+    "D": "H",
+    "H": "D",
+    "n": "n",
+    "a": "t",
+    "t": "a",
+    "g": "c",
+    "c": "g",
+    "y": "r",
+    "r": "y",
+    "s": "s",
+    "w": "w",
+    "k": "m",
+    "m": "k",
+    "b": "v",
+    "v": "b",
+    "d": "h",
+    "h": "d",
+}
 
 ################################################################################
 # Constants for model construction:
