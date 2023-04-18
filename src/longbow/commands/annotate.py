@@ -75,6 +75,7 @@ def main(
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
     threads = ctx.obj["THREADS"]
+    logger.info(f"Running with {threads} worker subprocess(es)")
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None

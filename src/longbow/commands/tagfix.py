@@ -33,6 +33,7 @@ def main(ctx, output_bam, force, input_bam):
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
     threads = ctx.obj["THREADS"]
+    logger.info(f"Running with {threads} worker subprocess(es)")
 
     # Configure process manager:
     # NOTE: We're using processes to overcome the Global Interpreter Lock.

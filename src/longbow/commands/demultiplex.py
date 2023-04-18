@@ -47,6 +47,7 @@ def main(ctx, pbi, out_base_name, demux_on_tag, input_bam):
     t_start = time.time()
 
     threads = ctx.obj["THREADS"]
+    logger.info(f"Running with {threads} worker subprocess(es)")
 
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None

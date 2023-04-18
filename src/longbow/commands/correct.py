@@ -136,12 +136,12 @@ def main(
     )
 
     threads = ctx.obj["THREADS"]
+    logger.info(f"Running with {threads} worker subprocess(es)")
     if threads > 1:
         logger.warning(
-            "You have selected %d threads.  Each thread can use a very large amount of memory.  "
-            "In the case of the 3' barcode list, each thread will use about 30Gb of ram.  "
-            "You probably do not want to do this.",
-            threads,
+            f"You have selected {threads} threads. Each thread can use a very large "
+            "amount of memory. In the case of the 3' barcode list, each thread will "
+            "use about 30Gb of ram. You probably do not want to do this."
         )
 
     logger.info(f"Using CCS Levenshtein distance threshold: {max_hifi_dist}")

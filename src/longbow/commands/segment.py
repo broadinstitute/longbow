@@ -62,6 +62,7 @@ def main(
     bam_utils.check_for_preexisting_files(output_bam, exist_ok=force)
 
     threads = ctx.obj["THREADS"]
+    logger.info(f"Running with {threads} worker subprocess(es)")
 
     logger.info("Using simple splitting mode.")
 

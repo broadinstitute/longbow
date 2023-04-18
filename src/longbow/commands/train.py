@@ -50,6 +50,7 @@ def main(
     t_start = time.time()
 
     threads = ctx.obj["THREADS"]
+    logger.info(f"Running with {threads} worker subprocess(es)")
 
     # Get our model:
     with pysam.AlignmentFile(
