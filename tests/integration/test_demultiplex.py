@@ -7,12 +7,11 @@ from longbow.__main__ import main_entry as longbow
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data"
 TEST_PARAMS = [
-    TEST_DATA_FOLDER / "annotate" / "mas15v2_expected.bam",
-    TEST_DATA_FOLDER / "annotate" / "mas10v2_expected.bam",
+    TEST_DATA_FOLDER / "annotate" / "mas_15+sc_10x5p.expected.bam",
+    TEST_DATA_FOLDER / "annotate" / "mas_10+sc_10x5p.expected.bam",
 ]
 
 
-@pytest.mark.skip(reason="skip for now")
 @pytest.mark.parametrize("input_bam", TEST_PARAMS)
 def test_demultiplex_from_file(tmpdir, input_bam):
     args = ["demultiplex", "-d", "YN", "-o", "demux", str(input_bam)]
@@ -24,7 +23,6 @@ def test_demultiplex_from_file(tmpdir, input_bam):
     assert result.exit_code == 0
 
 
-@pytest.mark.skip(reason="skip for now")
 @pytest.mark.parametrize("input_bam", TEST_PARAMS)
 def test_demultiplex_from_pipe(tmpdir, input_bam):
     args = ["demultiplex", "-d", "YN", "-o" "demux"]
