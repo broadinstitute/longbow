@@ -243,8 +243,6 @@ def main(
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
     # Check to see if the output files exist:
     bam_utils.check_for_preexisting_files([output_bam, reject_bam], exist_ok=force)
 

@@ -1,6 +1,7 @@
 import gzip
 import logging
 import math
+import multiprocessing as mp
 import os
 import re
 import sys
@@ -95,7 +96,9 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     help="Store annotations from a downstream BAM file so they can be displayed on reads from previous processing steps.",
 )
 @cli_utils.input_bam
+@click.pass_context
 def main(
+    ctx,
     read_names,
     pbi,
     file_format,
@@ -112,7 +115,8 @@ def main(
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
+    threads = ctx.obj["THREADS"]
+    logger.info(f"Running with {threads} worker subprocess(es)")
 
     read_name_set = set()
     for read_name in read_names:
@@ -133,6 +137,11 @@ def main(
     if annotated_bam is not None:
         anns, name_map = _load_annotations(annotated_bam)
 
+    # Create queues for data:
+    queue_size = threads * 2 if threads < 10 else 20
+    manager = mp.Manager()
+    input_data_queue = manager.Queue(maxsize=queue_size)
+
     # Open our bam file:
     pysam.set_verbosity(0)
     with pysam.AlignmentFile(
@@ -149,6 +158,28 @@ def main(
                 "Seg score selected, but not using quick mode.  Ignoring --seg-score."
             )
 
+        # Start worker sub-processes:
+        worker_pool = []
+
+        for _ in range(threads):
+            p = mp.Process(
+                target=__create_read_figure,
+                args=(
+                    input_data_queue,
+                    file_format,
+                    lb_model,
+                    outdir,
+                    seg_score,
+                    max_length,
+                    min_rq,
+                    quick,
+                    anns,
+                    name_map,
+                ),
+            )
+            p.start()
+            worker_pool.append(p)
+
         # If we have read names, we should use them to inspect the file:
         if len(read_name_set) > 0:
             logger.info(f"Looking for {len(read_name_set)} read names")
@@ -161,18 +192,7 @@ def main(
                 )
                 for read in bam_file:
                     if read.query_name in read_name_set:
-                        __create_read_figure(
-                            file_format,
-                            lb_model,
-                            outdir,
-                            read,
-                            seg_score,
-                            max_length,
-                            min_rq,
-                            quick,
-                            anns,
-                            name_map,
-                        )
+                        input_data_queue.put(read.to_string())
             else:
                 file_offsets = load_read_offsets(pbi, load_read_names(read_names))
 
@@ -183,45 +203,35 @@ def main(
 
                     bam_file.seek(file_offsets[z]["offset"])
                     read = bam_file.__next__()
-                    __create_read_figure(
-                        file_format,
-                        lb_model,
-                        outdir,
-                        read,
-                        seg_score,
-                        max_length,
-                        min_rq,
-                        quick,
-                        anns,
-                        name_map,
-                    )
+                    input_data_queue.put(read.to_string())
         else:
             # Without read names we just inspect every read in the file:
             logger.info(
                 "No read names given. Inspecting every read in the input bam file."
             )
             for read in bam_file:
-                __create_read_figure(
-                    file_format,
-                    lb_model,
-                    outdir,
-                    read,
-                    seg_score,
-                    max_length,
-                    min_rq,
-                    quick,
-                    anns,
-                    name_map,
-                )
+                input_data_queue.put(read.to_string())
+
+        for _ in range(threads):
+            input_data_queue.put(None)
+
+        logger.debug("Finished reading data and sending it to sub-processes.")
+        logger.debug("Waiting for sub-processes to finish...")
+
+        # Wait for our input jobs to finish:
+        for p in worker_pool:
+            p.join()
+
+        logger.debug("All workers stopped.")
 
     logger.info(f"Done. Elapsed time: {time.time() - t_start:2.2f}s.")
 
 
 def __create_read_figure(
+    in_queue,
     file_format,
     lb_model,
     outdir,
-    read,
     seg_score,
     max_length,
     min_rq,
@@ -231,39 +241,58 @@ def __create_read_figure(
 ):
     """Create a figure for the given read."""
 
-    out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
+    lb_model.build()  # rebuild HMM inside subprocess
 
-    seq, path, logp = annotate_read(read, lb_model, max_length, min_rq)
+    while True:
+        # Wait until we get some data.
+        # Note: Because we have a sentinel value None inserted at the end of the input data for each
+        #       subprocess, we don't have to add a timeout - we're guaranteed each process will always have
+        #       at least one element.
+        raw_data = in_queue.get()
 
-    if seq is not None:
-        logger.info("Drawing read '%s' to '%s'", read.query_name, out)
+        # Check for exit sentinel:
+        if raw_data is None:
+            break
 
-        if quick:
-            draw_simplified_state_sequence(
-                seq,
-                path,
-                logp,
-                read,
-                out,
-                seg_score,
-                lb_model,
-                size=13,
-                family="monospace",
-            )
-        else:
-            draw_extended_state_sequence(
-                seq,
-                path,
-                logp,
-                read,
-                out,
-                seg_score,
-                lb_model,
-                anns,
-                name_map,
-                size=13,
-                family="monospace",
-            )
+        # Unpack our data here:
+        read = raw_data
+        read = pysam.AlignedSegment.fromstring(
+            read, pysam.AlignmentHeader.from_dict(dict())
+        )
+
+        out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
+
+        seq, path, logp = annotate_read(read, lb_model, max_length, min_rq)
+
+        if seq is not None:
+            logger.info("Drawing read '%s' to '%s'", read.query_name, out)
+
+            if quick:
+                draw_simplified_state_sequence(
+                    seq,
+                    path,
+                    logp,
+                    read,
+                    out,
+                    seg_score,
+                    lb_model,
+                    size=13,
+                    family="monospace",
+                )
+            else:
+                draw_extended_state_sequence(
+                    seq,
+                    path,
+                    logp,
+                    read,
+                    out,
+                    seg_score,
+                    lb_model,
+                    anns,
+                    name_map,
+                    size=13,
+                    family="monospace",
+                )
 
 
 def load_read_names(read_name_args):
@@ -710,13 +739,13 @@ def draw_extended_state_sequence(
     ) = _make_aligned_state_sequence(seq, path, library_model)
 
     f = Figure(figsize=(24, 24))
+    f.patch.set_facecolor("white")
     ax = f.add_axes([0.1, 0.1, 0.8, 0.8])
     t = ax.transData
 
     collapsed_annotations = bam_utils.collapse_annotations(path)
     _set_figure_title(f, library_model, logp, collapsed_annotations, read)
 
-    f.patch.set_visible(False)
     ax.axis("off")
 
     columns = line_length
@@ -852,14 +881,13 @@ def draw_simplified_state_sequence(
     segments = bam_utils.collapse_annotations(path) if show_seg_score else None
 
     f = Figure(figsize=(24, 24))
-
+    f.patch.set_facecolor("white")
     ax = f.add_axes([0.1, 0.1, 0.8, 0.8])
     t = ax.transData
 
     collapsed_annotations = bam_utils.collapse_annotations(path)
     _set_figure_title(f, library_model, logp, collapsed_annotations, read)
 
-    f.patch.set_visible(False)
     ax.axis("off")
 
     columns = line_length

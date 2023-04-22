@@ -30,8 +30,6 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
 
     t_start = time.time()
 
-    logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
-
     pbi = f"{input_bam.name}.pbi" if pbi is None else pbi
     read_count = None
     if os.path.exists(pbi):
