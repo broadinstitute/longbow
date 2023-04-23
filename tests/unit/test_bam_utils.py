@@ -1,4 +1,3 @@
-import importlib
 import json
 import pathlib
 import tempfile
@@ -9,37 +8,6 @@ import pytest
 from longbow.utils import bam_utils, model, model_utils
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / "models"
-
-
-# all combinations of the models included in src/longbow/models
-BUILTIN_MODELS = [
-    "isoseq+bulk_10x5p",
-    "isoseq+spatial_slideseq",
-    "isoseq+sc_10x5p",
-    "isoseq+sc_10x3p",
-    "isoseq+bulk_teloprimeV2",
-    "mas_15+bulk_10x5p",
-    "mas_15+spatial_slideseq",
-    "mas_15+sc_10x5p",
-    "mas_15+sc_10x3p",
-    "mas_15+bulk_teloprimeV2",
-    "mas_16+bulk_10x5p",
-    "mas_16+spatial_slideseq",
-    "mas_16+sc_10x5p",
-    "mas_16+sc_10x3p",
-    "mas_16+bulk_teloprimeV2",
-    "mas_10+bulk_10x5p",
-    "mas_10+spatial_slideseq",
-    "mas_10+sc_10x5p",
-    "mas_10+sc_10x3p",
-    "mas_10+bulk_teloprimeV2",
-]
-
-
-@pytest.fixture(scope="module")
-def preload_models():
-    with importlib.resources.files("longbow.models") as model_dir:
-        model_utils.load_models(model_dir)
 
 
 @pytest.fixture(scope="module")
@@ -78,13 +46,13 @@ def bam_header_without_program_group():
     return header
 
 
-@pytest.fixture(scope="module", params=BUILTIN_MODELS)
-def bam_header_with_program_group(request, preload_models):
+@pytest.fixture(scope="module")
+def bam_header_with_program_group(builtin_model):
     rgid = "01234567"
     movie_name = "m00001e_210000_000000"
     version = "0.0.0"
 
-    model_name = request.param
+    model_name = builtin_model.name
     model_json = model.LibraryModel.build_pre_configured_model(model_name).to_json(
         indent=None
     )
@@ -127,8 +95,8 @@ def bam_header_with_program_group(request, preload_models):
     return header
 
 
-@pytest.fixture(scope="module", params=BUILTIN_MODELS)
-def bam_header_with_multiple_program_groups(request, preload_models):
+@pytest.fixture(scope="module")
+def bam_header_with_multiple_program_groups(builtin_model):
     rgid = "01234567"
     movie_name = "m00001e_210000_000000"
     version = "0.0.0"
@@ -159,7 +127,7 @@ def bam_header_with_multiple_program_groups(request, preload_models):
         "SQ": [],
     }
 
-    for model_name in ["mas_15+sc_10x5p", request.param]:
+    for model_name in ["mas_15+sc_10x5p", builtin_model.name]:
         model_json = model.LibraryModel.build_pre_configured_model(model_name).to_json(
             indent=None
         )
@@ -244,7 +212,7 @@ def _compare_models(prebuilt_model, stored_model):
                     assert p[k] == s[k]
 
 
-def test_load_model_from_name(preload_models):
+def test_load_model_from_name():
     for array_model_name in model_utils.ModelBuilder.models["array"]:
         for cdna_model_name in model_utils.ModelBuilder.models["cdna"]:
             model_name = f"{array_model_name}+{cdna_model_name}"
@@ -280,37 +248,36 @@ def test_load_model_from_json():
     _compare_models(lb_model, stored_model)
 
 
-def test_reverse_complement():
-    d = {
-        "GTTCTAGCGCTAGTATG": "CATACTAGCGCTAGAAC",
-        "CTGCATAAAT": "ATTTATGCAG",
-        "TTTCGCGCATATAG": "CTATATGCGCGAAA",
-        "CCAA": "TTGG",
-        "TTATATTTAT": "ATAAATATAA",
-        "TANG": "CNTA",
-        "SGYACGR": "YCGTRCS",
-        "GCWATMCKVAABHGCD": "HGCDVTTBMGKATWGC",
-    }
+@pytest.mark.parametrize(
+    "input_seq, expected_seq",
+    [
+        ("GTTCTAGCGCTAGTATG", "CATACTAGCGCTAGAAC"),
+        ("CTGCATAAAT", "ATTTATGCAG"),
+        ("TTTCGCGCATATAG", "CTATATGCGCGAAA"),
+        ("CCAA", "TTGG"),
+        ("TTATATTTAT", "ATAAATATAA"),
+        ("TANG", "CNTA"),
+        ("SGYACGR", "YCGTRCS"),
+        ("GCWATMCKVAABHGCD", "HGCDVTTBMGKATWGC"),
+    ],
+)
+def test_reverse_complement(input_seq, expected_seq):
+    v_obs = bam_utils.reverse_complement(input_seq)
+    v_obs_lc = bam_utils.reverse_complement(input_seq.lower())
 
-    for k, v_exp in d.items():
-        v_obs = bam_utils.reverse_complement(k)
-        v_obs_lc = bam_utils.reverse_complement(k.lower())
-
-        assert v_obs == v_exp
-        assert v_obs_lc == v_exp.lower()
+    assert v_obs == expected_seq
+    assert v_obs_lc == expected_seq.lower()
 
 
-@pytest.mark.slow
 def test_generate_read_name_produces_no_collisions():
     movie_name = "m64020e_210000_000000"
 
     read_names = set()
-    for zmw in range(8000000):
+    # this test is trivial and always going to pass, might as well make it fast
+    for zmw in range(8_000):
         for split_read_index in range(20):
-            new_read_name = bam_utils.generate_read_name(
-                movie_name, zmw, split_read_index
+            read_names.add(
+                bam_utils.generate_read_name(movie_name, zmw, split_read_index)
             )
 
-            assert new_read_name not in read_names
-
-            read_names.add(new_read_name)
+    assert len(read_names) == 8_000 * 20

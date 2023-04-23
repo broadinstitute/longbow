@@ -57,7 +57,7 @@ class LibraryModel:
         self.adapter_dict = {**array_model["adapters"], **cdna_model["adapters"]}
 
         self.named_random_segments = set(cdna_model["named_random_segments"])
-        self.coding_region = cdna_model["coding_region"]
+        self.coding_region = cdna_model["coding_region"] or None
         self.annotation_segments = cdna_model["annotation_segments"]
 
         self.hmm = None
@@ -97,7 +97,7 @@ class LibraryModel:
     def _has_annotation(self, annotation_tag):
         if self.cdna_model["annotation_segments"]:
             # Get all annotation tags:
-            for _, tag_tuple_list in self.annotation_segments.items():
+            for tag_tuple_list in self.annotation_segments.values():
                 for tag_tuple in tag_tuple_list:
                     if annotation_tag in tag_tuple:
                         return True
@@ -112,7 +112,7 @@ class LibraryModel:
 
     @property
     def has_named_random_segments(self):
-        return self.named_random_segments is not None
+        return len(self.named_random_segments) > 0
 
     @property
     def num_array_elements(self):
