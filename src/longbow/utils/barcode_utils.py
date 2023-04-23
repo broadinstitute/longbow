@@ -35,7 +35,7 @@ def load_barcode_allowlist(filename, disable_pbar=None):
     barcodes = OrderedSet()
 
     if filename is not None:
-        if filename.endswith(".gz"):
+        if filename.name.endswith(".gz"):
             with gzip.open(filename, "rb") as f:
                 _load_barcode_allowlist_helper(f, barcodes, disable_pbar)
         else:

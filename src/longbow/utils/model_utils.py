@@ -1,6 +1,6 @@
-import importlib.resources
 import json
 import logging
+from pathlib import Path
 
 from pomegranate import DiscreteDistribution, HiddenMarkovModel, State
 
@@ -15,19 +15,22 @@ from .constants import (
 logger = logging.getLogger(__name__)
 
 
-def load_models():
-    models = {"array": {}, "cdna": {}}
+def load_models(model_dir: Path):
+    """Look for json files in the given directory and add them to a dictionary of models"""
 
-    with importlib.resources.files("longbow.models") as model_dir:
-        for json_file in model_dir.glob("*json"):
-            with json_file.open() as fh:
-                m = json.load(fh)
-                if "array" in m:
-                    models["array"][m["array"]["name"]] = m["array"]
-                if "cdna" in m:
-                    models["cdna"][m["cdna"]["name"]] = m["cdna"]
+    if "array" not in ModelBuilder.models:
+        ModelBuilder.models["array"] = dict()
 
-    return models
+    if "cdna" not in ModelBuilder.models:
+        ModelBuilder.models["cdna"] = dict()
+
+    for json_file in model_dir.glob("*json"):
+        with json_file.open() as fh:
+            m = json.load(fh)
+            if "array" in m:
+                ModelBuilder.models["array"][m["array"]["name"]] = m["array"]
+            if "cdna" in m:
+                ModelBuilder.models["cdna"][m["cdna"]["name"]] = m["cdna"]
 
 
 class ModelBuilder:
@@ -69,7 +72,7 @@ class ModelBuilder:
     SUDDEN_END_PROB = 0.01
     MATCH_END_PROB = 0.1
 
-    pre_configured_models = load_models()
+    models = {}
 
     @staticmethod
     def make_global_alignment_model(target, name=None):

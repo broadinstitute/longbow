@@ -148,9 +148,6 @@ def _write_thread_fn(out_queue, out_bam_header, out_bam_base_name, res, read_cou
                 # Check for exit sentinel:
                 if raw_data is None:
                     break
-                # Should really never be None, but just in case:
-                elif raw_data is None:
-                    continue
 
                 # Unpack data:
                 read, tag_value = raw_data
@@ -193,9 +190,6 @@ def _worker_demux_fn(in_queue, out_queue, worker_num, demux_on_tag):
         # Check for exit sentinel:
         if raw_data is None:
             break
-        # Should really never be None, but just in case:
-        elif raw_data is None:
-            continue
 
         # Unpack our data here:
         read = raw_data

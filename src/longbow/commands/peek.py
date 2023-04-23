@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 
 import click
 import numpy as np
@@ -30,7 +31,7 @@ PROG_NAME = "peek"
     "--output-model",
     default="-",
     show_default=True,
-    type=click.Path(exists=False),
+    type=click.Path(path_type=Path),
     help="model name output",
 )
 @click.option(
@@ -77,14 +78,6 @@ PROG_NAME = "peek"
     help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].",
 )
 @cli_utils.force_overwrite
-@click.option(
-    "-d",
-    "--include-deprecated-models",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Examine the deprecated built-in models as well",
-)
 @cli_utils.input_bam
 @click.pass_context
 def main(
@@ -97,7 +90,6 @@ def main(
     max_length,
     min_rq,
     force,
-    include_deprecated_models,
     input_bam,
 ):
     """Guess the best pre-built array model to use for annotation."""
@@ -112,15 +104,11 @@ def main(
 
     # Make all prebuilt models
     models = {}
-    for array_model_name in ModelBuilder.pre_configured_models["array"]:
-        for cdna_model_name in ModelBuilder.pre_configured_models["cdna"]:
+    for array_model_name in ModelBuilder.models["array"]:
+        for cdna_model_name in ModelBuilder.models["cdna"]:
             if (
-                not ModelBuilder.pre_configured_models["array"][array_model_name][
-                    "deprecated"
-                ]
-                and not ModelBuilder.pre_configured_models["cdna"][cdna_model_name][
-                    "deprecated"
-                ]
+                not ModelBuilder.models["array"][array_model_name]["deprecated"]
+                and not ModelBuilder.models["cdna"][cdna_model_name]["deprecated"]
             ):
                 model_name = f"{array_model_name}+{cdna_model_name}"
                 m = LibraryModel.build_pre_configured_model(model_name)
@@ -203,7 +191,6 @@ def main(
             target=_collect_thread_fn,
             args=(
                 results,
-                output_model,
                 not sys.stdin.isatty(),
                 res,
                 num_reads if read_count is None else min(read_count, num_reads),
@@ -290,7 +277,7 @@ def plot_model_counts(res, models, max_width=50.0):
             )
 
 
-def _collect_thread_fn(out_queue, out_bam_file_name, disable_pbar, res, read_count):
+def _collect_thread_fn(out_queue, disable_pbar, res, read_count):
     """Thread / process fn to write out all our data."""
 
     with tqdm.tqdm(
@@ -308,9 +295,6 @@ def _collect_thread_fn(out_queue, out_bam_file_name, disable_pbar, res, read_cou
             # Check for exit sentinel:
             if raw_data is None:
                 break
-            # Should really never be None, but just in case:
-            elif raw_data is None:
-                continue
 
             # Unpack data:
             best_model = raw_data
@@ -343,9 +327,6 @@ def _worker_attempt_segmentations_fn(
         # Check for exit sentinel:
         if raw_data is None:
             break
-        # Should really never be None, but just in case:
-        elif raw_data is None:
-            continue
 
         # Unpack our data here:
         read = raw_data

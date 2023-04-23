@@ -1,4 +1,4 @@
-import itertools
+import importlib
 import json
 import pathlib
 import tempfile
@@ -11,7 +11,38 @@ from longbow.utils import bam_utils, model, model_utils
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / "models"
 
 
-@pytest.fixture
+# all combinations of the models included in src/longbow/models
+BUILTIN_MODELS = [
+    "isoseq+bulk_10x5p",
+    "isoseq+spatial_slideseq",
+    "isoseq+sc_10x5p",
+    "isoseq+sc_10x3p",
+    "isoseq+bulk_teloprimeV2",
+    "mas_15+bulk_10x5p",
+    "mas_15+spatial_slideseq",
+    "mas_15+sc_10x5p",
+    "mas_15+sc_10x3p",
+    "mas_15+bulk_teloprimeV2",
+    "mas_16+bulk_10x5p",
+    "mas_16+spatial_slideseq",
+    "mas_16+sc_10x5p",
+    "mas_16+sc_10x3p",
+    "mas_16+bulk_teloprimeV2",
+    "mas_10+bulk_10x5p",
+    "mas_10+spatial_slideseq",
+    "mas_10+sc_10x5p",
+    "mas_10+sc_10x3p",
+    "mas_10+bulk_teloprimeV2",
+]
+
+
+@pytest.fixture(scope="module")
+def preload_models():
+    with importlib.resources.files("longbow.models") as model_dir:
+        model_utils.load_models(model_dir)
+
+
+@pytest.fixture(scope="module")
 def bam_header_without_program_group():
     rgid = "01234567"
     movie_name = "m00001e_210000_000000"
@@ -47,23 +78,8 @@ def bam_header_without_program_group():
     return header
 
 
-@pytest.fixture(
-    scope="module",
-    params=list(
-        map(
-            lambda x: f"{x[0]}+{x[1]}",
-            list(
-                itertools.product(
-                    list(
-                        model_utils.ModelBuilder.pre_configured_models["array"].keys()
-                    ),
-                    list(model_utils.ModelBuilder.pre_configured_models["cdna"].keys()),
-                )
-            ),
-        )
-    ),
-)
-def bam_header_with_program_group(request):
+@pytest.fixture(scope="module", params=BUILTIN_MODELS)
+def bam_header_with_program_group(request, preload_models):
     rgid = "01234567"
     movie_name = "m00001e_210000_000000"
     version = "0.0.0"
@@ -111,32 +127,8 @@ def bam_header_with_program_group(request):
     return header
 
 
-@pytest.fixture(
-    scope="module",
-    params=list(
-        filter(
-            lambda x: x != "mas_15+sc_10x5p",
-            map(
-                lambda x: f"{x[0]}+{x[1]}",
-                list(
-                    itertools.product(
-                        list(
-                            model_utils.ModelBuilder.pre_configured_models[
-                                "array"
-                            ].keys()
-                        ),
-                        list(
-                            model_utils.ModelBuilder.pre_configured_models[
-                                "cdna"
-                            ].keys()
-                        ),
-                    )
-                ),
-            ),
-        )
-    ),
-)
-def bam_header_with_multiple_program_groups(request):
+@pytest.fixture(scope="module", params=BUILTIN_MODELS)
+def bam_header_with_multiple_program_groups(request, preload_models):
     rgid = "01234567"
     movie_name = "m00001e_210000_000000"
     version = "0.0.0"
@@ -252,13 +244,9 @@ def _compare_models(prebuilt_model, stored_model):
                     assert p[k] == s[k]
 
 
-def test_load_model_from_name():
-    for array_model_name in list(
-        model_utils.ModelBuilder.pre_configured_models["array"].keys()
-    ):
-        for cdna_model_name in list(
-            model_utils.ModelBuilder.pre_configured_models["cdna"].keys()
-        ):
+def test_load_model_from_name(preload_models):
+    for array_model_name in model_utils.ModelBuilder.models["array"]:
+        for cdna_model_name in model_utils.ModelBuilder.models["cdna"]:
             model_name = f"{array_model_name}+{cdna_model_name}"
 
             lb_model = bam_utils.load_model(model_name)

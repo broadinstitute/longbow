@@ -3,6 +3,7 @@ import logging
 import math
 import sys
 import time
+from pathlib import Path
 
 import click
 import pysam
@@ -36,11 +37,11 @@ PROG_NAME = "train"
     "-o",
     "--output-yaml",
     required=True,
-    type=click.Path(exists=False),
+    type=click.Path(path_type=Path),
     help="trained model",
 )
 @cli_utils.model
-@click.argument("training-bam", type=click.Path(exists=True))
+@click.argument("training-bam", type=click.Path(exists=True, path_type=Path))
 @click.pass_context
 def main(
     ctx, num_training_samples, max_training_iterations, output_yaml, model, training_bam

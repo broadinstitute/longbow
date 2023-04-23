@@ -8,6 +8,7 @@ import sys
 import time
 from collections import OrderedDict, defaultdict
 from functools import reduce
+from pathlib import Path
 
 import click
 import numpy as np
@@ -52,7 +53,7 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     default=".",
     show_default=True,
     required=False,
-    type=click.Path(exists=False),
+    type=click.Path(path_type=Path),
     help="Output directory",
 )
 @cli_utils.model

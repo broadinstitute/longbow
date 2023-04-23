@@ -1,8 +1,11 @@
 import logging
 import sys
+from pathlib import Path
 
 import click
 import click_log
+
+from .constants import MODEL_DESC_DELIMITER
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +35,7 @@ def input_pbi(function):
         "-p",
         "--pbi",
         required=False,
-        type=click.Path(exists=False),
+        type=click.Path(path_type=Path),
         help="BAM .pbi index file",
     )(function)
 
@@ -44,7 +47,7 @@ def output_bam(help_message):
             "--output-bam",
             default="-",
             show_default=True,
-            type=click.Path(exists=False),
+            type=click.Path(path_type=Path),
             help=help_message,
         )(function)
 
@@ -57,7 +60,7 @@ def reject_bam(function):
         "--reject-bam",
         default="/dev/null",
         show_default=True,
-        type=click.Path(exists=False),
+        type=click.Path(path_type=Path),
         help="Filtered bam output (failing reads only).",
     )(function)
 
@@ -66,12 +69,10 @@ def model(function):
     return click.option(
         "-m",
         "--model",
-        help="The model to use for annotation.  If not specified, it will be autodetected from "
-        "the BAM header.  If the given value is a pre-configured model name, then that "
-        "model will be used.  Otherwise, the given value will be treated as a file name "
-        "and Longbow will attempt to read in the file and create a LibraryModel from it.  "
-        "Longbow will assume the contents are the configuration of a LibraryModel as per "
-        "LibraryModel.to_json().",
+        help="The model to use for annotation. If not specified, it will be autodetected from "
+        f"the BAM header. The value should be of the form [array]{MODEL_DESC_DELIMITER}[cdna] "
+        "and both values should be valid models, either preconfigured or loaded by providing "
+        "--model-path.",
     )(function)
 
 

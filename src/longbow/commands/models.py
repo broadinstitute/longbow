@@ -43,10 +43,10 @@ def main(list_models, dump):
         print("Longbow includes the following models:")
 
         print("\nArray models\n============")
-        print_models(ModelBuilder.pre_configured_models["array"])
+        print_models(ModelBuilder.models["array"])
 
         print("\ncDNA models\n===========")
-        print_models(ModelBuilder.pre_configured_models["cdna"])
+        print_models(ModelBuilder.models["cdna"])
 
         print(
             "\nSpecify a fully combined model via '<array model>+<cDNA model>' syntax, e.g. 'mas_15+sc_10x5p'."
@@ -56,22 +56,22 @@ def main(list_models, dump):
         model_name = dump
         (array_model_name, cdna_model_name) = MODEL_NAME_REGEX.split(model_name, 2)
 
-        if array_model_name not in ModelBuilder.pre_configured_models["array"].keys():
+        if array_model_name not in ModelBuilder.models["array"].keys():
             logger.error(
                 f"Given model name '{array_model_name}' not in preconfigured array models "
-                f"{list(ModelBuilder.pre_configured_models['array'].keys())}"
+                f"{list(ModelBuilder.models['array'].keys())}"
             )
 
-        if cdna_model_name not in ModelBuilder.pre_configured_models["cdna"].keys():
+        if cdna_model_name not in ModelBuilder.models["cdna"].keys():
             logger.error(
                 f"Given model name '{cdna_model_name}' not in preconfigured cDNA models "
-                f"{list(ModelBuilder.pre_configured_models['cdna'].keys())}"
+                f"{list(ModelBuilder.models['cdna'].keys())}"
             )
 
         logger.info(f"Generating model: {model_name}")
         lb = LibraryModel(
-            array_model=ModelBuilder.pre_configured_models["array"][array_model_name],
-            cdna_model=ModelBuilder.pre_configured_models["cdna"][cdna_model_name],
+            array_model=ModelBuilder.models["array"][array_model_name],
+            cdna_model=ModelBuilder.models["cdna"][cdna_model_name],
             model_name=model_name,
         )
 

@@ -257,7 +257,7 @@ def load_model(model, bam_file=None):
         )
     elif model is not None and LibraryModel.has_prebuilt_model(model):
         lb_model = LibraryModel.build_pre_configured_model(model)
-    else:
+    elif model:
         lb_model = LibraryModel.from_json_file(model)
 
     return lb_model

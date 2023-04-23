@@ -860,10 +860,10 @@ class LibraryModel:
             return False
 
         array_model_name, cdna_model_name = model_name_pieces
-        if array_model_name not in ModelBuilder.pre_configured_models["array"]:
+        if array_model_name not in ModelBuilder.models["array"]:
             return False
 
-        if cdna_model_name not in ModelBuilder.pre_configured_models["cdna"]:
+        if cdna_model_name not in ModelBuilder.models["cdna"]:
             return False
 
         return True
@@ -873,8 +873,8 @@ class LibraryModel:
         (array_model_name, cdna_model_name) = MODEL_NAME_REGEX.split(model_name, 2)
 
         lb = LibraryModel(
-            array_model=ModelBuilder.pre_configured_models["array"][array_model_name],
-            cdna_model=ModelBuilder.pre_configured_models["cdna"][cdna_model_name],
+            array_model=ModelBuilder.models["array"][array_model_name],
+            cdna_model=ModelBuilder.models["cdna"][cdna_model_name],
             model_name=model_name,
         )
 

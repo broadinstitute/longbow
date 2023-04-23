@@ -1,6 +1,6 @@
 import logging
-import os
 import time
+from pathlib import Path
 
 import click
 import pysam
@@ -45,7 +45,9 @@ PROG_NAME = "convert"
     help="Maximum length of reads to process",
 )
 @cli_utils.force_overwrite
-@click.argument("input-spec", required=True, type=click.Path(exists=True))
+@click.argument(
+    "input-spec", required=True, type=click.Path(exists=True, path_type=Path)
+)
 def main(
     output_bam,
     default_rq,
@@ -111,16 +113,16 @@ def main(
     )
 
 
-def _get_files(user_input):
+def _get_files(user_input: Path):
     inputs = []
 
-    if os.path.isdir(user_input):
-        for root, dirs, files in os.walk(user_input):
-            for file in files:
-                if file.endswith(".fastq.gz") or file.endswith(".fq.gz"):
-                    inputs.append(os.path.join(root, file))
-    elif os.path.isfile(user_input):
-        if user_input.endswith(".fastq.gz") or user_input.endswith(".fq.gz"):
+    if user_input.is_dir():
+        for file in user_input.glob("**/*.fastq.gz"):
+            inputs.append(user_input / file)
+        for file in user_input.glob("**/*.fq.gz"):
+            inputs.append(user_input / file)
+    elif user_input.is_file():
+        if user_input.name.endswith(".fastq.gz") or user_input.name.endswith(".fq.gz"):
             inputs.append(user_input)
 
     return inputs

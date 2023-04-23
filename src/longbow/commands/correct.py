@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 from collections import defaultdict
+from pathlib import Path
 
 import click
 import pysam
@@ -61,12 +62,12 @@ class BarcodeResolutionFailure(enum.Enum):
     "-a",
     "--allow-list",
     required=True,
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, path_type=Path),
     help="List of allowed barcodes for specified tag (.txt, .txt.gz).",
 )
 @click.option(
     "--barcode-freqs",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, path_type=Path),
     required=False,
     help="TSV file containing barcodes and the frequencies associated with them in the data (BARCODE\tFREQ).  "
     "If not provided, barcode freqs will be uniformly seeded by the barcode whitelist.  "
@@ -98,7 +99,7 @@ class BarcodeResolutionFailure(enum.Enum):
     "--barcode-uncorrectable-bam",
     default="/dev/null",
     show_default=True,
-    type=click.Path(exists=False),
+    type=click.Path(path_type=Path),
     help="File to which to write all reads with barcodes that could not be corrected.",
 )
 @cli_utils.input_bam
@@ -530,9 +531,6 @@ def _write_thread_fn(
             # Check for exit sentinel:
             if raw_data is None:
                 break
-            # Should really never be None, but just in case:
-            elif raw_data is None:
-                continue
 
             # Unpack data:
             read, num_segments, num_corrected_segments, has_barcode = raw_data

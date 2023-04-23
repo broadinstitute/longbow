@@ -3,6 +3,7 @@ import os
 import sys
 import time
 from collections import Counter
+from pathlib import Path
 
 import click
 import pysam
@@ -30,7 +31,7 @@ PROG_NAME = "sift"
     "-s",
     "--stats",
     default="/dev/null",
-    type=click.Path(exists=False),
+    type=click.Path(path_type=Path),
     help="Table describing the ways in which the reads do not conform to expectation (failing reads only)"
     "[default: /dev/null]",
 )
@@ -38,7 +39,7 @@ PROG_NAME = "sift"
     "-u",
     "--summary-stats",
     default="/dev/null",
-    type=click.Path(exists=False),
+    type=click.Path(path_type=Path),
     help="Table containing summary statistics for the sifted reads that are output."
     "[default: /dev/null]",
 )
@@ -46,7 +47,7 @@ PROG_NAME = "sift"
     "-k",
     "--ignore-list",
     required=False,
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, path_type=Path),
     help="Txt file containing a list of read names to ignore.",
 )
 @cli_utils.input_bam

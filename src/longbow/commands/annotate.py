@@ -252,9 +252,6 @@ def _write_thread_fn(
             # Check for exit sentinel:
             if raw_data is None:
                 break
-            # Should really never be None, but just in case:
-            elif raw_data is None:
-                continue
 
             # Unpack data:
             read, ppath, logp, is_rc = raw_data
@@ -311,9 +308,6 @@ def _worker_segmentation_fn(
         # Check for exit sentinel:
         if raw_data is None:
             break
-        # Should really never be None, but just in case:
-        elif raw_data is None:
-            continue
 
         # Unpack our data here:
         read = raw_data
