@@ -5,7 +5,7 @@ import tempfile
 import pysam
 import pytest
 
-from longbow.utils import bam_utils, model, model_utils
+from longbow.utils import bam_utils, model
 
 TEST_DATA_FOLDER = pathlib.Path(__file__).parent.parent / "test_data" / "models"
 
@@ -212,18 +212,14 @@ def _compare_models(prebuilt_model, stored_model):
                     assert p[k] == s[k]
 
 
-def test_load_model_from_name():
-    for array_model_name in model_utils.ModelBuilder.models["array"]:
-        for cdna_model_name in model_utils.ModelBuilder.models["cdna"]:
-            model_name = f"{array_model_name}+{cdna_model_name}"
+def test_load_model_from_name(builtin_model):
+    lb_model = bam_utils.load_model(builtin_model.name)
 
-            lb_model = bam_utils.load_model(model_name)
+    stored_model = model.LibraryModel.from_json_file(
+        TEST_DATA_FOLDER / f"{builtin_model.name}.json"
+    )
 
-            stored_model = model.LibraryModel.from_json_file(
-                TEST_DATA_FOLDER / f"{model_name}.json"
-            )
-
-            _compare_models(lb_model, stored_model)
+    _compare_models(lb_model, stored_model)
 
 
 def test_load_model_from_json():
