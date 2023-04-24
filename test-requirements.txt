@@ -1,4 +1,5 @@
 pytest
 pytest-cov
 pytest-skip-slow
+pytest-xdist
 coverage[toml] >= 4.5

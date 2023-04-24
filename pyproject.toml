@@ -42,6 +42,7 @@ ignore = ["E501"]
 [tool.coverage.run]
 source = ["longbow"]
 branch = true
+parallel = true
 
 [tool.coverage.report]
 skip_covered = true
