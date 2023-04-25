@@ -28,22 +28,8 @@ PROG_NAME = "convert"
 @click.option(
     "-s", "--sample-name", type=str, help="Sample name to set in the read group"
 )
-@click.option(
-    "-l",
-    "--min-length",
-    type=int,
-    default=0,
-    required=False,
-    help="Minimum length of reads to process",
-)
-@click.option(
-    "-L",
-    "--max-length",
-    type=int,
-    default=30000,
-    required=False,
-    help="Maximum length of reads to process",
-)
+@cli_utils.min_length
+@cli_utils.max_length
 @cli_utils.force_overwrite
 @click.argument(
     "input-spec", required=True, type=click.Path(exists=True, path_type=Path)

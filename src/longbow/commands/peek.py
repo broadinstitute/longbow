@@ -13,8 +13,6 @@ import numpy as np
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
 from ..utils import bam_utils, cli_utils
 from ..utils.model import LibraryModel
 from ..utils.model_utils import ModelBuilder
@@ -51,32 +49,9 @@ PROG_NAME = "peek"
     required=False,
     help="Number of reads to examine when trying to guess the array model",
 )
-@click.option(
-    "-l",
-    "--min-length",
-    type=int,
-    default=0,
-    show_default=True,
-    required=False,
-    help="Minimum length of a read to process.  Reads shorter than this length will not be annotated.",
-)
-@click.option(
-    "-L",
-    "--max-length",
-    type=int,
-    default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
-    show_default=True,
-    required=False,
-    help="Maximum length of a read to process.  Reads longer than this length will not be annotated.",
-)
-@click.option(
-    "--min-rq",
-    type=float,
-    default=-2,
-    show_default=True,
-    required=False,
-    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].",
-)
+@cli_utils.min_length
+@cli_utils.max_length
+@cli_utils.min_rq
 @cli_utils.force_overwrite
 @cli_utils.input_bam
 @click.pass_context

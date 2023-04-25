@@ -1,3 +1,4 @@
+import functools
 import logging
 import sys
 from pathlib import Path
@@ -5,7 +6,7 @@ from pathlib import Path
 import click
 import click_log
 
-from .constants import MODEL_DESC_DELIMITER
+from .constants import DEFAULT_MAX_READ_LENGTH, MODEL_DESC_DELIMITER
 
 log = logging.getLogger(__name__)
 
@@ -41,17 +42,15 @@ def input_pbi(function):
 
 
 def output_bam(help_message):
-    def decorator(function):
-        return click.option(
-            "-o",
-            "--output-bam",
-            default="-",
-            show_default=True,
-            type=click.Path(path_type=Path),
-            help=help_message,
-        )(function)
-
-    return decorator
+    # note: this one returns a new decorator
+    return click.option(
+        "-o",
+        "--output-bam",
+        default="-",
+        show_default=True,
+        type=click.Path(path_type=Path),
+        help=help_message,
+    )  # no call here
 
 
 def reject_bam(function):
@@ -84,6 +83,57 @@ def force_overwrite(function):
         default=False,
         show_default=True,
         help="Force overwrite of the output files if they exist.",
+    )(function)
+
+
+def decorator_with_kwarg(function):
+    def wrapper(func=None, **kwargs):
+        if func is None:
+            return functools.partial(function, **kwargs)
+        else:
+            return function(func, **kwargs)
+
+    return wrapper
+
+
+@decorator_with_kwarg
+def min_length(function, *, additional_help=""):
+    return click.option(
+        "-l",
+        "--min-length",
+        type=int,
+        default=0,
+        show_default=True,
+        required=False,
+        help="Minimum length of a read to process. Reads shorter than this will not"
+        f" be annotated.{additional_help}",
+    )(function)
+
+
+@decorator_with_kwarg
+def max_length(function, *, additional_help=""):
+    return click.option(
+        "-L",
+        "--max-length",
+        type=int,
+        default=DEFAULT_MAX_READ_LENGTH,
+        show_default=True,
+        required=False,
+        help="Maximum length of a read to process. Reads longer than this will not"
+        f" be annotated.{additional_help}",
+    )(function)
+
+
+@decorator_with_kwarg
+def min_rq(function, *, additional_help=""):
+    return click.option(
+        "--min-rq",
+        type=float,
+        default=-2,
+        show_default=True,
+        required=False,
+        help="Minimum ccs-determined read quality for a read to be annotated."
+        f" CCS read quality range is [-1,1].{additional_help}",
     )(function)
 
 

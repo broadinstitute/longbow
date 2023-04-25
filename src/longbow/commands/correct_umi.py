@@ -201,7 +201,7 @@ class ReadSnapshot:
     show_default=True,
     help="Length of the UMI for this sample.",
 )
-@cli_utils.output_bam("Corrected UMI bam output")
+@cli_utils.output_bam("corrected UMI bam output")
 @cli_utils.reject_bam
 @cli_utils.force_overwrite
 @click.option(

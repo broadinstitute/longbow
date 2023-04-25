@@ -11,9 +11,6 @@ import click
 import pysam
 import tqdm
 
-import longbow.utils
-import longbow.utils.constants
-
 from ..utils import bam_utils, cli_utils
 from ..utils.bam_utils import collapse_annotations
 
@@ -35,32 +32,9 @@ PROG_NAME = "annotate"
     help="Process a single chunk of data (e.g. specify '2/4' to process the second of four equally-sized "
     "chunks across the dataset)",
 )
-@click.option(
-    "-l",
-    "--min-length",
-    type=int,
-    default=0,
-    show_default=True,
-    required=False,
-    help="Minimum length of a read to process.  Reads shorter than this length will not be annotated.",
-)
-@click.option(
-    "-L",
-    "--max-length",
-    type=int,
-    default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
-    show_default=True,
-    required=False,
-    help="Maximum length of a read to process.  Reads longer than this length will not be annotated.",
-)
-@click.option(
-    "--min-rq",
-    type=float,
-    default=-2,
-    show_default=True,
-    required=False,
-    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].",
-)
+@cli_utils.min_length
+@cli_utils.max_length
+@cli_utils.min_rq
 @cli_utils.force_overwrite
 @cli_utils.input_bam
 @click.pass_context
@@ -319,17 +293,17 @@ def _worker_segmentation_fn(
         segment_info = None, None, None, None
         if len(read.query_sequence) < min_length:
             logger.debug(
-                f"Read is shorter than min length.  "
+                "Read is shorter than min length.  "
                 f"Skipping: {read.query_name} ({len(read.query_sequence)} < {min_length})"
             )
         elif len(read.query_sequence) > max_length:
             logger.debug(
-                f"Read is longer than max length.  "
+                "Read is longer than max length.  "
                 f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})"
             )
         elif read.get_tag("rq") < min_rq:
             logger.debug(
-                f"Read quality is below the minimum.  "
+                "Read quality is below the minimum.  "
                 f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})"
             )
         else:
