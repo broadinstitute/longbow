@@ -19,15 +19,15 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from polyleven import levenshtein
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils
+from ..utils import bam_utils, cli_utils, constants
 
 logger = logging.getLogger(__name__)
 
 PROG_NAME = "inspect"
 
 DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
+
+ADDED_HELP = " If the input file has already been annotated, this parameter is ignored."
 
 
 @click.command(PROG_NAME)
@@ -64,21 +64,15 @@ DEFAULT_COLOR_MAP_ENTRY = "DEFAULT"
     show_default=True,
     help="Display alignment score for annotated segments.  (--quick mode only)",
 )
+@cli_utils.min_length(additional_help=ADDED_HELP)
+@cli_utils.max_length(additional_help=ADDED_HELP)
+@cli_utils.min_rq(additional_help=ADDED_HELP)
 @click.option(
-    "--max-length",
-    type=int,
-    default=longbow.utils.constants.DEFAULT_MAX_READ_LENGTH,
+    "--collapse-random",
+    type=click.IntRange(min=constants.MIN_COLLAPSE_RANDOM_LEN, clamp=True),
+    default=None,
     show_default=True,
-    required=False,
-    help="Maximum length of a read to process.  Reads beyond this length will not be annotated.  If the input file has already been annotated, this parameter is ignored.",
-)
-@click.option(
-    "--min-rq",
-    type=float,
-    default=-2,
-    show_default=True,
-    required=False,
-    help="Minimum ccs-determined read quality for a read to be annotated.  CCS read quality range is [-1,1].  If the input file has already been annotated, this parameter is ignored.",
+    help="Hide the displayed sequence for long random segments.",
 )
 @click.option(
     "-q",
@@ -106,8 +100,10 @@ def main(
     outdir,
     model,
     seg_score,
+    min_length,
     max_length,
     min_rq,
+    collapse_random,
     quick,
     annotated_bam,
     input_bam,
@@ -171,8 +167,10 @@ def main(
                     lb_model,
                     outdir,
                     seg_score,
+                    min_length,
                     max_length,
                     min_rq,
+                    collapse_random,
                     quick,
                     anns,
                     name_map,
@@ -234,8 +232,10 @@ def __create_read_figure(
     lb_model,
     outdir,
     seg_score,
+    min_length,
     max_length,
     min_rq,
+    collapse_random,
     quick,
     anns,
     name_map,
@@ -263,7 +263,7 @@ def __create_read_figure(
 
         out = f'{outdir}/{re.sub("/", "_", read.query_name)}.{file_format}'
 
-        seq, path, logp = annotate_read(read, lb_model, max_length, min_rq)
+        seq, path, logp = annotate_read(read, lb_model, min_length, max_length, min_rq)
 
         if seq is not None:
             logger.info("Drawing read '%s' to '%s'", read.query_name, out)
@@ -275,8 +275,8 @@ def __create_read_figure(
                     logp,
                     read,
                     out,
-                    seg_score,
                     lb_model,
+                    show_seg_score=seg_score,
                     size=13,
                     family="monospace",
                 )
@@ -287,10 +287,10 @@ def __create_read_figure(
                     logp,
                     read,
                     out,
-                    seg_score,
                     lb_model,
                     anns,
                     name_map,
+                    collapse_random=collapse_random,
                     size=13,
                     family="monospace",
                 )
@@ -371,34 +371,40 @@ def load_read_offsets(pbi_file, read_names):
     return file_offsets_hash
 
 
-def annotate_read(read, m, max_length, min_rq):
+def annotate_read(read, m, min_length, max_length, min_rq):
     fseq = read.query_sequence
     fppath = []
     flogp = -math.inf
 
-    if read.has_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG):
+    if read.has_tag(constants.SEGMENTS_CIGAR_TAG):
         logger.debug("Loading annotation from BAM")
         # Set our ppath from the bam file:
         fppath = re.split(
-            longbow.utils.constants.SEGMENT_TAG_DELIMITER,
-            read.get_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG),
+            constants.SEGMENT_TAG_DELIMITER,
+            read.get_tag(constants.SEGMENTS_CIGAR_TAG),
         )
 
         # Set our logp from the bam file:
-        flogp = read.get_tag(longbow.utils.constants.READ_MODEL_SCORE_TAG)
+        flogp = read.get_tag(constants.READ_MODEL_SCORE_TAG)
     else:
         logger.debug("Annotating read from scratch")
-        # Check for max length and min quality:
-        if len(read.query_sequence) > max_length:
-            logger.warning(
-                f"Read is longer than max length.  "
-                f"Skipping: {read.query_name} ({len(read.query_sequence)} > {max_length})"
+        # Check for min/max length and min quality:
+        if len(read.query_sequence) < min_length:
+            logger.debug(
+                "Read is shorter than min length. Skipping: "
+                f"{read.query_name} ({len(read.query_sequence)} < {min_length})"
+            )
+            return [None] * 3
+        elif len(read.query_sequence) > max_length:
+            logger.debug(
+                "Read is longer than max length. Skipping: "
+                f"{read.query_name} ({len(read.query_sequence)} > {max_length})"
             )
             return [None] * 3
         elif read.get_tag("rq") < min_rq:
-            logger.warning(
-                f"Read quality is below the minimum.  "
-                f"Skipping: {read.query_name} ({read.get_tag('rq')} < {min_rq})"
+            logger.debug(
+                "Read quality is below the minimum. Skipping: "
+                f"{read.query_name} ({read.get_tag('rq')} < {min_rq})"
             )
             return [None] * 3
         for seq in [
@@ -430,7 +436,7 @@ def create_colormap_for_model(m):
     default_color = "#c2a8f0"
 
     color_map = {
-        longbow.utils.constants.RANDOM_SEGMENT_NAME: random_color,
+        constants.RANDOM_SEGMENT_NAME: random_color,
         DEFAULT_COLOR_MAP_ENTRY: default_color,
     }
 
@@ -442,7 +448,7 @@ def create_colormap_for_model(m):
             c = adapter_state_color
         elif m.has_coding_region and name == m.coding_region:
             c = coding_region_color
-        elif name in longbow.utils.constants.MAS_SCAFFOLD_NAMES:
+        elif name in constants.MAS_SCAFFOLD_NAMES:
             c = scaffold_state_color
         elif m.has_named_random_segments and name in m.named_random_segments:
             # We'll do these next:
@@ -595,7 +601,7 @@ def _adjust_aligned_state_sequence(seq, path, library_model, read_anns):
     return new_path
 
 
-def _make_aligned_state_sequence(seq, path, library_model):
+def _make_aligned_state_sequence(seq, path, library_model, collapse_random):
     observed_track = []
     mismatch_track = []
     expected_track = []
@@ -606,6 +612,11 @@ def _make_aligned_state_sequence(seq, path, library_model):
     cur_pos = 0
 
     seq_pos = 0
+
+    if collapse_random is not None:
+        collapse_seg_len = min(collapse_random // 3, constants.MIN_COLLAPSE_RANDOM_LEN)
+        collapse_len = 2 * collapse_seg_len + 3
+
     for p in path:
         f = re.split(":", p)
         state, ops = f[0], f[1]
@@ -628,6 +639,18 @@ def _make_aligned_state_sequence(seq, path, library_model):
                     cur_adapter = library_model.adapter_dict[cur_state]
                 elif len(f) > 2:
                     cur_adapter = f[2]
+
+            if collapse_random is not None and op[0] == "R" and oplen > collapse_random:
+                classification_track.extend((state,) * collapse_len)
+                expected_track.extend(" " * collapse_len)
+                mismatch_track.extend(" " * collapse_len)
+                observed_track.extend(seq[seq_pos : seq_pos + collapse_seg_len])
+                observed_track.extend("...")
+                observed_track.extend(
+                    seq[seq_pos + oplen - collapse_seg_len : seq_pos + oplen]
+                )
+                seq_pos += oplen
+                continue
 
             for _ in range(oplen):
                 base = seq[seq_pos] if seq_pos < len(seq) else " "
@@ -720,7 +743,16 @@ def format_state_sequence(seq, path, library_model, line_length=150):
 
 
 def draw_extended_state_sequence(
-    seq, path, logp, read, out, show_seg_score, library_model, anns, name_map, **kwargs
+    seq,
+    path,
+    logp,
+    read,
+    out,
+    library_model,
+    anns,
+    name_map,
+    collapse_random,
+    **kwargs,
 ):
     line_length = 150
 
@@ -737,7 +769,7 @@ def draw_extended_state_sequence(
         mismatch_track,
         expected_track,
         classification_track,
-    ) = _make_aligned_state_sequence(seq, path, library_model)
+    ) = _make_aligned_state_sequence(seq, path, library_model, collapse_random)
 
     f = Figure(figsize=(24, 24))
     f.patch.set_facecolor("white")
@@ -868,7 +900,7 @@ def _expand_cigar_sequence(cigar_path):
 
 
 def draw_simplified_state_sequence(
-    seq, path, logp, read, out, show_seg_score, library_model, **kwargs
+    seq, path, logp, read, out, library_model, *, show_seg_score, **kwargs
 ):
     line_length = 150
 
@@ -931,7 +963,7 @@ def draw_simplified_state_sequence(
         # Write state label if we haven't already written it:
         if lbl != last_label:
             seg_score_string = ""
-            if lbl == longbow.utils.constants.RANDOM_SEGMENT_NAME:
+            if lbl == constants.RANDOM_SEGMENT_NAME:
                 # Let's add the length of the random segment to the label:
                 length = len(collapsed_annotations[total_segments_seen])
                 seg_score_string = f" [{length}]"
@@ -942,10 +974,7 @@ def draw_simplified_state_sequence(
                 and lbl in library_model.named_random_segments
             ):
                 # Handle basic named random segment:
-                if (
-                    library_model.adapter_dict[lbl]
-                    == longbow.utils.constants.RANDOM_SEGMENT_NAME
-                ):
+                if library_model.adapter_dict[lbl] == constants.RANDOM_SEGMENT_NAME:
                     length = len(collapsed_annotations[total_segments_seen])
                     seg_score_string = f" [{length}]"
 
@@ -955,7 +984,7 @@ def draw_simplified_state_sequence(
 
                     if (
                         special_seg_type
-                        == longbow.utils.constants.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME
+                        == constants.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME
                     ):
                         # Mark the length that this known random segment should be:
                         length = list(library_model.adapter_dict[lbl].values())[0]
@@ -973,10 +1002,7 @@ def draw_simplified_state_sequence(
                 if isinstance(library_model.adapter_dict[lbl], dict):
                     special_seg_type = list(library_model.adapter_dict[lbl].keys())[0]
 
-                    if (
-                        special_seg_type
-                        == longbow.utils.constants.HPR_SEGMENT_TYPE_NAME
-                    ):
+                    if special_seg_type == constants.HPR_SEGMENT_TYPE_NAME:
                         base, count = library_model.adapter_dict[lbl][special_seg_type]
                         known_segment_seq = base * count
                         segment_bases = _get_segment_bases(
