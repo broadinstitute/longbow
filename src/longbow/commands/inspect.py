@@ -72,7 +72,7 @@ ADDED_HELP = " If the input file has already been annotated, this parameter is i
     type=click.IntRange(min=constants.MIN_COLLAPSE_RANDOM_LEN, clamp=True),
     default=None,
     show_default=True,
-    help="Hide the displayed sequence for long random segments.",
+    help="Truncate the display for random segments above this length.",
 )
 @click.option(
     "-q",
