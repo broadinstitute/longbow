@@ -11,10 +11,7 @@ import numpy as np
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils, plot_utils
-from ..utils.constants import FFORMAT
+from ..utils import bam_utils, cli_utils, constants, plot_utils
 from . import segment
 
 plot_title_path_regex = re.compile(r".*/([^/].*?)/*$")
@@ -130,7 +127,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             except KeyError:
                 logger.error(
                     f"Input bam file does not contain longbow segmented reads!  "
-                    f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
+                    f"No {constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
                 )
                 sys.exit(1)
 
@@ -199,7 +196,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
             array_lengths.append(array_len)
 
             # Adjust names for segmented direction:
-            if read.get_tag(longbow.utils.constants.SEGMENTS_RC_TAG) == 1:
+            if read.get_tag(constants.SEGMENTS_RC_TAG) == 1:
                 read_mas_seq_adapters = [
                     a + rc_decorator for a in read_mas_seq_adapters
                 ]
@@ -267,7 +264,7 @@ def main(pbi, output_prefix, model, do_simple_splitting, input_bam):
         f"MAS-seq Ligations\n({lb_model.name})",
     )
 
-    logger.info(f"Done. Elapsed time: %{FFORMAT}s.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: %{constants.FFORMAT}s.", time.time() - t_start)
 
 
 def _write_stats(
@@ -454,21 +451,11 @@ def _write_summary_stats_file(
             )
             f.write("\n")
             f.write("#" + ("=" * 80) + "\n")
-            f.write(
-                """#                 __        ___    ____  _   _ ___ _   _  ____\n"""
-            )
-            f.write(
-                """#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n"""
-            )
-            f.write(
-                """#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n"""
-            )
-            f.write(
-                """#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n"""
-            )
-            f.write(
-                """#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n"""
-            )
+            f.write("#                 __        ___    ____  _   _ ___ _   _  ____\n")
+            f.write("#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n")
+            f.write("#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n")
+            f.write("#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n")
+            f.write("#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n")
             f.write("#\n")
             f.write("WARNING:                  No array elements were found.\n")
             f.write(
@@ -492,21 +479,11 @@ def _write_summary_stats_file(
             )
             f.write("\n")
             f.write("#" + ("=" * 80) + "\n")
-            f.write(
-                """#                 __        ___    ____  _   _ ___ _   _  ____\n"""
-            )
-            f.write(
-                """#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n"""
-            )
-            f.write(
-                """#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n"""
-            )
-            f.write(
-                """#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n"""
-            )
-            f.write(
-                """#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n"""
-            )
+            f.write("#                 __        ___    ____  _   _ ___ _   _  ____\n")
+            f.write("#                 \ \      / / \  |  _ \| \ | |_ _| \ | |/ ___|\n")
+            f.write("#                  \ \ /\ / / _ \ | |_) |  \| || ||  \| | |  _\n")
+            f.write("#                   \ V  V / ___ \|  _ <| |\  || || |\  | |_| |\n")
+            f.write("#                    \_/\_/_/   \_\_| \_\_| \_|___|_| \_|\____|\n")
             f.write("#\n")
             f.write(
                 "WARNING:   The number of array elements found was the same as the number of\n"
@@ -530,7 +507,7 @@ def _write_summary_stats_file(
         f.write(f"Total Num Reads (Arrays):\t{len(array_lengths)}\n")
         f.write(f"Total Num Array Elements (Segmented Arrays):\t{num_array_elements}\n")
         f.write(
-            f"Output yield gain:\t{num_array_elements/len(array_lengths):{FFORMAT}}x\n"
+            f"Output yield gain:\t{num_array_elements/len(array_lengths):{constants.FFORMAT}}x\n"
         )
         f.write(f"Num unique ligation profiles: {len(ligation_profile_count_dict)}\n")
         f.write("\n")
@@ -732,7 +709,7 @@ def _calculate_top_ligation_profiles(
         [
             top_ligations[i],
             top_counts[i],
-            f"{(top_counts[i] / num_reads) * 100:{FFORMAT}}%",
+            f"{(top_counts[i] / num_reads) * 100:{constants.FFORMAT}}%",
         ]
         for i in range(len(top_counts) - 1, -1, -1)
     ]

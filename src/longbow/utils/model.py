@@ -3,9 +3,6 @@ import logging
 import re
 import sys
 
-import longbow.utils.constants
-import longbow.utils.model_utils
-
 from ..meta import VERSION
 from .constants import (
     END_STATE_INDICATOR,
@@ -13,6 +10,10 @@ from .constants import (
     HPR_SEGMENT_TYPE_NAME,
     MODEL_DESC_DELIMITER,
     RANDOM_SEGMENT_NAME,
+    READ_BARCODE_TAG,
+    READ_RAW_BARCODE_TAG,
+    READ_RAW_UMI_TAG,
+    READ_UMI_TAG,
     START_STATE_INDICATOR,
 )
 from .model_utils import ModelBuilder
@@ -84,15 +85,15 @@ class LibraryModel:
 
     @property
     def has_umi_annotation(self):
-        return self._has_annotation(
-            longbow.utils.constants.READ_RAW_UMI_TAG
-        ) or self._has_annotation(longbow.utils.constants.READ_UMI_TAG)
+        return self._has_annotation(READ_RAW_UMI_TAG) or self._has_annotation(
+            READ_UMI_TAG
+        )
 
     @property
     def has_cell_barcode_annotation(self):
-        return self._has_annotation(
-            longbow.utils.constants.READ_RAW_BARCODE_TAG
-        ) or self._has_annotation(longbow.utils.constants.READ_BARCODE_TAG)
+        return self._has_annotation(READ_RAW_BARCODE_TAG) or self._has_annotation(
+            READ_BARCODE_TAG
+        )
 
     def _has_annotation(self, annotation_tag):
         if self.cdna_model["annotation_segments"]:
@@ -616,14 +617,11 @@ class LibraryModel:
             segment_length = len(self.adapter_dict[segment_name])
         elif isinstance(self.adapter_dict[segment_name], dict):
             seg_type = next(iter(self.adapter_dict[segment_name].keys()))
-            if seg_type == longbow.utils.constants.HPR_SEGMENT_TYPE_NAME:
+            if seg_type == HPR_SEGMENT_TYPE_NAME:
                 segment_length = next(iter(self.adapter_dict[segment_name].values()))[1]
-            elif (
-                seg_type
-                == longbow.utils.constants.FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME
-            ):
+            elif seg_type == FIXED_LENGTH_RANDOM_SEGMENT_TYPE_NAME:
                 segment_length = next(iter(self.adapter_dict[segment_name].values()))
-            elif seg_type == longbow.utils.constants.RANDOM_SEGMENT_NAME:
+            elif seg_type == RANDOM_SEGMENT_NAME:
                 segment_length = 0
             else:
                 # We should never get here:

@@ -10,9 +10,7 @@ import click
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils
+from ..utils import bam_utils, cli_utils, constants
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ PROG_NAME = "pad"
     "-n",
     "--new-barcode-tag",
     type=str,
-    default=longbow.utils.constants.READ_RAW_UMI_TAG,
+    default=constants.READ_RAW_UMI_TAG,
     show_default=True,
     help="The barcode tag into which to put the adjusted value.",
 )
@@ -196,7 +194,7 @@ def _expand_tag_fn(
             read_is_refined = False
 
             if read.has_tag(barcode_tag):
-                segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(",")
+                segments = read.get_tag(constants.SEGMENTS_TAG).split(",")
 
                 for segment in segments:
                     if segment.startswith(barcode_seg_name + ":"):
@@ -266,8 +264,8 @@ def _pass_read_fn(in_queue, out_queue):
         #     raw_data, pysam.AlignmentHeader.from_dict(dict())
         # )
 
-        # if read.has_tag(longbow.utils.constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(longbow.utils.constants.SEGMENTS_TAG):
-        #     segments = read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(",")
+        # if read.has_tag(constants.SEGMENTS_TAG) and barcode_tag in read.get_tag(constants.SEGMENTS_TAG):
+        #     segments = read.get_tag(constants.SEGMENTS_TAG).split(",")
         #     num_segments = len(segments)
 
         #     for i, segment in enumerate(segments):

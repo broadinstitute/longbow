@@ -7,11 +7,8 @@ import click
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils
+from ..utils import bam_utils, cli_utils, constants
 from ..utils.bam_utils import SegmentInfo
-from ..utils.constants import FFORMAT
 
 logger = logging.getLogger(__name__)
 
@@ -97,20 +94,20 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                     segments = tuple(
                         [
                             SegmentInfo.from_tag(s)
-                            for s in read.get_tag(
-                                longbow.utils.constants.SEGMENTS_TAG
-                            ).split(longbow.utils.constants.SEGMENT_TAG_DELIMITER)
+                            for s in read.get_tag(constants.SEGMENTS_TAG).split(
+                                constants.SEGMENT_TAG_DELIMITER
+                            )
                         ]
                     )
                 except KeyError:
                     logger.error(
                         f"Input bam file does not contain longbow segmented reads!  "
-                        f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
+                        f"No {constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
                     )
                     sys.exit(1)
 
                 # Annotate the read with the model that was used in its validation:
-                read.set_tag(longbow.utils.constants.READ_MODEL_NAME_TAG, lb_model.name)
+                read.set_tag(constants.READ_MODEL_NAME_TAG, lb_model.name)
 
                 # Check to see if the read is valid by this model and write it out:
                 (
@@ -129,15 +126,13 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                         num_valid_adapters,
                     )
 
+                    read.set_tag(constants.READ_IS_VALID_FOR_MODEL_TAG, True)
                     read.set_tag(
-                        longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, True
-                    )
-                    read.set_tag(
-                        longbow.utils.constants.READ_NUM_KEY_SEGMENTS_TAG,
+                        constants.READ_NUM_KEY_SEGMENTS_TAG,
                         num_valid_adapters,
                     )
                     read.set_tag(
-                        longbow.utils.constants.READ_FIRST_KEY_SEG_TAG,
+                        constants.READ_FIRST_KEY_SEG_TAG,
                         lb_model.key_adapters[first_valid_adapter_index],
                     )
                     passing_bam_file.write(read)
@@ -156,9 +151,7 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
                             ",".join([s.name for s in segments]),
                         )
 
-                    read.set_tag(
-                        longbow.utils.constants.READ_IS_VALID_FOR_MODEL_TAG, False
-                    )
+                    read.set_tag(constants.READ_IS_VALID_FOR_MODEL_TAG, False)
                     failing_bam_file.write(read)
                     tot_num_failed_adapters += num_valid_adapters
                     num_failed += 1
@@ -167,16 +160,16 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
     total_reads = num_passed + num_failed
 
     # Yell at the user:
-    logger.info(f"Done. Elapsed time: %{FFORMAT}s.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: %{constants.FFORMAT}s.", time.time() - t_start)
     logger.info(f"Total Reads Processed: {num_passed + num_failed}")
 
     count_str, pct_str = cli_utils.get_field_count_and_percent_string(
-        num_passed, total_reads, FFORMAT
+        num_passed, total_reads, constants.FFORMAT
     )
     logger.info(f"# Reads Passing Model Filter: {count_str} {pct_str}")
 
     count_str, pct_str = cli_utils.get_field_count_and_percent_string(
-        num_failed, total_reads, FFORMAT
+        num_failed, total_reads, constants.FFORMAT
     )
     logger.info(f"# Reads Failing Model Filter: {count_str} {pct_str}")
 
@@ -187,12 +180,12 @@ def main(pbi, output_bam, reject_bam, model, force, input_bam):
         f"Total # correctly ordered key adapters in failing reads: {tot_num_failed_adapters}"
     )
     logger.info(
-        f"Avg # correctly ordered key adapters per passing read: %{FFORMAT} [%d]",
+        f"Avg # correctly ordered key adapters per passing read: %{constants.FFORMAT} [%d]",
         cli_utils.zero_safe_div(tot_num_valid_adapters, num_passed),
         len(lb_model.key_adapters),
     )
     logger.info(
-        f"Avg # correctly ordered key adapters per failing read: %{FFORMAT} [%d]",
+        f"Avg # correctly ordered key adapters per failing read: %{constants.FFORMAT} [%d]",
         cli_utils.zero_safe_div(tot_num_failed_adapters, num_passed),
         len(lb_model.key_adapters),
     )

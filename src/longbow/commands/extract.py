@@ -7,9 +7,7 @@ import click
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils
+from ..utils import bam_utils, cli_utils, constants
 from .segment import (
     create_simple_delimiters,
     create_simple_split_array_element,
@@ -32,7 +30,7 @@ PROG_NAME = "extract"
     default=False,
     help=f"Create a barcode confidence score file based on the barcodes in the given model.  "
     f"This only applies for models that have annotation_segments where one such segment "
-    f"is annotated into the raw barcode field ({longbow.utils.constants.READ_RAW_BARCODE_TAG})",
+    f"is annotated into the raw barcode field ({constants.READ_RAW_BARCODE_TAG})",
 )
 @click.option(
     "-b",
@@ -149,7 +147,7 @@ def main(
                 raise RuntimeError(message)
 
             logger.info(
-                f"Extracting `{longbow.utils.constants.RANDOM_SEGMENT_NAME}` segments between {leading_adapter} and {trailing_adapter}."
+                f"Extracting `{constants.RANDOM_SEGMENT_NAME}` segments between {leading_adapter} and {trailing_adapter}."
             )
             logger.info(
                 f"Ignoring the first {start_offset} bases from extracted read segments."
@@ -160,11 +158,9 @@ def main(
         if create_barcode_conf_file:
             if lb_model.has_cell_barcode_annotation:
                 logger.info(
-                    f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}"
+                    f"Creating barcode confidence file: {constants.BARCODE_CONF_FILE_NAME}"
                 )
-                barcode_conf_file = open(
-                    longbow.utils.constants.BARCODE_CONF_FILE_NAME, "w"
-                )
+                barcode_conf_file = open(constants.BARCODE_CONF_FILE_NAME, "w")
             else:
                 logger.warning(
                     "Model does not have a barcode output, but barcode creation flag was given.  "
@@ -203,14 +199,14 @@ def main(
                 except KeyError:
                     logger.error(
                         f"Input bam file does not contain longbow segmented reads!  "
-                        f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
+                        f"No {constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
                     )
                     sys.exit(1)
 
                 # Check if the read is already segmented:
-                if (
-                    not read.has_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG)
-                ) or (not read.get_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG)):
+                if (not read.has_tag(constants.READ_IS_SEGMENTED_TAG)) or (
+                    not read.get_tag(constants.READ_IS_SEGMENTED_TAG)
+                ):
                     # The read is not segmented.
                     # We should segment it first and then go through our segments one by one:
                     logger.debug(
@@ -307,23 +303,23 @@ def _get_segments_only(read):
     """Get the segments corresponding to a particular read by reading the segments tag information."""
     return [
         bam_utils.SegmentInfo.from_tag(s)
-        for s in read.get_tag(longbow.utils.constants.SEGMENTS_TAG).split(
-            longbow.utils.constants.SEGMENT_TAG_DELIMITER
+        for s in read.get_tag(constants.SEGMENTS_TAG).split(
+            constants.SEGMENT_TAG_DELIMITER
         )
     ]
 
 
 def _get_segment_cigars_only(read):
     """Get the segment cigars corresponding to a particular read by reading the segments tag information."""
-    return read.get_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG).split(
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER
+    return read.get_tag(constants.SEGMENTS_CIGAR_TAG).split(
+        constants.SEGMENT_TAG_DELIMITER
     )
 
 
 def _get_segment_quals_only(read):
     """Get the segment quals corresponding to a particular read by reading the segments tag information."""
-    return read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG).split(
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER
+    return read.get_tag(constants.SEGMENTS_QUAL_TAG).split(
+        constants.SEGMENT_TAG_DELIMITER
     )
 
 
@@ -535,25 +531,25 @@ def _create_extracted_aligned_segment(
     a.flag = 4  # unmapped flag
     a.mapping_quality = 255
     a.set_tag(
-        longbow.utils.constants.READ_ALTERED_NAME_TAG,
+        constants.READ_ALTERED_NAME_TAG,
         f"{read.query_name}/{start_coord}_{end_coord}",
     )
     a.set_tag(
-        longbow.utils.constants.SEGMENTS_TAG,
+        constants.SEGMENTS_TAG,
         f"{seg_to_extract.name}"
-        f"{longbow.utils.constants.SEGMENT_POS_DELIMITER}0"
+        f"{constants.SEGMENT_POS_DELIMITER}0"
         f"-{end_coord-start_coord}",
     )
-    a.set_tag(longbow.utils.constants.SEGMENTS_CIGAR_TAG, cig_to_extract)
-    a.set_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG, qual_to_extract)
+    a.set_tag(constants.SEGMENTS_CIGAR_TAG, cig_to_extract)
+    a.set_tag(constants.SEGMENTS_QUAL_TAG, qual_to_extract)
 
     # Write our barcode confidence to the file if we have to:
     if barcode_conf_file is not None and a.has_tag(
-        longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG
+        constants.READ_BARCODE_CONF_FACTOR_TAG
     ):
         barcode_conf_file.write(
-            f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t"
-            f"{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n"
+            f"{a.get_tag(constants.READ_RAW_BARCODE_TAG)}\t"
+            f"{a.get_tag(constants.READ_BARCODE_CONF_FACTOR_TAG)}\n"
         )
 
     return a

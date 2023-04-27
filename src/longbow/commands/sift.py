@@ -9,12 +9,9 @@ import click
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils
+from ..utils import bam_utils, cli_utils, constants
 from ..utils.bam_utils import get_segments
 from ..utils.cli_utils import zero_safe_div
-from ..utils.constants import FFORMAT
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +148,7 @@ def main(
                 except KeyError:
                     logger.error(
                         f"Input bam file does not contain longbow segmented reads!  "
-                        f"No {longbow.utils.constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
+                        f"No {constants.SEGMENTS_TAG} tag detected on read {read.query_name} !"
                     )
                     sys.exit(1)
 
@@ -198,23 +195,23 @@ def main(
 
     # Yell at the user / write out summary stats:
     with open(summary_stats, "w") as f:
-        message = f"Total Reads Processed:\t{tot_reads:d}"
-        f.write(f"{message}\n")
-        logger.info(message)
+        message = ("Total Reads Processed:", f"{tot_reads:d}")
+        print(message, sep="\t", file=f)
+        logger.info("\t".join(message))
 
-        message = f"# Reads Passing Model Filter:\t{num_passed:d}\t{100*zero_safe_div(num_passed, tot_reads):{FFORMAT}}"
-        f.write(f"{message}\n")
-        logger.info(message)
+        for label, denom in zip(
+            ("Passing Model Filter", "Failing Model Filter", "Ignored"),
+            (num_passed, num_failed, num_ignored),
+        ):
+            message = (
+                f"# Reads {label}:",
+                f"{denom:d}",
+                f"{100 * zero_safe_div(denom, tot_reads):{constants.FFORMAT}}",
+            )
+            print(message, sep="\t", file=f)
+            logger.info("\t".join(message))
 
-        message = f"# Reads Failing Model Filter:\t{num_failed:d}\t{100*zero_safe_div(num_failed, tot_reads):{FFORMAT}}"
-        f.write(f"{message}\n")
-        logger.info(message)
-
-        message = f"# Reads Ignored:\t{num_ignored:d}\t{100*zero_safe_div(num_ignored, tot_reads):{FFORMAT}}"
-        f.write(f"{message}\n")
-        logger.info(message)
-
-    logger.info(f"Done. Elapsed time: %{FFORMAT}s.", time.time() - t_start)
+    logger.info(f"Done. Elapsed time: %{constants.FFORMAT}s.", time.time() - t_start)
 
 
 def check_validity(lb_model, segment_ranges):

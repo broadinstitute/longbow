@@ -10,9 +10,7 @@ import click
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils
+from ..utils import bam_utils, cli_utils, constants
 
 logger = logging.getLogger(__name__)
 
@@ -188,8 +186,8 @@ def _correct_read_tags(in_queue, out_queue, bam_header, res):
 
         if read.is_reverse:
             # Reverse the segments and update the positions:
-            segments_tag = read.get_tag(longbow.utils.constants.SEGMENTS_TAG)
-            segments = segments_tag.split(longbow.utils.constants.SEGMENT_TAG_DELIMITER)
+            segments_tag = read.get_tag(constants.SEGMENTS_TAG)
+            segments = segments_tag.split(constants.SEGMENT_TAG_DELIMITER)
             read_length = len(read.query_sequence)
             new_segments = []
             for seg in reversed(segments):
@@ -200,18 +198,16 @@ def _correct_read_tags(in_queue, out_queue, bam_header, res):
                 new_segments.append(f"{seg_name}:{new_start}-{new_end}")
 
             read.set_tag(
-                longbow.utils.constants.SEGMENTS_TAG,
-                longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(new_segments),
+                constants.SEGMENTS_TAG,
+                constants.SEGMENT_TAG_DELIMITER.join(new_segments),
             )
 
             # Reverse the Segment Qualities:
-            seg_quals = read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG)
-            new_seg_quals = seg_quals.split(
-                longbow.utils.constants.SEGMENT_TAG_DELIMITER
-            )[::-1]
+            seg_quals = read.get_tag(constants.SEGMENTS_QUAL_TAG)
+            new_seg_quals = seg_quals.split(constants.SEGMENT_TAG_DELIMITER)[::-1]
             read.set_tag(
-                longbow.utils.constants.SEGMENTS_QUAL_TAG,
-                longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(new_seg_quals),
+                constants.SEGMENTS_QUAL_TAG,
+                constants.SEGMENT_TAG_DELIMITER.join(new_seg_quals),
             )
 
             # Increment our counter:

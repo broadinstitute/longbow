@@ -13,9 +13,7 @@ import click
 import pysam
 from tqdm import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, barcode_utils, cli_utils
+from ..utils import bam_utils, barcode_utils, cli_utils, constants
 from ..utils.cli_utils import get_field_count_and_percent_string
 
 logger = logging.getLogger(__name__)
@@ -46,7 +44,7 @@ class BarcodeResolutionFailure(enum.Enum):
     "-b",
     "--barcode-tag",
     type=str,
-    default=longbow.utils.constants.READ_BARCODE_TAG,
+    default=constants.READ_BARCODE_TAG,
     show_default=True,
     help="The tag from which to read the uncorrected barcode.",
 )
@@ -54,7 +52,7 @@ class BarcodeResolutionFailure(enum.Enum):
     "-c",
     "--corrected-tag",
     type=str,
-    default=longbow.utils.constants.READ_BARCODE_CORRECTED_TAG,
+    default=constants.READ_BARCODE_CORRECTED_TAG,
     show_default=True,
     help="The tag in which to store the corrected barcode.",
 )
@@ -542,7 +540,7 @@ def _write_thread_fn(
             )
 
             # Write our our read:
-            if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG):
+            if read.get_tag(constants.COULD_CORRECT_BARCODE_TAG):
                 out_bam_file.write(read)
             else:
                 # "num_ccs_could_not_correct_ambiguous": 0, "num_ccs_could_not_correct_no_match"
@@ -569,19 +567,16 @@ def _write_thread_fn(
                     )
 
                 # Set our corrected barcode tag to the unlabeled placeholder:
-                read.set_tag(corrected_tag, longbow.utils.constants.UNLABELED_BARCODE)
+                read.set_tag(corrected_tag, constants.UNLABELED_BARCODE)
                 barcode_uncorrectable_bam.write(read)
 
             # Increment our counters:
             res[f"num_{ccs_type_stat_string}_reads"] += 1
             if read.has_tag(barcode_tag):
                 res[f"num_{ccs_type_stat_string}_with_barcodes"] += 1
-            if read.get_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG) == 1:
+            if read.get_tag(constants.COULD_CORRECT_BARCODE_TAG) == 1:
                 res[f"num_{ccs_type_stat_string}_reads_corrected"] += 1
-                if (
-                    read.get_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED)
-                    == 0
-                ):
+                if read.get_tag(constants.BARCODE_CORRECTION_PERFORMED) == 0:
                     res[f"num_{ccs_type_stat_string}_reads_raw_was_correct"] += 1
 
             pbar.update(1)
@@ -665,7 +660,7 @@ def _correct_barcode_fn(
             num_segments += 1
             if new_bc is not None:
                 read.set_tag(corrected_tag, new_bc)
-                read.set_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG, True)
+                read.set_tag(constants.COULD_CORRECT_BARCODE_TAG, True)
 
                 print(f"Old BC: {old_bc}")
                 print(f"New BC: {new_bc}")
@@ -679,20 +674,16 @@ def _correct_barcode_fn(
                 else:
                     correction_performed = new_bc != old_bc
                 read.set_tag(
-                    longbow.utils.constants.BARCODE_CORRECTION_PERFORMED,
+                    constants.BARCODE_CORRECTION_PERFORMED,
                     correction_performed,
                 )
 
-                read.set_tag(
-                    longbow.utils.constants.READ_ADJUSTED_BARCODE_START, offset
-                )
+                read.set_tag(constants.READ_ADJUSTED_BARCODE_START, offset)
 
                 num_corrected_segments += 1
             else:
-                read.set_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG, False)
-                read.set_tag(
-                    longbow.utils.constants.BARCODE_CORRECTION_PERFORMED, False
-                )
+                read.set_tag(constants.COULD_CORRECT_BARCODE_TAG, False)
+                read.set_tag(constants.BARCODE_CORRECTION_PERFORMED, False)
 
                 if (
                     result_status
@@ -713,8 +704,8 @@ def _correct_barcode_fn(
                         f"Unknown SymSpellMatchResultType ({result_status})!  This should never happen!"
                     )
         else:
-            read.set_tag(longbow.utils.constants.COULD_CORRECT_BARCODE_TAG, False)
-            read.set_tag(longbow.utils.constants.BARCODE_CORRECTION_PERFORMED, False)
+            read.set_tag(constants.COULD_CORRECT_BARCODE_TAG, False)
+            read.set_tag(constants.BARCODE_CORRECTION_PERFORMED, False)
             # NOTE: using the enum.value field here because of the TYPE of the barcode tag.
             read.set_tag(corrected_tag, BarcodeResolutionFailure.NO_RAW_BARCODE.value)
 

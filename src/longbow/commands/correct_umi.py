@@ -11,10 +11,7 @@ import pysam
 from polyleven import levenshtein
 from tqdm import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils
-from ..utils.constants import FFORMAT
+from ..utils import bam_utils, cli_utils, constants
 
 logger = logging.getLogger(__name__)
 
@@ -397,12 +394,12 @@ def main(
     logger.info(f"Total Number of reads: {total_reads}")
 
     count_str, pct_str = cli_utils.get_field_count_and_percent_string(
-        num_corrected, total_reads, FFORMAT
+        num_corrected, total_reads, constants.FFORMAT
     )
     logger.info(f"Number of reads with corrected UMIs: {count_str} {pct_str}")
 
     count_str, pct_str = cli_utils.get_field_count_and_percent_string(
-        num_rejected, total_reads, FFORMAT
+        num_rejected, total_reads, constants.FFORMAT
     )
     logger.info(f"Number of reads with uncorrectable UMIs: {count_str} {pct_str}")
 
@@ -415,18 +412,16 @@ def get_read_type(read):
 
 
 def get_read_locus(read, eq_class_tag):
-    return read.get_tag(
-        longbow.utils.constants.READ_BARCODE_CORRECTED_TAG
-    ), read.get_tag(eq_class_tag)
+    return read.get_tag(constants.READ_BARCODE_CORRECTED_TAG), read.get_tag(
+        eq_class_tag
+    )
 
 
 def get_read_seq(read, pre_extracted):
     if pre_extracted:
         return read.query_sequence.upper()
     else:
-        seg = bam_utils.SegmentInfo.from_tag(
-            read.get_tag(longbow.utils.constants.SEGMENTS_TAG)
-        )
+        seg = bam_utils.SegmentInfo.from_tag(read.get_tag(constants.SEGMENTS_TAG))
         return read.query_sequence.upper()[seg.start : seg.end + 1]
 
 
@@ -453,7 +448,7 @@ def valid_tags(read, umi_tag, eq_class_tag):
     # checks for the presence of required tags
     return (
         read.has_tag(READ_QUALITY_TAG)
-        and read.has_tag(longbow.utils.constants.READ_BARCODE_CORRECTED_TAG)
+        and read.has_tag(constants.READ_BARCODE_CORRECTED_TAG)
         and read.has_tag(umi_tag)
         and read.has_tag(eq_class_tag)
     )

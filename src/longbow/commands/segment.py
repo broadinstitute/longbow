@@ -11,9 +11,7 @@ import numpy as np
 import pysam
 import tqdm
 
-import longbow.utils.constants
-
-from ..utils import bam_utils, cli_utils
+from ..utils import bam_utils, cli_utils, constants
 from ..utils.bam_utils import SegmentInfo, get_segments
 
 logger = logging.getLogger(__name__)
@@ -31,7 +29,7 @@ PROG_NAME = "segment"
     default=False,
     help=f"Create a barcode confidence score file based on the barcodes in the given model.  "
     f"This only applies for models that have annotation_segments where one such segment "
-    f"is annotated into the raw barcode field ({longbow.utils.constants.READ_RAW_BARCODE_TAG})",
+    f"is annotated into the raw barcode field ({constants.READ_RAW_BARCODE_TAG})",
 )
 @cli_utils.model
 @click.option(
@@ -222,11 +220,9 @@ def _sub_process_write_fn(
     if create_barcode_conf_file:
         if model.has_cell_barcode_annotation:
             logger.info(
-                f"Creating barcode confidence file: {longbow.utils.constants.BARCODE_CONF_FILE_NAME}"
+                f"Creating barcode confidence file: {constants.BARCODE_CONF_FILE_NAME}"
             )
-            barcode_conf_file = open(
-                longbow.utils.constants.BARCODE_CONF_FILE_NAME, "w"
-            )
+            barcode_conf_file = open(constants.BARCODE_CONF_FILE_NAME, "w")
         else:
             logger.warning(
                 "Model does not have a barcode output, but barcode creation flag was given.  "
@@ -597,11 +593,11 @@ def _write_split_array_element(
 
     # Write our barcode confidence to the file if we have to:
     if barcode_conf_file is not None and a.has_tag(
-        longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG
+        constants.READ_BARCODE_CONF_FACTOR_TAG
     ):
         barcode_conf_file.write(
-            f"{a.get_tag(longbow.utils.constants.READ_RAW_BARCODE_TAG)}\t"
-            f"{a.get_tag(longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG)}\n"
+            f"{a.get_tag(constants.READ_RAW_BARCODE_TAG)}\t"
+            f"{a.get_tag(constants.READ_BARCODE_CONF_FACTOR_TAG)}\n"
         )
 
     if ignore_cbc_and_umi:
@@ -651,7 +647,7 @@ def create_simple_split_array_element(
         movie_name, read.get_tag("zm"), split_read_index
     )
     a.set_tag(
-        longbow.utils.constants.READ_ALTERED_NAME_TAG,
+        constants.READ_ALTERED_NAME_TAG,
         f"{read.query_name}/{start_coord}_{end_coord}/{prev_delim_name}-{delim_name}",
     )
 
@@ -664,9 +660,9 @@ def create_simple_split_array_element(
 
     # Create an array for our segment quality scores so we can index them below:
     read_seg_quals = (
-        read.get_tag(longbow.utils.constants.SEGMENTS_QUAL_TAG)
+        read.get_tag(constants.SEGMENTS_QUAL_TAG)
         .strip()
-        .split(longbow.utils.constants.SEGMENT_TAG_DELIMITER)
+        .split(constants.SEGMENT_TAG_DELIMITER)
     )
 
     for i, (r, c) in enumerate(zip(segment_ranges, segment_cigars)):
@@ -685,35 +681,31 @@ def create_simple_split_array_element(
 
     # Set our segments tag to only include the segments in this read:
     a.set_tag(
-        longbow.utils.constants.SEGMENTS_TAG,
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(
-            ([s.to_tag() for s in out_segment_ranges])
-        ),
+        constants.SEGMENTS_TAG,
+        constants.SEGMENT_TAG_DELIMITER.join(s.to_tag() for s in out_segment_ranges),
     )
 
     a.set_tag(
-        longbow.utils.constants.SEGMENTS_CIGAR_TAG,
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_segment_cigars),
+        constants.SEGMENTS_CIGAR_TAG,
+        constants.SEGMENT_TAG_DELIMITER.join(out_segment_cigars),
     )
 
     # Set our segment quality score tag to only include the segments in this read:
     a.set_tag(
-        longbow.utils.constants.SEGMENTS_QUAL_TAG,
-        longbow.utils.constants.SEGMENT_TAG_DELIMITER.join(out_seg_model_quals),
+        constants.SEGMENTS_QUAL_TAG,
+        constants.SEGMENT_TAG_DELIMITER.join(out_seg_model_quals),
     )
 
     # Store tags where we'll record a refined tag instead of extracting query subsequence
     ba_tags = {}
-    if a.has_tag(longbow.utils.constants.READ_INDEX_ARRAY_TAG):
-        for index_tag in a.get_tag(longbow.utils.constants.READ_INDEX_ARRAY_TAG).split(
-            ","
-        ):
+    if a.has_tag(constants.READ_INDEX_ARRAY_TAG):
+        for index_tag in a.get_tag(constants.READ_INDEX_ARRAY_TAG).split(","):
             tag, tag_start, tag_stop, bc = re.split("[:-]", index_tag)
             tag_start = int(tag_start) - start_coord
             tag_stop = int(tag_stop) - start_coord
             ba_tags[f"{tag}:{tag_start}-{tag_stop}"] = bc
 
-        a.set_tag(longbow.utils.constants.READ_INDEX_ARRAY_TAG, None)
+        a.set_tag(constants.READ_INDEX_ARRAY_TAG, None)
 
     # Annotate any segments in this array element that we have to:
     clipped_tags = set()
@@ -733,7 +725,7 @@ def create_simple_split_array_element(
 
             # Next check if the annotation is our READ_RAW_BARCODE_TAG.
             # If so, we should annotate the confidence score as well:
-            if field_tag_name == longbow.utils.constants.READ_RAW_BARCODE_TAG:
+            if field_tag_name == constants.READ_RAW_BARCODE_TAG:
                 # Get the length from the model:
                 # barcode_length = list(model.adapter_dict[s.name].values())[0]
                 qual_bases = a.query_qualities[s.start : s.end + 1]
@@ -741,24 +733,19 @@ def create_simple_split_array_element(
                     np.round(bam_utils.get_confidence_factor_raw_quals(qual_bases))
                 )
 
-                a.set_tag(
-                    longbow.utils.constants.READ_BARCODE_CONF_FACTOR_TAG, conf_factor
-                )
+                a.set_tag(constants.READ_BARCODE_CONF_FACTOR_TAG, conf_factor)
 
     # Set IsoSeq3-compatible tags:
+    a.set_tag(constants.READ_CLIPPED_SEQS_LIST_TAG, ",".join(sorted(clipped_tags)))
+    a.set_tag(constants.READ_NUM_CONSENSUS_PASSES_TAG, 1)
+    a.set_tag(constants.READ_ZMW_NAMES_TAG, read.query_name)
+    a.set_tag(constants.READ_NUM_ZMWS_TAG, 1)
     a.set_tag(
-        longbow.utils.constants.READ_CLIPPED_SEQS_LIST_TAG,
-        ",".join(sorted(clipped_tags)),
-    )
-    a.set_tag(longbow.utils.constants.READ_NUM_CONSENSUS_PASSES_TAG, 1)
-    a.set_tag(longbow.utils.constants.READ_ZMW_NAMES_TAG, read.query_name)
-    a.set_tag(longbow.utils.constants.READ_NUM_ZMWS_TAG, 1)
-    a.set_tag(
-        longbow.utils.constants.READ_TAGS_ORDER_TAG,
-        f"{longbow.utils.constants.READ_RAW_BARCODE_TAG}-{longbow.utils.constants.READ_RAW_UMI_TAG}",
+        constants.READ_TAGS_ORDER_TAG,
+        f"{constants.READ_RAW_BARCODE_TAG}-{constants.READ_RAW_UMI_TAG}",
     )
 
     # Set our tag indicating that this read is now segmented:
-    a.set_tag(longbow.utils.constants.READ_IS_SEGMENTED_TAG, True)
+    a.set_tag(constants.READ_IS_SEGMENTED_TAG, True)
 
     return a
