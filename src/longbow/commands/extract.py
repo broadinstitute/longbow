@@ -195,7 +195,7 @@ def main(
             ):
                 # Get our read segments:
                 try:
-                    seq, segment_ranges, segment_cigars = bam_utils.get_segments(read)
+                    _, segment_ranges, segment_cigars = bam_utils.get_segments(read)
                 except KeyError:
                     logger.error(
                         f"Input bam file does not contain longbow segmented reads!  "
@@ -204,8 +204,9 @@ def main(
                     sys.exit(1)
 
                 # Check if the read is already segmented:
-                if (not read.has_tag(constants.READ_IS_SEGMENTED_TAG)) or (
-                    not read.get_tag(constants.READ_IS_SEGMENTED_TAG)
+                if not (
+                    read.has_tag(constants.READ_IS_SEGMENTED_TAG)
+                    and read.get_tag(constants.READ_IS_SEGMENTED_TAG)
                 ):
                     # The read is not segmented.
                     # We should segment it first and then go through our segments one by one:

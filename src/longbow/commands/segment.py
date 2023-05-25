@@ -248,11 +248,7 @@ def _sub_process_write_fn(
             read = pysam.AlignedSegment.fromstring(read, out_bam_header)
 
             # Obligatory log message:
-            logger.debug(
-                "Segments for read %s: %s",
-                read.query_name,
-                segment_ranges,
-            )
+            logger.debug("Segments for read %s: %s", read.query_name, segment_ranges)
 
             # Write out our segmented reads:
             res["num_segments"] += _write_segmented_read(
