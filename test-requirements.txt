@@ -2,16 +2,3 @@ pytest
 pytest-cov
 pytest-skip-slow
 coverage >= 4.5
-click
-click_log
-tqdm
-ssw
-pysam
-construct
-numpy
-pandas
-git+https://github.com/jonn-smith/pomegranate.git@d80ec9304bba4c42ee3943c887754fd78885cd55#egg=pomegranate
-matplotlib
-polyleven
-ordered-set
-symspellpy

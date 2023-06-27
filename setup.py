@@ -33,7 +33,7 @@ setup(
         "symspellpy"
     ],
     tests_require=["coverage", "pytest"],
-    python_requires=">=3.6, <3.8",
+    python_requires=">3.6, <3.12",
     packages=find_packages("src"),
     package_dir={"": "src"},
     classifiers=[
@@ -42,9 +42,10 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Natural Language :: English",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: Implementation :: CPython",
     ],
     entry_points={"console_scripts": ["longbow=longbow.__main__:main_entry"]},
