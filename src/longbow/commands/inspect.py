@@ -122,6 +122,18 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
 
     logger.info("Invoked via: longbow %s", " ".join(sys.argv[1:]))
 
+    read_name_set = set()
+    for read_name in read_names:
+        if os.path.isfile(read_name):
+            logger.info(f"Loading read names from {read_name}")
+            with open(read_name) as fh:
+                read_name_set.update(line.strip() for line in fh)
+        else:
+            read_name_set.add(read_name)
+
+    # overwrite read_names with the actual list of names
+    read_names = sorted(read_name_set)
+
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
@@ -143,14 +155,15 @@ def main(read_names, pbi, file_format, outdir, model, seg_score, max_length, min
             logger.warning("Seg score selected, but not using quick mode.  Ignoring --seg-score.")
 
         # If we have read names, we should use them to inspect the file:
-        if len(read_names) > 0:
+        if len(read_name_set) > 0:
+            logger.info(f"Looking for {len(read_name_set)} read names")
 
             pbi = f"{input_bam}.pbi" if pbi is None else pbi
             if not os.path.exists(pbi):
                 # raise FileNotFoundError(f"Missing .pbi file for {input_bam}")
                 logger.info("No .pbi file available. Inspecting whole input bam file until we find specified reads.")
                 for read in bam_file:
-                    if read.query_name in read_names:
+                    if read.query_name in read_name_set:
                         __create_read_figure(file_format, lb_model, outdir, read, seg_score, max_length, min_rq, quick, anns, name_map)
             else:
                 file_offsets = load_read_offsets(pbi, load_read_names(read_names))
